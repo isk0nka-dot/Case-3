@@ -612,6 +612,93 @@ export interface AppealDetail {
 }
 
 // ---------------------------------------------------------------------------
+// Secondary Camera (Mobile) Orchestration Types
+// ---------------------------------------------------------------------------
+
+export type SidecamPolicy = 'mandatory' | 'optional' | 'disabled'
+
+export type SidecamPairingState = 'pending' | 'connected' | 'calibrating' | 'ready' | 'disconnected' | 'failed'
+
+export interface SidecamCalibrationStatus {
+  passed: boolean
+  viewAngle: number
+  handsVisible: boolean
+  keyboardVisible: boolean
+  screenEdge: boolean
+  message: string
+  attemptCount: number
+  calibratedAt?: string
+}
+
+export interface SidecamMobileDevice {
+  deviceModel: string
+  osVersion: string
+  batteryLevel: number
+  isCharging: boolean
+  thermalState: 'nominal' | 'fair' | 'serious' | 'critical'
+  fpsCurrent: number
+  fpsTarget: number
+  accelX: number
+  accelY: number
+  accelZ: number
+  gyroMagnitude: number
+}
+
+export interface SidecamStreamHealth {
+  connected: boolean
+  lastHeartbeat: string
+  latencyMs: number
+  frameRate: number
+  droppedFrames: number
+  uptimeSec: number
+  quality: 'excellent' | 'good' | 'degraded' | 'critical'
+}
+
+export interface SidecamPairingSession {
+  sessionId: string
+  studentId: string
+  examId: string
+  orgId: string
+  policy: SidecamPolicy
+  state: SidecamPairingState
+  pairingToken: string
+  pairingCode: string
+  createdAt: string
+  expiresAt: string
+  connectedAt?: string
+  deviceInfo?: SidecamMobileDevice
+  calibration: SidecamCalibrationStatus
+  health: SidecamStreamHealth
+  handsOnDesk: boolean
+  displacementAlert: boolean
+}
+
+export interface SidecamQRPayload {
+  sid: string
+  tok: string
+  url: string
+  exp: number
+}
+
+export interface SidecamDeviceDirective {
+  targetFps: number
+  pauseSession: boolean
+  alerts: Array<{
+    type: string
+    severity: 'warning' | 'critical'
+    message: string
+  }>
+}
+
+export interface SidecamCalibrationFrame {
+  estimatedAngle: number
+  handsDetected: boolean
+  keyboardDetected: boolean
+  screenEdgeDetected: boolean
+  frameQuality: number
+}
+
+// ---------------------------------------------------------------------------
 // API Client
 // ---------------------------------------------------------------------------
 
@@ -1232,6 +1319,66 @@ export function useAdminAPI() {
     return request<ForensicVerifyResult>('POST', '/api/v1/forensic/verify', { sessionId, reportHash })
   }
 
+  // ── Secondary Camera (Mobile Orchestration) ───────────────────────────
+
+  async function initiateSidecamPairing(data: {
+    sessionId: string
+    studentId: string
+    examId: string
+    orgId: string
+    policy: SidecamPolicy
+  }): Promise<{
+    session: SidecamPairingSession
+    qrData: string
+    payload: SidecamQRPayload
+  }> {
+    return request('POST', '/api/v1/sidecam/pair/initiate', data)
+  }
+
+  async function completeSidecamPairing(data: {
+    sessionId: string
+    pairingToken: string
+    device: SidecamMobileDevice
+  }): Promise<{ status: string; session: SidecamPairingSession }> {
+    return request('POST', '/api/v1/sidecam/pair/complete', data)
+  }
+
+  async function validateSidecamStart(sessionId: string, policy: SidecamPolicy): Promise<{
+    allowed: boolean
+    reason?: string
+  }> {
+    return request('POST', '/api/v1/sidecam/validate-start', { sessionId, policy })
+  }
+
+  async function submitSidecamCalibration(sessionId: string, frame: SidecamCalibrationFrame): Promise<SidecamCalibrationStatus> {
+    return request('POST', '/api/v1/sidecam/calibrate', { sessionId, frame })
+  }
+
+  async function sendSidecamTelemetry(sessionId: string, device: SidecamMobileDevice): Promise<SidecamDeviceDirective> {
+    return request('POST', '/api/v1/sidecam/telemetry', { sessionId, device })
+  }
+
+  async function sendSidecamHeartbeat(sessionId: string, frameRate: number, droppedFrames: number): Promise<SidecamStreamHealth> {
+    return request('POST', '/api/v1/sidecam/heartbeat', {
+      sessionId,
+      clientTs: new Date().toISOString(),
+      frameRate,
+      droppedFrames,
+    })
+  }
+
+  async function sendSidecamHandsDetection(sessionId: string, handsVisible: boolean): Promise<{ status: string }> {
+    return request('POST', '/api/v1/sidecam/hands', { sessionId, handsVisible })
+  }
+
+  async function getSidecamSession(sessionId: string): Promise<SidecamPairingSession> {
+    return request<SidecamPairingSession>('GET', `/api/v1/sidecam/session/${sessionId}`)
+  }
+
+  async function cleanupSidecamSession(sessionId: string): Promise<{ status: string }> {
+    return request<{ status: string }>('DELETE', `/api/v1/sidecam/session/${sessionId}`)
+  }
+
   // ── Media (WebRTC / LiveKit) ────────────────────────────────────────────
 
   async function getMediaToken(sessionId: string, role: 'student' | 'proctor' = 'proctor'): Promise<{ token: string; wsUrl: string; room: string }> {
@@ -1335,6 +1482,17 @@ export function useAdminAPI() {
     getForensicHeatmapUrl,
     getForensicVoice,
     verifyForensicReport,
+
+    // Secondary Camera (Mobile Orchestration)
+    initiateSidecamPairing,
+    completeSidecamPairing,
+    validateSidecamStart,
+    submitSidecamCalibration,
+    sendSidecamTelemetry,
+    sendSidecamHeartbeat,
+    sendSidecamHandsDetection,
+    getSidecamSession,
+    cleanupSidecamSession,
 
     // Media (WebRTC / LiveKit)
     getMediaToken,

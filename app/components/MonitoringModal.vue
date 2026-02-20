@@ -187,6 +187,18 @@ function cancelTerminate() {
   showTerminateConfirm.value = false
 }
 
+// --- Secondary Camera Policy ---
+// Derive policy from the exam settings in the dashboard store.
+// If the current exam requires side camera → 'mandatory', else 'optional'.
+const sidecamPolicy = computed<'mandatory' | 'optional' | 'disabled'>(() => {
+  if (!props.session) return 'disabled'
+  const exam = store.selectedExam
+  // If we have exam-level settings indicating mandatory side camera
+  // In production this would come from the exam config via API
+  // For now, 'optional' allows the SecondaryCamSetup to offer pairing
+  return 'optional'
+})
+
 // --- Camera swap ---
 const camerasSwapped = ref(false)
 
@@ -450,7 +462,15 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                     :style="{ background: 'var(--argus-bg-deep)', borderColor: 'var(--argus-border)' }"
                   >
                     <div class="absolute inset-0 flex items-center justify-center">
-                      <div class="flex flex-col items-center gap-2 opacity-25">
+                      <SecondaryCamSetup
+                        v-if="session && sidecamPolicy !== 'disabled'"
+                        :session-id="session.id"
+                        :student-id="session.iin"
+                        :exam-id="session.examId"
+                        :org-id="session.orgId"
+                        :policy="sidecamPolicy"
+                      />
+                      <div v-else class="flex flex-col items-center gap-2 opacity-25">
                         <UIcon name="i-lucide-camera" class="size-8" style="color: var(--argus-text-dimmed);" />
                         <span class="text-[9px] font-medium text-center px-2" style="color: var(--argus-text-dimmed);">{{ camerasSwapped ? 'ВЕБ-КАМЕРА' : 'БОКОВАЯ КАМЕРА' }}</span>
                       </div>
