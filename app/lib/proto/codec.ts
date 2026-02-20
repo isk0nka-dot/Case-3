@@ -141,6 +141,14 @@ function encodePayload(payload: EventPayload): Record<string, unknown> {
       return { network: keysToSnakeCase(payload.data as unknown as Record<string, unknown>) }
     case 'kernel':
       return { kernel: keysToSnakeCase(payload.data as unknown as Record<string, unknown>) }
+    case 'headPose':
+      return { head_pose: keysToSnakeCase(payload.data as unknown as Record<string, unknown>) }
+    case 'liveness':
+      return { liveness: keysToSnakeCase(payload.data as unknown as Record<string, unknown>) }
+    case 'audioAnalysis':
+      return { audio_analysis: keysToSnakeCase(payload.data as unknown as Record<string, unknown>) }
+    case 'faceEmbedding':
+      return { face_embedding: keysToSnakeCase(payload.data as unknown as Record<string, unknown>) }
     default:
       return {}
   }

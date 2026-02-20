@@ -41,6 +41,11 @@ export enum EventType {
   MULTIPLE_PERSONS = 5,
   DYNAMIC_FACE_RECHECK_FAIL = 6,
 
+  // AI Vision events (7-9)
+  HEAD_POSE_ANOMALY = 7,
+  LIVENESS_CHECK_FAILED = 8,
+  FACE_OCCLUDED = 9,
+
   // Object detection events (10-13)
   PHONE_DETECTED = 10,
   BOOK_DETECTED = 11,
@@ -52,6 +57,11 @@ export enum EventType {
   AUDIO_ANOMALY = 21,
   AUDIO_PERIPHERY_DETECTED = 22,
   SMART_NOISE_CLASSIFIED = 23,
+
+  // AI Audio events (24-26)
+  WHISPER_DETECTED = 24,
+  SECOND_SPEAKER_DETECTED = 25,
+  AUDIO_PLAYBACK_DETECTED = 26,
 
   // Browser events (30-35)
   TAB_SWITCH = 30,
@@ -87,7 +97,12 @@ export enum EventType {
   GAZE_TELEMETRY = 100,
   MOUSE_TELEMETRY = 101,
   KEYBOARD_TELEMETRY = 102,
-  FOCUS_SCORE_UPDATE = 103
+  FOCUS_SCORE_UPDATE = 103,
+
+  // AI Telemetry (continuous inference streams: 104-106)
+  HEAD_POSE_TELEMETRY = 104,
+  FACE_EMBEDDING_TELEMETRY = 105,
+  AUDIO_LEVEL_TELEMETRY = 106
 }
 
 /** Severity classification for triage and alerting. */
@@ -129,6 +144,9 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   [EventType.FACE_SPOOF_DETECTED]: 'Подмена лица',
   [EventType.MULTIPLE_PERSONS]: 'Несколько человек',
   [EventType.DYNAMIC_FACE_RECHECK_FAIL]: 'Повторная проверка не пройдена',
+  [EventType.HEAD_POSE_ANOMALY]: 'Аномалия положения головы',
+  [EventType.LIVENESS_CHECK_FAILED]: 'Проверка живости не пройдена',
+  [EventType.FACE_OCCLUDED]: 'Лицо частично закрыто',
   [EventType.PHONE_DETECTED]: 'Обнаружен телефон',
   [EventType.BOOK_DETECTED]: 'Обнаружена книга',
   [EventType.EARBUDS_DETECTED]: 'Обнаружены наушники',
@@ -137,6 +155,9 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   [EventType.AUDIO_ANOMALY]: 'Аудио аномалия',
   [EventType.AUDIO_PERIPHERY_DETECTED]: 'Аудио периферия',
   [EventType.SMART_NOISE_CLASSIFIED]: 'Классификация шума',
+  [EventType.WHISPER_DETECTED]: 'Обнаружен шёпот',
+  [EventType.SECOND_SPEAKER_DETECTED]: 'Обнаружен второй голос',
+  [EventType.AUDIO_PLAYBACK_DETECTED]: 'Воспроизведение аудио',
   [EventType.TAB_SWITCH]: 'Переключение вкладок',
   [EventType.COPY_PASTE_ATTEMPT]: 'Попытка копирования',
   [EventType.PRINT_SCREEN_ATTEMPT]: 'Попытка скриншота',
@@ -159,7 +180,10 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   [EventType.GAZE_TELEMETRY]: 'Телеметрия взгляда',
   [EventType.MOUSE_TELEMETRY]: 'Телеметрия мыши',
   [EventType.KEYBOARD_TELEMETRY]: 'Телеметрия клавиатуры',
-  [EventType.FOCUS_SCORE_UPDATE]: 'Обновление фокуса'
+  [EventType.FOCUS_SCORE_UPDATE]: 'Обновление фокуса',
+  [EventType.HEAD_POSE_TELEMETRY]: 'Телеметрия положения головы',
+  [EventType.FACE_EMBEDDING_TELEMETRY]: 'Телеметрия биометрии лица',
+  [EventType.AUDIO_LEVEL_TELEMETRY]: 'Телеметрия аудио уровня'
 }
 
 /** Human-readable severity labels. */
@@ -274,6 +298,63 @@ export interface KernelPayload {
   virtualMonitor: boolean
 }
 
+// ---------------------------------------------------------------------------
+// AI Vision Payload Types
+// ---------------------------------------------------------------------------
+
+/** Head pose estimation from 3D face landmark regression. */
+export interface HeadPosePayload {
+  yaw: number        // degrees, negative=left, positive=right
+  pitch: number      // degrees, negative=down, positive=up
+  roll: number       // degrees, negative=tilt left, positive=tilt right
+  faceX: number      // bbox normalized 0-1
+  faceY: number
+  faceW: number
+  faceH: number
+  ipdPx: number      // inter-pupillary distance in pixels
+  landmarkCount: number
+  inferenceMs: number
+}
+
+/** Multi-factor liveness verification result. */
+export interface LivenessPayload {
+  livenessScore: number       // 0=spoof, 1=real
+  blinkDetected: boolean
+  blinkRatePerMin: number
+  textureScore: number        // detects photos/screen replays
+  depthScore: number          // detects flat surfaces
+  spoofVector: string         // "photo", "screen_replay", "mask", "deepfake", "none"
+  frameQuality: number        // 0-1
+}
+
+/** 512-dim face embedding for continuous identity verification. */
+export interface FaceEmbeddingPayload {
+  embedding: number[]         // 512-dimensional vector
+  similarity: number          // cosine similarity to enrolled reference
+  identityMatch: boolean      // >0.65 threshold
+  modelVersion: string
+  alignmentQuality: number    // 0-1
+}
+
+// ---------------------------------------------------------------------------
+// AI Audio Payload Types
+// ---------------------------------------------------------------------------
+
+/** Audio analysis — SAD + anomaly classification. All processing is local. */
+export interface AudioAnalysisPayload {
+  rmsDb: number                     // A-weighted RMS dB
+  vadActive: boolean                // Voice Activity Detection
+  vadConfidence: number             // 0-1
+  spectralCentroidHz: number        // frequency centroid
+  zcr: number                       // zero-crossing rate
+  classification: string            // "silence"|"speech"|"whisper"|"music"|"keyboard"|"ambient"
+  classificationConfidence: number  // 0-1
+  speakerCount: number
+  speakerMatch: boolean             // matches enrolled voiceprint
+  speakerSimilarity: number         // cosine similarity to reference
+  segmentDurationMs: number
+}
+
 /** Union type for all event payloads. */
 export type EventPayload =
   | { type: 'gazeDeviation'; data: GazeDeviationPayload }
@@ -285,6 +366,10 @@ export type EventPayload =
   | { type: 'psychometry'; data: PsychometryPayload }
   | { type: 'network'; data: NetworkPayload }
   | { type: 'kernel'; data: KernelPayload }
+  | { type: 'headPose'; data: HeadPosePayload }
+  | { type: 'liveness'; data: LivenessPayload }
+  | { type: 'faceEmbedding'; data: FaceEmbeddingPayload }
+  | { type: 'audioAnalysis'; data: AudioAnalysisPayload }
 
 // ---------------------------------------------------------------------------
 // Client Metadata
@@ -392,7 +477,9 @@ export const CRITICAL_EVENT_TYPES: ReadonlySet<EventType> = new Set([
   EventType.PHONE_DETECTED,
   EventType.REMOTE_ACCESS_DETECTED,
   EventType.VIRTUAL_MACHINE_DETECTED,
-  EventType.VPN_PROXY_DETECTED
+  EventType.VPN_PROXY_DETECTED,
+  EventType.LIVENESS_CHECK_FAILED,
+  EventType.SECOND_SPEAKER_DETECTED
 ])
 
 /** High-frequency telemetry events — batched, not individually displayed. */
@@ -400,7 +487,10 @@ export const TELEMETRY_EVENT_TYPES: ReadonlySet<EventType> = new Set([
   EventType.GAZE_TELEMETRY,
   EventType.MOUSE_TELEMETRY,
   EventType.KEYBOARD_TELEMETRY,
-  EventType.FOCUS_SCORE_UPDATE
+  EventType.FOCUS_SCORE_UPDATE,
+  EventType.HEAD_POSE_TELEMETRY,
+  EventType.FACE_EMBEDDING_TELEMETRY,
+  EventType.AUDIO_LEVEL_TELEMETRY
 ])
 
 /** Check if an event type is a telemetry event (high-frequency, low-severity). */
@@ -416,13 +506,13 @@ export function isCriticalEvent(eventType: EventType): boolean {
 /** Get the event category string for grouping. */
 export function getEventCategory(eventType: EventType): string {
   const val = eventType as number
-  if (val >= 1 && val <= 6) return 'video'
+  if (val >= 1 && val <= 9) return 'video'
   if (val >= 10 && val <= 13) return 'object'
-  if (val >= 20 && val <= 23) return 'audio'
+  if (val >= 20 && val <= 26) return 'audio'
   if (val >= 30 && val <= 35) return 'browser'
   if (val >= 40 && val <= 41) return 'network'
   if (val >= 50 && val <= 52) return 'psychometry'
   if (val >= 60 && val <= 67) return 'kernel'
-  if (val >= 100 && val <= 103) return 'telemetry'
+  if (val >= 100 && val <= 106) return 'telemetry'
   return 'unknown'
 }

@@ -172,10 +172,23 @@ export function eventIcon(type: string): string {
     case 'gaze_deviation': return 'i-lucide-eye-off'
     case 'gaze_telemetry': return 'i-lucide-eye'
     case 'face_mismatch': return 'i-lucide-user-x'
+    case 'face_not_detected': return 'i-lucide-user-x'
+    case 'face_spoof_detected': return 'i-lucide-shield-alert'
     case 'tab_switch': return 'i-lucide-app-window'
     case 'audio_anomaly': return 'i-lucide-mic-off'
     case 'earbuds_detected': return 'i-lucide-headphones'
     case 'multiple_persons': return 'i-lucide-users'
+    // AI Vision events
+    case 'head_pose_anomaly': return 'i-lucide-rotate-3d'
+    case 'head_pose_telemetry': return 'i-lucide-rotate-3d'
+    case 'liveness_check_failed': return 'i-lucide-scan-face'
+    case 'face_occluded': return 'i-lucide-eye-off'
+    case 'face_embedding_telemetry': return 'i-lucide-fingerprint'
+    // AI Audio events
+    case 'whisper_detected': return 'i-lucide-ear'
+    case 'second_speaker_detected': return 'i-lucide-users'
+    case 'audio_playback_detected': return 'i-lucide-volume-2'
+    case 'audio_level_telemetry': return 'i-lucide-activity'
     // Behavioral Analysis (Kernel-Level)
     case 'typing_dynamics': return 'i-lucide-keyboard'
     case 'typing_anomaly': return 'i-lucide-keyboard'
@@ -192,7 +205,11 @@ export function isBehavioralEvent(type: string): boolean {
 }
 
 export function isAudioEvent(type: string): boolean {
-  return type === 'audio_anomaly' || type === 'background_voices' || type === 'whispering'
+  return ['audio_anomaly', 'background_voices', 'whispering', 'whisper_detected', 'second_speaker_detected', 'audio_playback_detected', 'audio_level_telemetry', 'voice_activity', 'smart_noise_classified'].includes(type)
+}
+
+export function isVisionAIEvent(type: string): boolean {
+  return ['head_pose_anomaly', 'liveness_check_failed', 'face_occluded', 'head_pose_telemetry', 'face_embedding_telemetry'].includes(type)
 }
 
 // ---------------------------------------------------------------------------
@@ -323,6 +340,7 @@ export function useStatusHelpers() {
     eventIcon,
     isBehavioralEvent,
     isAudioEvent,
+    isVisionAIEvent,
 
     // Source
     sourceLabel,
