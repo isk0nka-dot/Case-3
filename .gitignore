@@ -1,0 +1,68 @@
+# =============================================================================
+# argus-backend — .gitignore (Go 1.24 / gRPC / ClickHouse / Kafka)
+# =============================================================================
+
+# ── Compiled binaries ────────────────────────────────────────────────────────
+bin/
+event-collector
+loadtest
+*.exe
+*.dll
+*.so
+*.dylib
+
+# ── Test artifacts ───────────────────────────────────────────────────────────
+*.test
+coverage.*
+*.out
+coverage.html
+
+# ── Profiling / Debugging ────────────────────────────────────────────────────
+*.prof
+*.pprof
+*.trace
+cpu.prof
+mem.prof
+debug.test
+
+# ── Environment & Secrets (CRITICAL: never commit) ──────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+credentials.json
+service-account*.json
+secrets.yaml
+secrets.yml
+*.secret
+
+# ── Docker build cache ──────────────────────────────────────────────────────
+*.pid
+
+# ── Vendor (if not committing Go vendor dir) ────────────────────────────────
+# vendor/
+
+# ── Editor / IDE ─────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+.fleet/
+*.swp
+*.swo
+*~
+\#*\#
+.#*
+
+# ── Temporary / Generated ───────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+tmp/

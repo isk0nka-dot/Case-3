@@ -1,0 +1,153 @@
+# =============================================================================
+# argus-backend — GitLab CI/CD Pipeline
+# =============================================================================
+#
+# Stages:
+#   1. verify  — lint, vet, test, security scan
+#   2. build   — compile binary + Docker image
+#   3. publish — push image to registry
+#   4. deploy  — trigger argus-infra deployment (via downstream pipeline)
+#
+# Required CI variables (set in GitLab Settings > CI/CD > Variables):
+#   REGISTRY_HOST       Container registry hostname (e.g. registry.argus.ai)
+#   REGISTRY_USER       Registry username
+#   REGISTRY_PASSWORD   Registry password / access token
+#   INFRA_TRIGGER_TOKEN Token for triggering the argus-infra deploy pipeline
+
+image: golang:1.24-alpine
+
+stages:
+  - verify
+  - build
+  - publish
+  - deploy
+
+variables:
+  IMAGE_NAME: argus/backend
+  GO_CACHE: ${CI_PROJECT_DIR}/.go-cache
+
+cache:
+  key: go-${CI_COMMIT_REF_SLUG}
+  paths:
+    - .go-cache/
+
+# ── Stage: verify ─────────────────────────────────────────────────────────────
+
+lint:
+  stage: verify
+  before_script:
+    - apk add --no-cache git make
+    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+  script:
+    - golangci-lint run ./...
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+vet:
+  stage: verify
+  script:
+    - go vet ./...
+
+test:
+  stage: verify
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+      variables:
+        POSTGRES_DB: argus_test
+        POSTGRES_USER: argus
+        POSTGRES_PASSWORD: argus_test
+  variables:
+    EVENT_COLLECTOR_PG_HOST: postgres
+    EVENT_COLLECTOR_PG_DATABASE: argus_test
+    EVENT_COLLECTOR_PG_USERNAME: argus
+    EVENT_COLLECTOR_PG_PASSWORD: argus_test
+    EVENT_COLLECTOR_JWT_SIGNING_KEY: test-jwt-signing-key-32-chars-ok
+    GOFLAGS: "-count=1"
+    GOPATH: "${CI_PROJECT_DIR}/.go-cache"
+  before_script:
+    - apk add --no-cache git
+  script:
+    - go test -race -coverprofile=coverage.out ./...
+    - go tool cover -func=coverage.out | tail -1
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+
+security-scan:
+  stage: verify
+  image: securego/gosec:latest
+  script:
+    - gosec -fmt sarif -out gosec.sarif ./... || true
+  artifacts:
+    reports:
+      sast: gosec.sarif
+  allow_failure: true
+
+# ── Stage: build ──────────────────────────────────────────────────────────────
+
+build-binary:
+  stage: build
+  script:
+    - CGO_ENABLED=0 GOOS=linux GOARCH=amd64
+      go build -trimpath -ldflags="-s -w -X main.version=${CI_COMMIT_TAG:-dev} -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      -o bin/event-collector ./cmd/server
+  artifacts:
+    paths:
+      - bin/event-collector
+    expire_in: 1 hour
+
+build-image:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  script:
+    - docker build
+      --build-arg VERSION=${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}
+      --build-arg BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+      --cache-from ${REGISTRY_HOST}/${IMAGE_NAME}:latest
+      -t ${REGISTRY_HOST}/${IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}
+      -t ${REGISTRY_HOST}/${IMAGE_NAME}:${CI_COMMIT_TAG:-latest}
+      .
+  needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ── Stage: publish ────────────────────────────────────────────────────────────
+
+publish-image:
+  stage: publish
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - echo "${REGISTRY_PASSWORD}" | docker login ${REGISTRY_HOST} -u ${REGISTRY_USER} --password-stdin
+  script:
+    - docker push ${REGISTRY_HOST}/${IMAGE_NAME}:${CI_COMMIT_SHORT_SHA}
+    - docker push ${REGISTRY_HOST}/${IMAGE_NAME}:${CI_COMMIT_TAG:-latest}
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ── Stage: deploy ─────────────────────────────────────────────────────────────
+
+trigger-infra-deploy:
+  stage: deploy
+  trigger:
+    project: argus-ai/argus-infra
+    branch: main
+    strategy: depend
+  variables:
+    BACKEND_TAG: ${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}
+  rules:
+    - if: $CI_COMMIT_TAG

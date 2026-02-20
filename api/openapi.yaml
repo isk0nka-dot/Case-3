@@ -1,0 +1,2682 @@
+openapi: 3.1.0
+
+info:
+  title: Argus AI — Event Collector API
+  version: 2.1.0
+  description: |
+    REST API for the Argus AI proctoring platform.
+
+    ## Authentication
+
+    All endpoints (except `POST /api/v1/auth/login`) require a Bearer JWT in the
+    `Authorization` header:
+
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    Tokens are obtained via the login endpoint and expire after 24 hours.
+
+    ## Rate Limits
+
+    | Scope       | Limit             |
+    |-------------|-------------------|
+    | Global      | 5 000 req/s       |
+    | Per-IP      | 100 req/s         |
+    | Login       | 5 req/s (Nginx)   |
+
+    Rate-limit responses return HTTP 429 with a `Retry-After` header.
+
+  contact:
+    name: Argus AI Engineering
+    url: https://argus.ai
+
+servers:
+  - url: https://api.argus.ai
+    description: Production
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Auth
+    description: Authentication and identity
+  - name: Admin — Organizations
+    description: Organization CRUD (super_admin only)
+  - name: Admin — Users
+    description: User management within an organization
+  - name: Admin — API Keys
+    description: API key management
+  - name: Admin — Stats
+    description: Platform-wide statistics
+  - name: Analytics
+    description: Executive dashboard — aggregated metrics from ClickHouse
+  - name: Monitoring
+    description: Live session monitoring with real-time risk scores
+  - name: Archive
+    description: Historical session review and export
+  - name: Evidence
+    description: Evidence fragment retrieval and presigned download URLs
+  - name: Export
+    description: Bulk async export jobs (TAR.GZ with forensic manifest)
+  - name: Appeals
+    description: Student appeal workflow with state machine transitions
+  - name: Consent
+    description: GDPR-compliant per-session consent recording
+  - name: Integrity
+    description: Forensic integrity verification (S3 ↔ ClickHouse cross-reference)
+  - name: Media
+    description: LiveKit WebRTC token generation for video streaming
+  - name: Ingest
+    description: Chunked binary evidence upload for degraded network conditions
+  - name: Health
+    description: Liveness and readiness probes
+
+# =============================================================================
+# Paths
+# =============================================================================
+
+paths:
+
+  # ── Health ────────────────────────────────────────────────────────────────
+
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: Returns 200 if the process is alive. No dependency checks.
+      operationId: getLiveness
+      security: []
+      responses:
+        '200':
+          description: Alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: Returns 200 only when Kafka and ClickHouse are reachable.
+      operationId: getReadiness
+      security: []
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Not ready — one or more dependencies are unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  # ── Auth ──────────────────────────────────────────────────────────────────
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: |
+        Authenticate with phone + password. Returns a signed JWT valid for 24 hours.
+
+        **Demo credentials (dev/staging)**
+        - Phone: `+7 (999) 000-00-00`
+        - Password: `Admin1234!`
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              phone: "+77001234567"
+              password: "Admin1234!"
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      description: Returns the authenticated user's profile decoded from the JWT.
+      operationId: getMe
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Admin — Organizations ─────────────────────────────────────────────────
+
+  /api/v1/admin/organizations:
+    get:
+      tags: [Admin — Organizations]
+      summary: List organizations
+      description: Returns all organizations. Requires `super_admin` role.
+      operationId: listOrganizations
+      responses:
+        '200':
+          description: Organization list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Organization'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Admin — Organizations]
+      summary: Create organization
+      description: Creates a new organization. Requires `super_admin` role.
+      operationId: createOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+      responses:
+        '201':
+          description: Created organization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/admin/organizations-with-admin:
+    post:
+      tags: [Admin — Organizations]
+      summary: Create organization with initial admin user
+      description: |
+        Atomically creates an organization and its first admin user in a single
+        transaction. Requires `super_admin` role.
+      operationId: createOrganizationWithAdmin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationWithAdminRequest'
+      responses:
+        '201':
+          description: Created organization and admin user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateOrganizationWithAdminResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/admin/organizations/{orgId}:
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+
+    get:
+      tags: [Admin — Organizations]
+      summary: Get organization
+      operationId: getOrganization
+      responses:
+        '200':
+          description: Organization detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Admin — Organizations]
+      summary: Update organization
+      operationId: updateOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+      responses:
+        '200':
+          description: Updated organization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Admin — Organizations]
+      summary: Soft-delete organization
+      description: |
+        Soft-deletes the organization (sets `deleted_at`). The org slug must be
+        confirmed by the caller in the `X-Confirm-Slug` header.
+
+        **Cannot delete the super-admin org** (`orgId = "*"`).
+      operationId: deleteOrganization
+      parameters:
+        - name: X-Confirm-Slug
+          in: header
+          required: true
+          description: Organization slug for confirmation (must match exactly)
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Admin — Users ─────────────────────────────────────────────────────────
+
+  /api/v1/admin/organizations/{orgId}/users:
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+
+    get:
+      tags: [Admin — Users]
+      summary: List users in organization
+      operationId: listUsers
+      responses:
+        '200':
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Admin — Users]
+      summary: Create user in organization
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ── Admin — API Keys ──────────────────────────────────────────────────────
+
+  /api/v1/admin/organizations/{orgId}/keys:
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+
+    get:
+      tags: [Admin — API Keys]
+      summary: List API keys for organization
+      operationId: listAPIKeys
+      responses:
+        '200':
+          description: API key list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/APIKey'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Admin — API Keys]
+      summary: Create API key
+      description: |
+        Creates a new API key. The raw secret is returned **once** in the response
+        and cannot be retrieved again. Store it securely.
+      operationId: createAPIKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAPIKeyRequest'
+      responses:
+        '201':
+          description: Created key (secret shown once)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAPIKeyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/admin/keys/{keyId}:
+    parameters:
+      - name: keyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    delete:
+      tags: [Admin — API Keys]
+      summary: Revoke API key
+      operationId: deleteAPIKey
+      responses:
+        '204':
+          description: Revoked
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Admin — Stats ─────────────────────────────────────────────────────────
+
+  /api/v1/admin/stats:
+    get:
+      tags: [Admin — Stats]
+      summary: Platform statistics
+      description: Returns aggregate counts of organizations, users, and API keys.
+      operationId: getAdminStats
+      responses:
+        '200':
+          description: Platform stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/admin/audit-logs:
+    get:
+      tags: [Admin — Stats]
+      summary: Audit log
+      description: Returns recent admin action audit log entries.
+      operationId: getAuditLogs
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLogEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ── Analytics ─────────────────────────────────────────────────────────────
+
+  /api/v1/analytics/overview:
+    get:
+      tags: [Analytics]
+      summary: Executive overview (all-in-one)
+      description: |
+        Aggregates risk distribution, system health, top violations, top students,
+        and hourly stats into a single response. Powers the Executive Dashboard.
+      operationId: getAnalyticsOverview
+      parameters:
+        - $ref: '#/components/parameters/OrgIdQuery'
+        - $ref: '#/components/parameters/TimeRange'
+      responses:
+        '200':
+          description: Overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsOverview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/analytics/risk-distribution:
+    get:
+      tags: [Analytics]
+      summary: Risk distribution
+      operationId: getRiskDistribution
+      parameters:
+        - $ref: '#/components/parameters/OrgIdQuery'
+        - $ref: '#/components/parameters/TimeRange'
+      responses:
+        '200':
+          description: Risk distribution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDistribution'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/analytics/system-health:
+    get:
+      tags: [Analytics]
+      summary: System health metrics
+      operationId: getSystemHealth
+      responses:
+        '200':
+          description: System health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemHealth'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/analytics/top-violations:
+    get:
+      tags: [Analytics]
+      summary: Top violation types
+      operationId: getTopViolations
+      parameters:
+        - $ref: '#/components/parameters/OrgIdQuery'
+        - $ref: '#/components/parameters/TimeRange'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: Violation list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ViolationEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/analytics/student-risk:
+    get:
+      tags: [Analytics]
+      summary: Top students by risk score
+      operationId: getStudentRisk
+      parameters:
+        - $ref: '#/components/parameters/OrgIdQuery'
+        - $ref: '#/components/parameters/TimeRange'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Student risk entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StudentRiskEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/analytics/hourly-stats:
+    get:
+      tags: [Analytics]
+      summary: Hourly event statistics (last 24 h)
+      operationId: getHourlyStats
+      parameters:
+        - $ref: '#/components/parameters/OrgIdQuery'
+      responses:
+        '200':
+          description: Hourly stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HourlyStatEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/analytics/infrastructure-stats:
+    get:
+      tags: [Analytics]
+      summary: Infrastructure node statistics
+      description: Returns per-service health and metrics for the Infrastructure dashboard.
+      operationId: getInfrastructureStats
+      responses:
+        '200':
+          description: Infrastructure nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InfraNode'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Monitoring ────────────────────────────────────────────────────────────
+
+  /api/v1/monitoring/active-sessions:
+    get:
+      tags: [Monitoring]
+      summary: Active sessions with live risk scores
+      description: |
+        Returns all currently active proctoring sessions with real-time risk scores
+        and recent violation events. Designed for the live monitoring dashboard.
+      operationId: getActiveSessions
+      parameters:
+        - $ref: '#/components/parameters/OrgIdQuery'
+        - name: minRisk
+          in: query
+          description: Filter to sessions with riskScore ≥ this value
+          schema:
+            type: number
+            format: float
+            minimum: 0
+            maximum: 1
+      responses:
+        '200':
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveSessionsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/monitoring/sessions/{sessionId}/warn:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      tags: [Monitoring]
+      summary: Send warning to session
+      description: Sends a real-time warning notification to the student in the session.
+      operationId: warnSession
+      responses:
+        '200':
+          description: Warning sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/monitoring/sessions/{sessionId}/terminate:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      tags: [Monitoring]
+      summary: Terminate session
+      description: |
+        Immediately terminates the proctoring session. The student's exam attempt
+        is flagged and cannot be continued.
+      operationId: terminateSession
+      responses:
+        '200':
+          description: Session terminated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Archive ───────────────────────────────────────────────────────────────
+
+  /api/v1/archive/sessions:
+    get:
+      tags: [Archive]
+      summary: List archived sessions
+      operationId: listArchivedSessions
+      parameters:
+        - $ref: '#/components/parameters/OrgIdQuery'
+        - name: examId
+          in: query
+          schema:
+            type: string
+        - name: studentId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, reviewed, flagged, voided]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 500
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Archived sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchiveSessionsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/archive/sessions/{sessionId}/events:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Archive]
+      summary: Get session event log
+      description: Returns the full event log for a completed session.
+      operationId: getSessionEvents
+      parameters:
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [critical, warning, info]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 1000
+            maximum: 10000
+      responses:
+        '200':
+          description: Session events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchiveSessionEventsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/archive/sessions/{sessionId}/export:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Archive]
+      summary: Export single session as JSON
+      description: Returns session metadata + full event log in a structured JSON envelope.
+      operationId: exportSession
+      responses:
+        '200':
+          description: Session export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportSessionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/archive/sessions/{sessionId}/review:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+
+    post:
+      tags: [Archive]
+      summary: Submit review decision
+      description: |
+        Records a proctor's review decision for a session.
+
+        `decision` values: `confirmed` | `dismissed` | `escalated`
+      operationId: reviewSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewRequest'
+      responses:
+        '200':
+          description: Review recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    get:
+      tags: [Archive]
+      summary: Get review decision for session
+      operationId: getSessionReview
+      responses:
+        '200':
+          description: Review decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/archive/exams:
+    get:
+      tags: [Archive]
+      summary: List exam summaries
+      operationId: listExams
+      parameters:
+        - $ref: '#/components/parameters/OrgIdQuery'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+      responses:
+        '200':
+          description: Exam list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchiveExamsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/archive/review-stats:
+    get:
+      tags: [Archive]
+      summary: Review decision statistics
+      operationId: getReviewStats
+      parameters:
+        - $ref: '#/components/parameters/OrgIdQuery'
+      responses:
+        '200':
+          description: Review stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewStatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Evidence ──────────────────────────────────────────────────────────────
+
+  /api/v1/evidence/sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Evidence]
+      summary: List evidence fragments for session
+      operationId: listEvidenceFragments
+      responses:
+        '200':
+          description: Evidence fragment list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/evidence/fragments/{fragmentId}/url:
+    parameters:
+      - $ref: '#/components/parameters/FragmentId'
+    get:
+      tags: [Evidence]
+      summary: Get presigned download URL
+      description: Returns a time-limited presigned S3 URL (default TTL: 5 minutes).
+      operationId: getEvidencePresignedURL
+      responses:
+        '200':
+          description: Presigned URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignedURLResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/evidence/fragments/{fragmentId}/verify:
+    parameters:
+      - $ref: '#/components/parameters/FragmentId'
+    get:
+      tags: [Evidence]
+      summary: Verify fragment integrity
+      description: Recomputes the SHA-256 hash of the S3 object and compares to the stored hash.
+      operationId: verifyEvidenceFragment
+      responses:
+        '200':
+          description: Integrity check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyIntegrityResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Export ────────────────────────────────────────────────────────────────
+
+  /api/v1/export/bulk:
+    post:
+      tags: [Export]
+      summary: Create bulk export job
+      description: |
+        Initiates an async job to produce a TAR.GZ archive containing evidence
+        fragments and a forensic manifest (SHA-256 chain) for the specified sessions.
+
+        Poll `GET /api/v1/export/{exportId}` for status. When `status = "completed"`,
+        the `downloadUrl` field contains a presigned URL.
+      operationId: createExportJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExportRequest'
+            example:
+              sessionIds:
+                - "sess_abc123"
+                - "sess_def456"
+              presignTtlSec: 3600
+      responses:
+        '202':
+          description: Export job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/export:
+    get:
+      tags: [Export]
+      summary: List export jobs
+      operationId: listExportJobs
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, completed, failed, cancelled]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Export job list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExportJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/export/{exportId}:
+    parameters:
+      - name: exportId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Export]
+      summary: Get export job status
+      operationId: getExportJob
+      responses:
+        '200':
+          description: Export job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Export]
+      summary: Cancel export job
+      description: Cancels a pending or processing export job.
+      operationId: cancelExportJob
+      responses:
+        '204':
+          description: Cancelled
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot cancel a completed or already-cancelled job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── Appeals ───────────────────────────────────────────────────────────────
+
+  /api/v1/appeals:
+    post:
+      tags: [Appeals]
+      summary: Submit appeal
+      description: Student or proctor submits an appeal for a flagged session.
+      operationId: submitAppeal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitAppealRequest'
+      responses:
+        '201':
+          description: Appeal submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appeal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    get:
+      tags: [Appeals]
+      summary: List appeals
+      operationId: listAppeals
+      parameters:
+        - $ref: '#/components/parameters/OrgIdQuery'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+        - name: studentId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Appeal list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Appeal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/appeals/{appealId}:
+    parameters:
+      - name: appealId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Appeals]
+      summary: Get appeal
+      operationId: getAppeal
+      responses:
+        '200':
+          description: Appeal detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appeal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/appeals/{appealId}/review:
+    parameters:
+      - name: appealId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    put:
+      tags: [Appeals]
+      summary: Review appeal
+      description: |
+        Admin reviews an appeal and sets the outcome.
+
+        `status` values: `approved` | `rejected`
+      operationId: reviewAppeal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewAppealRequest'
+      responses:
+        '200':
+          description: Updated appeal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Appeal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Consent ───────────────────────────────────────────────────────────────
+
+  /api/v1/consent:
+    post:
+      tags: [Consent]
+      summary: Record consent
+      description: Records a student's explicit consent (or refusal) before an exam session.
+      operationId: recordConsent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordConsentRequest'
+      responses:
+        '201':
+          description: Consent recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/consent/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Consent]
+      summary: Get consent status for session
+      operationId: getConsent
+      responses:
+        '200':
+          description: Consent record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Integrity ─────────────────────────────────────────────────────────────
+
+  /api/v1/integrity/verify-session:
+    post:
+      tags: [Integrity]
+      summary: Verify session integrity
+      description: |
+        Cross-references all evidence fragments in S3 against the ClickHouse forensic
+        ledger. Returns a per-fragment breakdown of hash mismatches and missing files.
+      operationId: verifySessionIntegrity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId:
+                  type: string
+      responses:
+        '200':
+          description: Integrity verification report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrityReport'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/integrity/verify-fragment:
+    post:
+      tags: [Integrity]
+      summary: Verify single fragment integrity
+      operationId: verifyFragmentIntegrity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fragmentId]
+              properties:
+                fragmentId:
+                  type: string
+      responses:
+        '200':
+          description: Fragment integrity result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyIntegrityResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/integrity/session/{sessionId}/report:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Integrity]
+      summary: Get integrity report for session
+      operationId: getIntegrityReport
+      responses:
+        '200':
+          description: Integrity report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrityReport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Media ─────────────────────────────────────────────────────────────────
+
+  /api/v1/media/token:
+    post:
+      tags: [Media]
+      summary: Get LiveKit WebRTC token
+      description: |
+        Generates a signed LiveKit access token for joining a proctoring room.
+
+        `role` values:
+        - `proctor` — can subscribe to all tracks, publish audio
+        - `student` — can publish camera/microphone/screen, subscribe to nothing
+      operationId: getMediaToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MediaTokenRequest'
+      responses:
+        '200':
+          description: LiveKit token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/media/rooms:
+    get:
+      tags: [Media]
+      summary: List active LiveKit rooms
+      operationId: listMediaRooms
+      parameters:
+        - $ref: '#/components/parameters/OrgIdQuery'
+      responses:
+        '200':
+          description: Room list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    room:
+                      type: string
+                    participantCount:
+                      type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Ingest (Chunked Upload) ───────────────────────────────────────────────
+
+  /api/v1/ingest/chunk:
+    post:
+      tags: [Ingest]
+      summary: Upload evidence chunk
+      description: |
+        Receives a single chunk of a binary evidence fragment (video/audio/screenshot).
+        Used by the browser SDK in Tier B/C (degraded network) mode.
+
+        Chunks are assembled server-side once all `totalChunks` have been received.
+        Each chunk is verified with a per-chunk SHA-256 hash.
+
+        **Multipart fields:**
+        - `fragmentId` — persistent ID across all chunks for this fragment
+        - `chunkIndex` — 0-based index of this chunk
+        - `totalChunks` — total number of chunks for this fragment
+        - `sha256` — SHA-256 of this chunk's binary data
+        - `data` — binary chunk data
+      operationId: uploadChunk
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [fragmentId, chunkIndex, totalChunks, sha256, data]
+              properties:
+                fragmentId:
+                  type: string
+                chunkIndex:
+                  type: integer
+                  minimum: 0
+                totalChunks:
+                  type: integer
+                  minimum: 1
+                sha256:
+                  type: string
+                  description: SHA-256 hex digest of this chunk
+                data:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Chunk received
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChunkUploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/ingest/chunk/{fragmentId}/status:
+    parameters:
+      - $ref: '#/components/parameters/FragmentId'
+    get:
+      tags: [Ingest]
+      summary: Get chunk assembly status
+      operationId: getChunkStatus
+      responses:
+        '200':
+          description: Assembly status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChunkUploadResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# =============================================================================
+# Components
+# =============================================================================
+
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  # ── Parameters ─────────────────────────────────────────────────────────────
+
+  parameters:
+    OrgId:
+      name: orgId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Organization identifier (e.g. `acme-corp` or `*` for super-admin scope)
+
+    OrgIdQuery:
+      name: orgId
+      in: query
+      schema:
+        type: string
+      description: Filter results to a specific organization. Super admins may omit for all orgs.
+
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Proctoring session identifier
+
+    FragmentId:
+      name: fragmentId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Evidence fragment identifier
+
+    TimeRange:
+      name: range
+      in: query
+      schema:
+        type: string
+        enum: [1h, 6h, 24h, 7d, 30d]
+        default: 24h
+      description: Time window for aggregated analytics queries
+
+  # ── Responses ──────────────────────────────────────────────────────────────
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid Bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "unauthorized"
+
+    Forbidden:
+      description: Authenticated but insufficient role/permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "forbidden"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "not found"
+
+    BadRequest:
+      description: Invalid request body or parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "invalid request body"
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "rate limit exceeded"
+
+  # ── Schemas ────────────────────────────────────────────────────────────────
+
+  schemas:
+
+    # ── Common ──────────────────────────────────────────────────────────────
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    ActionResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: string
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, unhealthy]
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+
+    # ── Auth ────────────────────────────────────────────────────────────────
+
+    LoginRequest:
+      type: object
+      required: [phone, password]
+      properties:
+        phone:
+          type: string
+          description: Phone number in E.164 or local format
+          example: "+77001234567"
+        password:
+          type: string
+          minLength: 8
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Signed JWT (HS256). Include as `Authorization: Bearer <token>`.
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orgId:
+          type: string
+          description: Organization ID. `"*"` indicates super_admin scope.
+        phone:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [super_admin, org_admin, proctor, viewer]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ── Organizations ────────────────────────────────────────────────────────
+
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orgId:
+          type: string
+          description: Short human-readable identifier (e.g. `acme-corp`)
+        name:
+          type: string
+        slug:
+          type: string
+        orgType:
+          type: string
+          enum: [university, school, corporate, government, other]
+        contactEmail:
+          type: string
+          format: email
+        contactPhone:
+          type: string
+        city:
+          type: string
+        region:
+          type: string
+        plan:
+          type: string
+          enum: [free, starter, professional, enterprise]
+        maxSessions:
+          type: integer
+        maxEventsRps:
+          type: integer
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateOrganizationRequest:
+      type: object
+      required: [orgId, name, slug]
+      properties:
+        orgId:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        orgType:
+          type: string
+          enum: [university, school, corporate, government, other]
+        contactEmail:
+          type: string
+          format: email
+        contactPhone:
+          type: string
+        city:
+          type: string
+        region:
+          type: string
+        plan:
+          type: string
+          enum: [free, starter, professional, enterprise]
+          default: starter
+        maxSessions:
+          type: integer
+          default: 100
+        maxEventsRps:
+          type: integer
+          default: 1000
+
+    CreateOrganizationWithAdminRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateOrganizationRequest'
+        - type: object
+          required: [adminFullName, adminPhone, adminPassword]
+          properties:
+            adminFullName:
+              type: string
+            adminPhone:
+              type: string
+            adminPassword:
+              type: string
+              minLength: 8
+
+    CreateOrganizationWithAdminResponse:
+      type: object
+      properties:
+        organization:
+          $ref: '#/components/schemas/Organization'
+        admin:
+          $ref: '#/components/schemas/User'
+
+    # ── Users ───────────────────────────────────────────────────────────────
+
+    CreateUserRequest:
+      type: object
+      required: [phone, password, fullName, role]
+      properties:
+        phone:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [org_admin, proctor, viewer]
+
+    # ── API Keys ─────────────────────────────────────────────────────────────
+
+    APIKey:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orgId:
+          type: string
+        name:
+          type: string
+        keyPrefix:
+          type: string
+          description: First 8 chars of the key for identification (full key not stored)
+        permissions:
+          type: array
+          items:
+            type: string
+        environment:
+          type: string
+          enum: [production, staging, development]
+        isActive:
+          type: boolean
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateAPIKeyRequest:
+      type: object
+      required: [name, permissions]
+      properties:
+        name:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+            enum: [events:write, events:read, admin:read, admin:write]
+        environment:
+          type: string
+          enum: [production, staging, development]
+          default: production
+
+    CreateAPIKeyResponse:
+      type: object
+      properties:
+        key:
+          $ref: '#/components/schemas/APIKey'
+        secret:
+          type: string
+          description: |
+            Full API key secret. Shown **once** — store it immediately.
+            Format: `argus_<env>_<random>`
+
+    # ── Admin Stats ──────────────────────────────────────────────────────────
+
+    AdminStats:
+      type: object
+      properties:
+        totalOrganizations:
+          type: integer
+        totalUsers:
+          type: integer
+        totalApiKeys:
+          type: integer
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+        actorName:
+          type: string
+        action:
+          type: string
+        resourceType:
+          type: string
+        resourceId:
+          type: string
+        orgId:
+          type: string
+        ipAddress:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── Analytics ───────────────────────────────────────────────────────────
+
+    RiskDistribution:
+      type: object
+      properties:
+        totalEvents:
+          type: integer
+          format: int64
+        bySeverity:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          example:
+            critical: 1240
+            warning: 8750
+            info: 74330
+        honest:
+          type: number
+          format: float
+          description: Percentage of sessions with no violations
+        suspicious:
+          type: number
+          format: float
+          description: Percentage of sessions with warning-level violations
+        cheaters:
+          type: number
+          format: float
+          description: Percentage of sessions with critical violations
+
+    SystemHealth:
+      type: object
+      properties:
+        totalFlushed:
+          type: integer
+          format: int64
+        totalDropped:
+          type: integer
+          format: int64
+        flushCount:
+          type: integer
+          format: int64
+        flushErrors:
+          type: integer
+          format: int64
+        bufferSize:
+          type: integer
+        overflowSize:
+          type: integer
+        totalEvents:
+          type: integer
+          format: int64
+        uniqueStudents:
+          type: integer
+          format: int64
+        uniqueSessions:
+          type: integer
+          format: int64
+        criticalEvents:
+          type: integer
+          format: int64
+        eventsLast5Min:
+          type: integer
+          format: int64
+        eventsLast1Hour:
+          type: integer
+          format: int64
+
+    ViolationEntry:
+      type: object
+      properties:
+        eventType:
+          type: string
+        severity:
+          type: string
+          enum: [critical, warning, info]
+        count:
+          type: integer
+          format: int64
+
+    StudentRiskEntry:
+      type: object
+      properties:
+        studentId:
+          type: string
+        totalEvents:
+          type: integer
+          format: int64
+        criticalCount:
+          type: integer
+          format: int64
+        warningCount:
+          type: integer
+          format: int64
+
+    HourlyStatEntry:
+      type: object
+      properties:
+        hour:
+          type: string
+          format: date-time
+        eventCount:
+          type: integer
+          format: int64
+        criticalCount:
+          type: integer
+          format: int64
+
+    InfraNode:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [backend, frontend, kafka, clickhouse, postgres, minio, livekit, nginx]
+        status:
+          type: string
+          enum: [healthy, degraded, down, unknown]
+        uptime:
+          type: string
+        cpu:
+          type: number
+          format: float
+          description: CPU usage percentage (0–100)
+        memory:
+          type: number
+          format: float
+          description: Memory usage percentage (0–100)
+        latencyMs:
+          type: number
+          format: float
+        version:
+          type: string
+        region:
+          type: string
+        lastChecked:
+          type: string
+          format: date-time
+
+    AnalyticsOverview:
+      type: object
+      properties:
+        risk:
+          $ref: '#/components/schemas/RiskDistribution'
+        health:
+          $ref: '#/components/schemas/SystemHealth'
+        violations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ViolationEntry'
+        topStudents:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentRiskEntry'
+        hourlyStats:
+          type: array
+          items:
+            $ref: '#/components/schemas/HourlyStatEntry'
+        generatedAt:
+          type: string
+          format: date-time
+
+    # ── Monitoring ──────────────────────────────────────────────────────────
+
+    RecentViolation:
+      type: object
+      properties:
+        eventId:
+          type: string
+        eventType:
+          type: string
+        severity:
+          type: string
+          enum: [critical, warning, info]
+        label:
+          type: string
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        timestamp:
+          type: string
+          format: date-time
+
+    ActiveSession:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        studentId:
+          type: string
+        examId:
+          type: string
+        orgId:
+          type: string
+        totalEvents:
+          type: integer
+          format: int64
+        criticalCount:
+          type: integer
+          format: int64
+        warningCount:
+          type: integer
+          format: int64
+        infoCount:
+          type: integer
+          format: int64
+        riskScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Composite risk score (0 = clean, 1 = definite cheating)
+        violationLevel:
+          type: string
+          enum: [clean, warning, critical]
+        lastEventTime:
+          type: string
+          format: date-time
+        firstEventTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, warned, terminated]
+        recentViolations:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecentViolation'
+
+    ActiveSessionsResponse:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActiveSession'
+        totalActive:
+          type: integer
+        totalCritical:
+          type: integer
+        totalWarning:
+          type: integer
+        totalClean:
+          type: integer
+        avgRiskScore:
+          type: number
+          format: float
+        generatedAt:
+          type: string
+          format: date-time
+
+    # ── Archive ─────────────────────────────────────────────────────────────
+
+    ArchiveSessionItem:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        studentId:
+          type: string
+        examId:
+          type: string
+        orgId:
+          type: string
+        totalEvents:
+          type: integer
+          format: int64
+        criticalCount:
+          type: integer
+          format: int64
+        warningCount:
+          type: integer
+          format: int64
+        infoCount:
+          type: integer
+          format: int64
+        integrityScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        violationCount:
+          type: integer
+          format: int64
+        firstEventTime:
+          type: string
+          format: date-time
+        lastEventTime:
+          type: string
+          format: date-time
+        durationSec:
+          type: integer
+          format: int64
+        duration:
+          type: string
+          description: Human-readable duration (e.g. `1h 23m`)
+        status:
+          type: string
+          enum: [pending, reviewed, flagged, voided]
+
+    ArchiveSessionsResponse:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArchiveSessionItem'
+        total:
+          type: integer
+        totalReviewed:
+          type: integer
+        totalPending:
+          type: integer
+        totalVoided:
+          type: integer
+        generatedAt:
+          type: string
+          format: date-time
+
+    ArchiveEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+        eventType:
+          type: string
+        severity:
+          type: string
+          enum: [critical, warning, info]
+        source:
+          type: string
+        label:
+          type: string
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        timestamp:
+          type: string
+          format: date-time
+        videoTimestamp:
+          type: integer
+          format: int64
+          description: Millisecond offset into the session recording
+
+    ArchiveSessionEventsResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArchiveEvent'
+        totalEvents:
+          type: integer
+        criticalCount:
+          type: integer
+        warningCount:
+          type: integer
+        durationSec:
+          type: integer
+          format: int64
+        integrityScore:
+          type: number
+          format: float
+        generatedAt:
+          type: string
+          format: date-time
+
+    ArchiveExamSummary:
+      type: object
+      properties:
+        examId:
+          type: string
+        orgId:
+          type: string
+        sessionCount:
+          type: integer
+          format: int64
+        totalEvents:
+          type: integer
+          format: int64
+        totalCritical:
+          type: integer
+          format: int64
+        totalWarning:
+          type: integer
+          format: int64
+        avgIntegrity:
+          type: number
+          format: float
+        firstEventTime:
+          type: string
+          format: date-time
+        lastEventTime:
+          type: string
+          format: date-time
+
+    ArchiveExamsResponse:
+      type: object
+      properties:
+        exams:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArchiveExamSummary'
+        total:
+          type: integer
+        generatedAt:
+          type: string
+          format: date-time
+
+    ExportSessionResponse:
+      type: object
+      properties:
+        session:
+          $ref: '#/components/schemas/ArchiveSessionItem'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArchiveEvent'
+        exportedAt:
+          type: string
+          format: date-time
+        exportedBy:
+          type: string
+        format:
+          type: string
+          default: json
+
+    ReviewRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [confirmed, dismissed, escalated]
+        notes:
+          type: string
+        evidenceIds:
+          type: array
+          items:
+            type: string
+        integrityScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+
+    ReviewResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        reviewerId:
+          type: string
+        reviewerName:
+          type: string
+        decision:
+          type: string
+          enum: [confirmed, dismissed, escalated]
+        notes:
+          type: string
+        evidenceIds:
+          type: array
+          items:
+            type: string
+        integrityScore:
+          type: number
+          format: float
+        reviewedAt:
+          type: string
+          format: date-time
+
+    ReviewStatsResponse:
+      type: object
+      properties:
+        confirmed:
+          type: integer
+        dismissed:
+          type: integer
+        escalated:
+          type: integer
+        orgId:
+          type: string
+
+    # ── Evidence ────────────────────────────────────────────────────────────
+
+    EvidenceFragment:
+      type: object
+      properties:
+        fragmentId:
+          type: string
+        sessionId:
+          type: string
+        eventId:
+          type: string
+        orgId:
+          type: string
+        examId:
+          type: string
+        studentId:
+          type: string
+        sha256Hash:
+          type: string
+          description: SHA-256 hex digest of the stored binary object
+        uri:
+          type: string
+          description: Internal S3 URI (not directly accessible — use presigned URL endpoint)
+        sizeBytes:
+          type: integer
+          format: int64
+        contentType:
+          type: string
+        durationSec:
+          type: number
+          format: float
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        uploadedAt:
+          type: string
+          format: date-time
+
+    EvidenceListResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        fragments:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvidenceFragment'
+        total:
+          type: integer
+        generatedAt:
+          type: string
+          format: date-time
+
+    PresignedURLResponse:
+      type: object
+      properties:
+        fragmentId:
+          type: string
+        url:
+          type: string
+          description: Presigned HTTPS URL (default TTL: 5 minutes)
+        expiresAt:
+          type: string
+          format: date-time
+        ttlSeconds:
+          type: integer
+
+    VerifyIntegrityResponse:
+      type: object
+      properties:
+        fragmentId:
+          type: string
+        valid:
+          type: boolean
+        expectedHash:
+          type: string
+        message:
+          type: string
+
+    # ── Export ──────────────────────────────────────────────────────────────
+
+    CreateExportRequest:
+      type: object
+      required: [sessionIds]
+      properties:
+        sessionIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 500
+        presignTtlSec:
+          type: integer
+          default: 3600
+          description: TTL for the download URL in seconds
+
+    ExportJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orgId:
+          type: string
+        requestedBy:
+          type: string
+        sessionIds:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, processing, completed, failed, cancelled]
+        archiveUri:
+          type: string
+          nullable: true
+        sha256Archive:
+          type: string
+          nullable: true
+          description: SHA-256 of the complete TAR.GZ archive
+        downloadUrl:
+          type: string
+          nullable: true
+          description: Presigned download URL (only present when status = completed)
+        errorMessage:
+          type: string
+          nullable: true
+        totalSizeBytes:
+          type: integer
+          format: int64
+          nullable: true
+        fragmentCount:
+          type: integer
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ── Appeals ─────────────────────────────────────────────────────────────
+
+    SubmitAppealRequest:
+      type: object
+      required: [sessionId, studentId, orgId, examId, reason]
+      properties:
+        sessionId:
+          type: string
+        studentId:
+          type: string
+        orgId:
+          type: string
+        examId:
+          type: string
+        reason:
+          type: string
+          minLength: 20
+          maxLength: 2000
+
+    ReviewAppealRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+        reviewNotes:
+          type: string
+          maxLength: 2000
+
+    Appeal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+        studentId:
+          type: string
+        orgId:
+          type: string
+        examId:
+          type: string
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        reviewedBy:
+          type: string
+          nullable: true
+        reviewNotes:
+          type: string
+          nullable: true
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ── Consent ─────────────────────────────────────────────────────────────
+
+    RecordConsentRequest:
+      type: object
+      required: [sessionId, studentId, orgId, examId, consentVersion, accepted]
+      properties:
+        sessionId:
+          type: string
+        studentId:
+          type: string
+        orgId:
+          type: string
+        examId:
+          type: string
+        consentVersion:
+          type: string
+          description: Version identifier for the consent form text (e.g. `v1.2`)
+        consentText:
+          type: string
+          description: Full text of the consent form shown to the student
+        accepted:
+          type: boolean
+
+    ConsentRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+        studentId:
+          type: string
+        orgId:
+          type: string
+        examId:
+          type: string
+        consentVersion:
+          type: string
+        accepted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── Integrity ───────────────────────────────────────────────────────────
+
+    IntegrityReport:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        valid:
+          type: boolean
+          description: True if all fragments passed integrity checks
+        totalFragments:
+          type: integer
+        validFragments:
+          type: integer
+        invalidFragments:
+          type: integer
+        missingFragments:
+          type: integer
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/VerifyIntegrityResponse'
+        generatedAt:
+          type: string
+          format: date-time
+
+    # ── Media ────────────────────────────────────────────────────────────────
+
+    MediaTokenRequest:
+      type: object
+      required: [sessionId, studentId, examId, role]
+      properties:
+        sessionId:
+          type: string
+        studentId:
+          type: string
+        examId:
+          type: string
+        role:
+          type: string
+          enum: [proctor, student]
+
+    MediaTokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Signed LiveKit access token (JWT)
+        wsUrl:
+          type: string
+          description: LiveKit WebSocket URL (e.g. `wss://livekit.argus.ai`)
+        room:
+          type: string
+          description: Room name derived from sessionId
+
+    # ── Ingest (Chunk) ───────────────────────────────────────────────────────
+
+    ChunkUploadResponse:
+      type: object
+      properties:
+        fragmentId:
+          type: string
+        chunkIndex:
+          type: integer
+        totalChunks:
+          type: integer
+        receivedChunks:
+          type: integer
+        complete:
+          type: boolean
+          description: True when all chunks have been received and assembled
+        uri:
+          type: string
+          nullable: true
+          description: S3 URI of the assembled fragment (only when complete = true)
+        sha256:
+          type: string
+          nullable: true
+          description: SHA-256 of the assembled fragment (only when complete = true)
+        sizeBytes:
+          type: integer
+          format: int64
+          nullable: true
+
+# Default security: all endpoints require Bearer token unless overridden
+security:
+  - BearerAuth: []

@@ -1,0 +1,378 @@
+syntax = "proto3";
+
+package argus.eventcollector.v1;
+
+option go_package = "github.com/argus-ai/event-collector/api/proto/v1;eventcollectorv1";
+
+import "google/protobuf/timestamp.proto";
+
+// ============================================================================
+//  EVENT COLLECTOR SERVICE
+//  High-throughput ingestion of proctoring events from 10,000+ browsers.
+//  Designed for maximum efficiency: no allocations on the hot path,
+//  batch-oriented writes, and zero-copy Kafka production.
+// ============================================================================
+
+service EventCollectorService {
+  // IngestEvent accepts a single proctoring event from a browser client.
+  // Used for critical, low-latency events (face mismatch, phone detected).
+  rpc IngestEvent(IngestEventRequest) returns (IngestEventResponse);
+
+  // IngestBatch accepts a batch of events from a browser client.
+  // Preferred path for high-frequency telemetry (gaze tracking, mouse moves).
+  // Reduces gRPC overhead by amortizing connection cost across N events.
+  rpc IngestBatch(IngestBatchRequest) returns (IngestBatchResponse);
+
+  // StreamEvents opens a bidirectional stream for continuous event ingestion.
+  // Used by the browser extension for persistent, low-overhead telemetry.
+  rpc StreamEvents(stream IngestEventRequest) returns (stream StreamAck);
+
+  // Heartbeat keeps the session alive and reports basic health.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}
+
+// ============================================================================
+//  CORE EVENT MESSAGE
+//  This is the canonical event envelope. Every proctoring signal from
+//  the browser is wrapped in this message before hitting Kafka.
+// ============================================================================
+
+message ProctoringEvent {
+  // Unique event identifier (UUIDv7 for time-ordered lexicographic sorting).
+  string event_id = 1;
+
+  // Session identifier linking this event to an active proctoring session.
+  string session_id = 2;
+
+  // Student identifier (IIN — Individual Identification Number).
+  string student_id = 3;
+
+  // Exam identifier from the ExamProctoringConfig.
+  string exam_id = 4;
+
+  // Organization/institution identifier for multi-tenant isolation.
+  string org_id = 5;
+
+  // Event classification.
+  EventType event_type = 6;
+
+  // Severity classification for triage and alerting.
+  Severity severity = 7;
+
+  // Source camera/system that generated the event.
+  EventSource source = 8;
+
+  // Server-side timestamp (set by the collector upon receipt).
+  google.protobuf.Timestamp server_timestamp = 9;
+
+  // Client-side timestamp (set by the browser when event occurred).
+  google.protobuf.Timestamp client_timestamp = 10;
+
+  // Video timestamp in seconds from session start (for archive replay).
+  double video_timestamp_sec = 11;
+
+  // Human-readable description of the event.
+  string label = 12;
+
+  // Confidence score from the AI model (0.0 - 1.0).
+  float confidence = 13;
+
+  // Structured payload — type-specific data.
+  oneof payload {
+    GazeDeviationPayload     gaze_deviation = 20;
+    FaceDetectionPayload     face_detection = 21;
+    ObjectDetectionPayload   object_detection = 22;
+    AudioPayload             audio = 23;
+    BrowserPayload           browser = 24;
+    SystemPayload            system = 25;
+    PsychometryPayload       psychometry = 26;
+    NetworkPayload           network = 27;
+    KernelPayload            kernel = 28;
+  }
+
+  // Client metadata for forensic analysis.
+  ClientMeta client_meta = 30;
+}
+
+// ============================================================================
+//  ENUMS
+// ============================================================================
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED        = 0;
+
+  // Video & Face events
+  GAZE_DEVIATION               = 1;
+  FACE_MISMATCH                = 2;
+  FACE_NOT_DETECTED            = 3;
+  FACE_SPOOF_DETECTED          = 4;
+  MULTIPLE_PERSONS             = 5;
+  DYNAMIC_FACE_RECHECK_FAIL    = 6;
+
+  // Object detection events
+  PHONE_DETECTED               = 10;
+  BOOK_DETECTED                = 11;
+  EARBUDS_DETECTED             = 12;
+  UNKNOWN_OBJECT_DETECTED      = 13;
+
+  // Audio events
+  VOICE_ACTIVITY               = 20;
+  AUDIO_ANOMALY                = 21;
+  AUDIO_PERIPHERY_DETECTED     = 22;
+  SMART_NOISE_CLASSIFIED       = 23;
+
+  // Browser events
+  TAB_SWITCH                   = 30;
+  COPY_PASTE_ATTEMPT           = 31;
+  PRINT_SCREEN_ATTEMPT         = 32;
+  CONTEXT_MENU_ATTEMPT         = 33;
+  FULLSCREEN_EXIT              = 34;
+  EXTERNAL_DISPLAY_DETECTED    = 35;
+
+  // Network events
+  VPN_PROXY_DETECTED           = 40;
+  SUSPICIOUS_NETWORK_DEVICE    = 41;
+
+  // Psychometry events
+  EMOTION_STRESS_SPIKE         = 50;
+  FOCUS_LOSS_DETECTED          = 51;
+  BLINK_PATTERN_ANOMALY        = 52;
+
+  // Kernel-level events
+  TYPING_DYNAMICS_ANOMALY      = 60;
+  HAND_CURSOR_DESYNC           = 61;
+  FORBIDDEN_PROCESS_DETECTED   = 62;
+  HARDWARE_DEVICE_ANOMALY      = 63;
+  REMOTE_ACCESS_DETECTED       = 64;
+  HARDWARE_ID_MISMATCH         = 65;
+  VIRTUAL_MONITOR_DETECTED     = 66;
+  VIRTUAL_MACHINE_DETECTED     = 67;
+
+  // Telemetry (high frequency, low severity)
+  GAZE_TELEMETRY               = 100;
+  MOUSE_TELEMETRY              = 101;
+  KEYBOARD_TELEMETRY           = 102;
+  FOCUS_SCORE_UPDATE           = 103;
+}
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  INFO               = 1;
+  WARNING            = 2;
+  CRITICAL           = 3;
+}
+
+enum EventSource {
+  SOURCE_UNSPECIFIED = 0;
+  WEBCAM             = 1;
+  SIDE_CAMERA        = 2;
+  SYSTEM             = 3;
+  BROWSER            = 4;
+  KERNEL_AGENT       = 5;
+  NETWORK_PROBE      = 6;
+}
+
+// ============================================================================
+//  TYPE-SPECIFIC PAYLOADS
+// ============================================================================
+
+message GazeDeviationPayload {
+  // Direction of gaze deviation.
+  string direction = 1;  // "left", "right", "up", "down"
+  // Duration of deviation in milliseconds.
+  int64 duration_ms = 2;
+  // Angle of deviation in degrees from center.
+  float angle_degrees = 3;
+  // Current gaze coordinates (normalized 0-1).
+  float gaze_x = 4;
+  float gaze_y = 5;
+}
+
+message FaceDetectionPayload {
+  // Whether the face matched the registered identity.
+  bool match = 1;
+  // Similarity score (0.0 - 1.0).
+  float similarity = 2;
+  // Number of faces detected in frame.
+  int32 face_count = 3;
+  // Spoof detection result.
+  bool is_spoof = 4;
+  // Type of spoof detected (photo, video, mask, deepfake).
+  string spoof_type = 5;
+}
+
+message ObjectDetectionPayload {
+  // Type of object detected.
+  string object_type = 1;  // "phone", "book", "earbuds", "tablet"
+  // Bounding box coordinates (normalized 0-1).
+  float bbox_x = 2;
+  float bbox_y = 3;
+  float bbox_w = 4;
+  float bbox_h = 5;
+  // Detection confidence.
+  float detection_confidence = 6;
+}
+
+message AudioPayload {
+  // Decibel level.
+  float db_level = 1;
+  // Whether speech was detected.
+  bool speech_detected = 2;
+  // Number of distinct speakers identified.
+  int32 speaker_count = 3;
+  // Classified noise source (keyboard, traffic, music, speech, whisper).
+  string noise_source = 4;
+  // Duration of audio anomaly in milliseconds.
+  int64 duration_ms = 5;
+}
+
+message BrowserPayload {
+  // Tab switch count in current session.
+  int32 tab_switch_count = 1;
+  // URL or tab title (redacted for privacy).
+  string target_info = 2;
+  // Whether fullscreen was exited.
+  bool fullscreen_exited = 3;
+  // Number of external displays detected.
+  int32 display_count = 4;
+  // Action attempted (copy, paste, print_screen, context_menu).
+  string action = 5;
+}
+
+message SystemPayload {
+  // Process name that triggered the alert.
+  string process_name = 1;
+  // Process ID.
+  int64 process_id = 2;
+  // Whether the process was terminated.
+  bool terminated = 3;
+  // Category of violation (remote_access, vm, screen_capture).
+  string category = 4;
+}
+
+message PsychometryPayload {
+  // Emotion classification (stress, confidence, confusion, neutral).
+  string emotion = 1;
+  // Intensity score (0.0 - 1.0).
+  float intensity = 2;
+  // Focus loss score (0.0 - 1.0, lower = worse focus).
+  float focus_score = 3;
+  // Blink rate per minute.
+  float blink_rate = 4;
+  // Whether blink pattern is anomalous.
+  bool blink_anomaly = 5;
+}
+
+message NetworkPayload {
+  // Type of detection (vpn, proxy, tor, suspicious_device).
+  string detection_type = 1;
+  // IP address or network identifier (hashed for privacy).
+  string network_hash = 2;
+  // Number of suspicious devices on local network.
+  int32 suspicious_device_count = 3;
+  // VPN/proxy provider name if identified.
+  string provider = 4;
+}
+
+message KernelPayload {
+  // Typing dynamics — words per minute.
+  float wpm = 1;
+  // Typing dynamics — keystroke latency standard deviation.
+  float keystroke_std_dev_ms = 2;
+  // Whether hand was detected on mouse during cursor movement.
+  bool hand_on_mouse = 3;
+  // Hardware ID hash for binding verification.
+  string hardware_id_hash = 4;
+  // Mismatched component (cpu, motherboard, gpu).
+  string mismatch_component = 5;
+  // Number of monitors detected at kernel level.
+  int32 monitor_count = 6;
+  // Whether any monitor is virtual.
+  bool virtual_monitor = 7;
+}
+
+// ============================================================================
+//  CLIENT METADATA
+// ============================================================================
+
+message ClientMeta {
+  // Browser user agent (for compatibility tracking, NOT fingerprinting).
+  string user_agent = 1;
+  // Client SDK version.
+  string sdk_version = 2;
+  // Screen resolution.
+  string resolution = 3;
+  // Client timezone offset in minutes from UTC.
+  int32 timezone_offset_min = 4;
+  // IP address (set server-side, never trusted from client).
+  string ip_address = 5;
+  // Region derived from IP (set server-side).
+  string region = 6;
+}
+
+// ============================================================================
+//  REQUEST / RESPONSE MESSAGES
+// ============================================================================
+
+message IngestEventRequest {
+  ProctoringEvent event = 1;
+}
+
+message IngestEventResponse {
+  bool accepted = 1;
+  string event_id = 2;
+  // Server-assigned sequence number for ordering guarantees.
+  int64 sequence = 3;
+}
+
+message IngestBatchRequest {
+  repeated ProctoringEvent events = 1;
+  // Client-assigned batch ID for deduplication.
+  string batch_id = 2;
+}
+
+message IngestBatchResponse {
+  int32 accepted_count = 1;
+  int32 rejected_count = 2;
+  repeated string rejected_event_ids = 3;
+  // Server-assigned batch sequence.
+  int64 batch_sequence = 4;
+}
+
+message StreamAck {
+  string event_id = 1;
+  int64 sequence = 2;
+  bool accepted = 3;
+}
+
+message HeartbeatRequest {
+  string session_id = 1;
+  string student_id = 2;
+  string exam_id = 3;
+  google.protobuf.Timestamp client_timestamp = 4;
+  // Current integrity metrics snapshot.
+  float current_focus_score = 5;
+  int32 violation_count = 6;
+}
+
+message HeartbeatResponse {
+  bool session_active = 1;
+  google.protobuf.Timestamp server_timestamp = 2;
+  // Server can instruct client to adjust settings dynamically.
+  SessionDirective directive = 3;
+}
+
+message SessionDirective {
+  // Whether to increase/decrease telemetry frequency.
+  TelemetryMode telemetry_mode = 1;
+  // Whether the session should be terminated.
+  bool terminate = 2;
+  // Reason for termination.
+  string terminate_reason = 3;
+}
+
+enum TelemetryMode {
+  TELEMETRY_NORMAL    = 0;
+  TELEMETRY_HIGH_FREQ = 1;  // Increase sampling (suspicious activity detected)
+  TELEMETRY_LOW_FREQ  = 2;  // Decrease sampling (save bandwidth)
+}
