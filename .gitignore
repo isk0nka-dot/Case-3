@@ -1,0 +1,57 @@
+# =============================================================================
+# argus-infra — .gitignore (Docker / Nginx / Migrations / CI)
+# =============================================================================
+
+# ── Secrets / Environment files (CRITICAL: never commit) ────────────────────
+docker/.env
+*.env
+!*.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+credentials.json
+service-account*.json
+secrets.yaml
+secrets.yml
+*.secret
+
+# ── TLS certs (generated locally, never committed) ──────────────────────────
+nginx/certs/
+ssl/
+tls/
+certs/
+
+# ── Docker volumes / runtime data ───────────────────────────────────────────
+volumes/
+data/
+*.pid
+
+# ── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+
+# ── Editor / IDE ─────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+.fleet/
+*.swp
+*.swo
+*~
+\#*\#
+.#*
+
+# ── Temporary / Generated ───────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+tmp/
+
+# ── OS metadata ─────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini

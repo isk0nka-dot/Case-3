@@ -1,0 +1,128 @@
+# =============================================================================
+# argus-infra — GitLab CI/CD Pipeline
+# =============================================================================
+#
+# This pipeline is triggered by downstream pipelines from:
+#   - argus-backend (when BACKEND_TAG is passed)
+#   - argus-frontend (when FRONTEND_TAG is passed)
+#
+# On a new version tag in either repo, this pipeline:
+#   1. Validates the docker-compose configuration
+#   2. Runs database migrations
+#   3. Performs a rolling deploy (zero-downtime)
+#
+# Required CI variables:
+#   DEPLOY_HOST       SSH target host (production server)
+#   DEPLOY_USER       SSH user with Docker access
+#   DEPLOY_SSH_KEY    Private SSH key (base64-encoded or raw)
+#   REGISTRY_HOST     Container registry hostname
+#   JWT_SIGNING_KEY   JWT signing secret for backend
+#   POSTGRES_PASSWORD PostgreSQL password
+#   MINIO_ROOT_PASSWORD MinIO root password
+#   LIVEKIT_API_SECRET  LiveKit API secret
+
+stages:
+  - validate
+  - migrate
+  - deploy
+
+variables:
+  BACKEND_TAG: ${BACKEND_TAG:-latest}
+  FRONTEND_TAG: ${FRONTEND_TAG:-latest}
+  DEPLOY_PATH: /opt/argus
+
+# ── Stage: validate ───────────────────────────────────────────────────────────
+
+validate-compose:
+  stage: validate
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    JWT_SIGNING_KEY: "ci-validation-only-not-real"
+    MINIO_ROOT_PASSWORD: "ci-validation-only"
+    POSTGRES_PASSWORD: "ci-validation-only"
+    LIVEKIT_API_SECRET: "ci-validation-only-must-be-long-enough"
+  script:
+    - cd docker
+    - docker compose config --quiet
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# ── Stage: migrate ────────────────────────────────────────────────────────────
+
+run-pg-migrations:
+  stage: migrate
+  image: postgres:16-alpine
+  variables:
+    PGPASSWORD: ${POSTGRES_PASSWORD}
+  script:
+    - for f in migrations/postgres/*.sql; do
+        psql -h ${DEPLOY_HOST} -U ${POSTGRES_USER:-argus} -d ${POSTGRES_DB:-argus} -f "$f" 2>&1 || true;
+      done
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+
+run-ch-migrations:
+  stage: migrate
+  image: clickhouse/clickhouse-client:latest
+  script:
+    - for f in migrations/clickhouse/*.sql; do
+        clickhouse-client --host ${DEPLOY_HOST} --query "$(cat $f)" 2>&1 || true;
+      done
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+
+# ── Stage: deploy ─────────────────────────────────────────────────────────────
+
+deploy-production:
+  stage: deploy
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "${DEPLOY_SSH_KEY}" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan -H ${DEPLOY_HOST} >> ~/.ssh/known_hosts
+  script:
+    # Copy updated docker-compose and .env to production server
+    - scp docker/docker-compose.yaml ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/
+    - |
+      ssh ${DEPLOY_USER}@${DEPLOY_HOST} "
+        set -e
+        cd ${DEPLOY_PATH}
+        # Inject environment
+        export BACKEND_TAG=${BACKEND_TAG}
+        export FRONTEND_TAG=${FRONTEND_TAG}
+        export JWT_SIGNING_KEY='${JWT_SIGNING_KEY}'
+        export POSTGRES_PASSWORD='${POSTGRES_PASSWORD}'
+        export MINIO_ROOT_PASSWORD='${MINIO_ROOT_PASSWORD}'
+        export LIVEKIT_API_SECRET='${LIVEKIT_API_SECRET}'
+        export BACKEND_PUBLIC_URL='${BACKEND_PUBLIC_URL:-https://api.argus.ai}'
+        export FRONTEND_ORIGIN='${FRONTEND_ORIGIN:-https://app.argus.ai}'
+
+        # Pull new images
+        docker compose pull backend frontend
+
+        # Rolling restart: backend first, then frontend
+        docker compose up -d --no-deps --wait backend
+        docker compose up -d --no-deps --wait frontend
+
+        echo 'Deploy complete: backend=${BACKEND_TAG} frontend=${FRONTEND_TAG}'
+      "
+  environment:
+    name: production
+    url: https://app.argus.ai
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
