@@ -584,6 +584,21 @@ func run() error {
 				zap.String("base_path", "/api/v1/integrity"),
 				zap.Int("endpoints", 3),
 			)
+
+			// =============================================================
+			// v3.0 — Forensic Reporting API
+			// AI-generated integrity scores, PDF reports, gaze heatmaps,
+			// voice biometric analysis, and report hash verification.
+			// =============================================================
+			forensicHandler := adminHTTP.NewForensicHandler(
+				chWriter.Conn(), integrityVerifier, pgRepo, logger, adminJWTKey,
+			)
+			forensicHandler.RegisterRoutes(httpMux)
+
+			logger.Info("forensic api registered",
+				zap.String("base_path", "/api/v1/forensic"),
+				zap.Int("endpoints", 6),
+			)
 		}
 
 		// =============================================================
