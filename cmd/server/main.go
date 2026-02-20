@@ -73,6 +73,7 @@ import (
 	minioStore "github.com/argus-ai/event-collector/internal/infrastructure/minio"
 	"github.com/argus-ai/event-collector/internal/infrastructure/recorder"
 	"github.com/argus-ai/event-collector/internal/infrastructure/session"
+	"github.com/argus-ai/event-collector/internal/infrastructure/sidecam"
 	"github.com/argus-ai/event-collector/internal/infrastructure/postgres"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	grpcTransport "github.com/argus-ai/event-collector/internal/transport/grpc"
@@ -600,6 +601,20 @@ func run() error {
 				zap.Int("endpoints", 6),
 			)
 		}
+
+		// =============================================================
+		// v3.1 — Secondary Camera (Mobile) Orchestration API
+		// QR pairing, spatial calibration, device telemetry,
+		// stream health, and session gating for mobile secondary cameras.
+		// =============================================================
+		sidecamOrchestrator := sidecam.NewOrchestrator(logger, adminJWTKey, fmt.Sprintf(":%d", cfg.Server.HTTPPort))
+		sidecamHandler := adminHTTP.NewSidecamHandler(sidecamOrchestrator, pgRepo, logger, adminJWTKey)
+		sidecamHandler.RegisterRoutes(httpMux)
+
+		logger.Info("sidecam api registered",
+			zap.String("base_path", "/api/v1/sidecam"),
+			zap.Int("endpoints", 9),
+		)
 
 		// =============================================================
 		// v2.1 — Bulk Export API + Background Worker
