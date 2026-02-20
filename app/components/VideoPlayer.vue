@@ -142,6 +142,9 @@ onUnmounted(() => {
   disconnect()
 })
 
+// --- Expose video element for evidence capture ---
+defineExpose({ videoRef })
+
 // --- Connection state label ---
 const stateLabel = computed(() => {
   switch (connectionState.value) {
