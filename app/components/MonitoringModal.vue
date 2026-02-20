@@ -187,15 +187,23 @@ function cancelTerminate() {
   showTerminateConfirm.value = false
 }
 
-// --- Secondary Camera Policy ---
-// Derive policy from the exam settings in the dashboard store.
-// If the current exam requires side camera → 'mandatory', else 'optional'.
+// --- Secondary Camera Policy (Fix 10) ---
+// Derive policy from exam configs + student exceptions in the dashboard store.
 const sidecamPolicy = computed<'mandatory' | 'optional' | 'disabled'>(() => {
   if (!props.session) return 'disabled'
-  const exam = store.selectedExam
-  // If we have exam-level settings indicating mandatory side camera
-  // In production this would come from the exam config via API
-  // For now, 'optional' allows the SecondaryCamSetup to offer pairing
+
+  // Check if student has a no_side_camera exception
+  const exception = store.getStudentExceptionInfo(
+    props.session.studentName,
+    props.session.iin,
+    props.session.examName,
+  )
+  if (exception?.profile === 'no_side_camera') return 'disabled'
+
+  // Check exam config for requireSideCamera setting
+  const examConfig = store.examConfigs.find(ec => ec.examName === props.session!.examName)
+  if (examConfig?.settings?.requireSideCamera) return 'mandatory'
+
   return 'optional'
 })
 

@@ -663,6 +663,7 @@ export interface SidecamPairingSession {
   state: SidecamPairingState
   pairingToken: string
   pairingCode: string
+  deviceToken?: string  // Fix 12: Post-pairing device auth token
   createdAt: string
   expiresAt: string
   connectedAt?: string
@@ -799,7 +800,8 @@ export function useAdminAPI() {
     method: string,
     path: string,
     body?: unknown,
-    requireAuth = true
+    requireAuth = true,
+    extraHeaders?: Record<string, string>,
   ): Promise<T> {
     const url = `${baseURL.value}${path}`
     const cacheKey = `${method}:${url}`
@@ -827,7 +829,7 @@ export function useAdminAPI() {
     }
 
     // ── Layer 3: Actual Fetch ───────────────────────────────────────────
-    const fetchPromise = _doFetch<T>(method, url, body, requireAuth)
+    const fetchPromise = _doFetch<T>(method, url, body, requireAuth, extraHeaders)
 
     // Register in-flight request (GET only)
     if (method === 'GET') {
@@ -869,10 +871,12 @@ export function useAdminAPI() {
     method: string,
     url: string,
     body?: unknown,
-    requireAuth = true
+    requireAuth = true,
+    extraHeaders?: Record<string, string>,
   ): Promise<T> {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...extraHeaders, // Fix 12: Support device token headers
     }
 
     if (requireAuth) {
@@ -1350,25 +1354,30 @@ export function useAdminAPI() {
     return request('POST', '/api/v1/sidecam/validate-start', { sessionId, policy })
   }
 
-  async function submitSidecamCalibration(sessionId: string, frame: SidecamCalibrationFrame): Promise<SidecamCalibrationStatus> {
-    return request('POST', '/api/v1/sidecam/calibrate', { sessionId, frame })
+  // Fix 12: Device-authenticated endpoints pass X-Device-Token + X-Session-ID headers
+  async function submitSidecamCalibration(sessionId: string, frame: SidecamCalibrationFrame, deviceToken?: string): Promise<SidecamCalibrationStatus> {
+    const hdrs = deviceToken ? { 'X-Device-Token': deviceToken, 'X-Session-ID': sessionId } : undefined
+    return request('POST', '/api/v1/sidecam/calibrate', { sessionId, frame }, false, hdrs)
   }
 
-  async function sendSidecamTelemetry(sessionId: string, device: SidecamMobileDevice): Promise<SidecamDeviceDirective> {
-    return request('POST', '/api/v1/sidecam/telemetry', { sessionId, device })
+  async function sendSidecamTelemetry(sessionId: string, device: SidecamMobileDevice, deviceToken?: string): Promise<SidecamDeviceDirective> {
+    const hdrs = deviceToken ? { 'X-Device-Token': deviceToken, 'X-Session-ID': sessionId } : undefined
+    return request('POST', '/api/v1/sidecam/telemetry', { sessionId, device }, false, hdrs)
   }
 
-  async function sendSidecamHeartbeat(sessionId: string, frameRate: number, droppedFrames: number): Promise<SidecamStreamHealth> {
+  async function sendSidecamHeartbeat(sessionId: string, frameRate: number, droppedFrames: number, deviceToken?: string): Promise<SidecamStreamHealth> {
+    const hdrs = deviceToken ? { 'X-Device-Token': deviceToken, 'X-Session-ID': sessionId } : undefined
     return request('POST', '/api/v1/sidecam/heartbeat', {
       sessionId,
       clientTs: new Date().toISOString(),
       frameRate,
       droppedFrames,
-    })
+    }, false, hdrs)
   }
 
-  async function sendSidecamHandsDetection(sessionId: string, handsVisible: boolean): Promise<{ status: string }> {
-    return request('POST', '/api/v1/sidecam/hands', { sessionId, handsVisible })
+  async function sendSidecamHandsDetection(sessionId: string, handsVisible: boolean, deviceToken?: string): Promise<{ status: string }> {
+    const hdrs = deviceToken ? { 'X-Device-Token': deviceToken, 'X-Session-ID': sessionId } : undefined
+    return request('POST', '/api/v1/sidecam/hands', { sessionId, handsVisible }, false, hdrs)
   }
 
   async function getSidecamSession(sessionId: string): Promise<SidecamPairingSession> {

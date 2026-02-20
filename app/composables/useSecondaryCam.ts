@@ -42,6 +42,9 @@ interface SecondaryCamState {
   // Telemetry
   lastDirective: SidecamDeviceDirective | null
   streamHealth: SidecamStreamHealth | null
+
+  // Fix 12: Device token for post-pairing auth
+  deviceToken: string
 }
 
 export function useSecondaryCam() {
@@ -56,6 +59,7 @@ export function useSecondaryCam() {
     phase: 'idle',
     lastDirective: null,
     streamHealth: null,
+    deviceToken: '',
   })
 
   // Polling intervals
@@ -168,7 +172,7 @@ export function useSecondaryCam() {
 
   async function submitCalibrationFrame(sessionId: string, frame: SidecamCalibrationFrame) {
     try {
-      const status = await api.submitSidecamCalibration(sessionId, frame)
+      const status = await api.submitSidecamCalibration(sessionId, frame, state.deviceToken || undefined)
       if (state.pairingSession) {
         state.pairingSession.calibration = status
         if (status.passed) {
@@ -189,7 +193,7 @@ export function useSecondaryCam() {
 
   async function sendTelemetry(sessionId: string, device: SidecamMobileDevice) {
     try {
-      const directive = await api.sendSidecamTelemetry(sessionId, device)
+      const directive = await api.sendSidecamTelemetry(sessionId, device, state.deviceToken || undefined)
       state.lastDirective = directive
       if (state.pairingSession) {
         state.pairingSession.deviceInfo = device
@@ -232,6 +236,11 @@ export function useSecondaryCam() {
         state.pairingSession = session
         updatePhase(session.state as SidecamPairingState)
 
+        // Fix 12: Capture device token from session (issued at pairing completion)
+        if (session.deviceToken && !state.deviceToken) {
+          state.deviceToken = session.deviceToken
+        }
+
         // Once connected, switch from status polling to health polling
         if (session.state === 'connected' || session.state === 'calibrating') {
           state.phase = 'calibrating'
@@ -261,7 +270,7 @@ export function useSecondaryCam() {
     stopHealthPolling()
     healthPollId = setInterval(async () => {
       try {
-        const health = await api.sendSidecamHeartbeat(sessionId, 0, 0)
+        const health = await api.sendSidecamHeartbeat(sessionId, 0, 0, state.deviceToken || undefined)
         state.streamHealth = health
 
         if (state.pairingSession) {
@@ -325,7 +334,33 @@ export function useSecondaryCam() {
     state.phase = 'idle'
     state.lastDirective = null
     state.streamHealth = null
+    state.deviceToken = ''
   }
+
+  // ---------------------------------------------------------------------------
+  // Fix 11: React to backend directives
+  // ---------------------------------------------------------------------------
+
+  watch(
+    () => state.lastDirective,
+    (directive) => {
+      if (!directive) return
+
+      // Pause session if backend instructs (e.g., battery critical in mandatory mode)
+      if (directive.pauseSession && state.phase !== 'disconnected') {
+        state.phase = 'disconnected'
+      }
+
+      // Propagate displacement alerts to session state for UI display
+      if (state.pairingSession) {
+        const hasDisplacement = directive.alerts?.some(a => a.type === 'device_displaced')
+        if (hasDisplacement !== undefined) {
+          state.pairingSession.displacementAlert = !!hasDisplacement
+        }
+      }
+    },
+    { deep: true },
+  )
 
   // Cleanup on unmount
   onUnmounted(() => {
