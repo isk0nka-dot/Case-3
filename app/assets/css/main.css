@@ -1,0 +1,634 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'DM Sans', ui-monospace, SFMono-Regular, monospace;
+}
+
+/* ==============================
+   DARK THEME (default)
+   ============================== */
+:root,
+.dark {
+  color-scheme: dark;
+  --argus-bg-deep: #0B0F14;
+  --argus-bg-card: #111822;
+  --argus-bg-elevated: #161F2C;
+  --argus-bg-hover: #1C2736;
+  --argus-border: #1E293B;
+  --argus-border-subtle: #162032;
+  --argus-accent: #38BDF8;
+  --argus-accent-muted: #0EA5E9;
+  --argus-text: #E2E8F0;
+  --argus-text-muted: #94A3B8;
+  --argus-text-dimmed: #64748B;
+  --argus-success: #34D399;
+  --argus-warning: #FBBF24;
+  --argus-error: #F87171;
+  /* Brand Logo Palette */
+  --argus-brand-blue: #4285F4;
+  --argus-brand-green: #34A853;
+  --argus-brand-yellow: #FBBC05;
+  --argus-brand-red: #EA4335;
+  --argus-brand-purple: #A259FF;
+  --argus-glass-from: rgba(17, 24, 34, 0.8);
+  --argus-glass-to: rgba(22, 31, 44, 0.6);
+  --argus-glass-border: rgba(30, 41, 59, 0.5);
+  --argus-scrollbar: #1E293B;
+  --argus-scrollbar-hover: #334155;
+  --argus-chart-grid: rgba(30, 41, 59, 0.5);
+  --argus-chart-tooltip-bg: #1E293B;
+  --argus-chart-tooltip-border: #334155;
+}
+
+/* ==============================
+   LIGHT THEME — Vibrant & Rich
+   ============================== */
+.light {
+  color-scheme: light;
+  /* Warm layered backgrounds with subtle blue-cream tint */
+  --argus-bg-deep: #F0F4FA;
+  --argus-bg-card: #FFFFFF;
+  --argus-bg-elevated: #F6F8FD;
+  --argus-bg-hover: #EDF1F9;
+  /* Visible but refined borders */
+  --argus-border: #D1DAE8;
+  --argus-border-subtle: #E4EAF4;
+  /* Vivid electric blue accent */
+  --argus-accent: #2563EB;
+  --argus-accent-muted: #1D4ED8;
+  /* Deep rich text */
+  --argus-text: #0C1425;
+  --argus-text-muted: #3B4963;
+  --argus-text-dimmed: #6B7D99;
+  /* Punchy saturated status colors */
+  --argus-success: #059669;
+  --argus-warning: #E67E22;
+  --argus-error: #E03E3E;
+  /* Vibrant Brand Logo Palette */
+  --argus-brand-blue: #2563EB;
+  --argus-brand-green: #16A34A;
+  --argus-brand-yellow: #F59E0B;
+  --argus-brand-red: #EF4444;
+  --argus-brand-purple: #8B5CF6;
+  /* Glass effect — richer gradient with warm tint */
+  --argus-glass-from: rgba(255, 255, 255, 0.95);
+  --argus-glass-to: rgba(240, 244, 255, 0.85);
+  --argus-glass-border: rgba(193, 207, 232, 0.7);
+  /* Scrollbar */
+  --argus-scrollbar: #B8C5D9;
+  --argus-scrollbar-hover: #8898B2;
+  /* Chart */
+  --argus-chart-grid: rgba(193, 207, 232, 0.5);
+  --argus-chart-tooltip-bg: #FFFFFF;
+  --argus-chart-tooltip-border: #D1DAE8;
+}
+
+/* ==============================
+   GLOBAL TYPOGRAPHY — DM Sans
+   Weights: 400 (Regular), 500 (Medium), 700 (Bold)
+   ============================== */
+*,
+*::before,
+*::after {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+}
+
+html {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+}
+
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  background: var(--argus-bg-deep);
+  color: var(--argus-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Ensure form elements inherit DM Sans (browsers override these) */
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+}
+
+/* Enforce DM Sans on code/mono elements while keeping distinct style */
+code,
+pre,
+kbd,
+samp,
+.font-mono {
+  font-family: 'DM Sans', ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==============================
+   SCROLLBAR
+   ============================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--argus-scrollbar);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--argus-scrollbar-hover);
+}
+
+/* ==============================
+   GLASS CARD
+   ============================== */
+.glass-card {
+  background: linear-gradient(135deg, var(--argus-glass-from), var(--argus-glass-to));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--argus-glass-border);
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.light .glass-card {
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06), 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* ==============================
+   GLOW EFFECTS
+   ============================== */
+.glow-accent {
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.1);
+}
+.light .glow-accent {
+  box-shadow: 0 0 24px rgba(37, 99, 235, 0.12);
+}
+
+.glow-error {
+  box-shadow: 0 0 20px rgba(248, 113, 113, 0.1);
+}
+.light .glow-error {
+  box-shadow: 0 0 20px rgba(224, 62, 62, 0.1);
+}
+
+/* ==============================
+   THEME TOGGLE ANIMATION
+   ============================== */
+.theme-toggle-icon {
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+}
+.theme-toggle-icon.spin-enter {
+  transform: rotate(0deg) scale(1);
+}
+.theme-toggle-icon:hover {
+  transform: rotate(15deg) scale(1.1);
+}
+
+/* ==============================
+   SIDEBAR TRANSITIONS
+   ============================== */
+.sidebar-transition {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: width;
+}
+
+.sidebar-label {
+  transition: opacity 0.2s ease, max-width 0.25s ease;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.sidebar-label-hidden {
+  opacity: 0;
+  max-width: 0;
+}
+
+.sidebar-label-visible {
+  opacity: 1;
+  max-width: 200px;
+}
+
+/* ==============================
+   RIGHT PANEL TRANSITIONS
+   ============================== */
+.right-panel-transition {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+  will-change: width;
+  overflow: hidden;
+}
+
+/* ==============================
+   MAIN CONTENT FLUID
+   ============================== */
+.main-fluid {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ==============================
+   CHEVRON ICON (sub-menu toggle)
+   ============================== */
+.chevron-icon {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chevron-open {
+  transform: rotate(0deg);
+}
+
+.chevron-closed {
+  transform: rotate(-90deg);
+}
+
+/* ==============================
+   SUB-MENU COLLAPSE ANIMATION
+   ============================== */
+.sub-menu-container {
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+}
+
+.sub-menu-open {
+  max-height: 300px;
+  opacity: 1;
+}
+
+.sub-menu-closed {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* ==============================
+   DROPDOWN TRANSITION
+   ============================== */
+.dropdown-enter-active {
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dropdown-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.dropdown-enter-from {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
+}
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+}
+
+/* ==============================
+   FILTER BADGE TRANSITION
+   ============================== */
+.filter-badge-enter-active {
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.filter-badge-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.filter-badge-enter-from {
+  opacity: 0;
+  transform: scale(0.8) translateX(-8px);
+}
+.filter-badge-leave-to {
+  opacity: 0;
+  transform: scale(0.85) translateX(-4px);
+}
+
+/* ==============================
+   EXAM LINK (clickable table cell)
+   ============================== */
+.exam-link {
+  text-decoration: none;
+  transition: color 0.15s ease;
+  cursor: pointer;
+}
+.exam-link:hover {
+  color: var(--argus-accent) !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ==============================
+   MONITORING VIDEO CARDS
+   ============================== */
+.video-card-hover {
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.15s ease;
+}
+.video-card-hover:hover {
+  transform: translateY(-1px);
+}
+
+.pulse-critical {
+  animation: pulse-red 2s infinite;
+}
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.3); }
+  50% { box-shadow: 0 0 12px 4px rgba(248, 113, 113, 0.15); }
+}
+.light .pulse-critical {
+  animation: pulse-red-light 2s infinite;
+}
+@keyframes pulse-red-light {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(224, 62, 62, 0.25); }
+  50% { box-shadow: 0 0 14px 4px rgba(224, 62, 62, 0.15); }
+}
+
+.pulse-warning {
+  animation: pulse-amber 2s infinite;
+}
+@keyframes pulse-amber {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.25); }
+  50% { box-shadow: 0 0 10px 3px rgba(251, 191, 36, 0.12); }
+}
+.light .pulse-warning {
+  animation: pulse-amber-light 2s infinite;
+}
+@keyframes pulse-amber-light {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230, 126, 34, 0.2); }
+  50% { box-shadow: 0 0 12px 4px rgba(230, 126, 34, 0.12); }
+}
+
+/* ==============================
+   AI OVERLAY BADGES
+   ============================== */
+.ai-badge {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: opacity 0.2s ease;
+}
+
+/* ==============================
+   MODAL TRANSITION
+   ============================== */
+.modal-enter-active {
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.modal-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
+.modal-leave-to {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+/* ==============================
+   SCANNER BUTTONS (Landing page brand style)
+   ============================== */
+.scanner-btn {
+  position: relative;
+  overflow: hidden;
+  background: rgba(66, 133, 244, 0.12);
+  border: 1px solid rgba(66, 133, 244, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 0 15px rgba(66, 133, 244, 0.08),
+    0 0 1px rgba(100, 200, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  z-index: 1;
+}
+
+/* Laser sweep line (idle) */
+.scanner-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(100, 210, 255, 0.08) 25%,
+    rgba(100, 210, 255, 0.25) 50%,
+    rgba(100, 210, 255, 0.08) 75%,
+    transparent 100%
+  );
+  z-index: 0;
+  pointer-events: none;
+  animation: scanner-sweep 3.5s ease-in-out infinite;
+}
+
+/* Glow edge accent (persistent) */
+.scanner-btn::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(66, 133, 244, 0.2) 0%,
+    transparent 40%,
+    transparent 60%,
+    rgba(100, 210, 255, 0.15) 100%
+  );
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+/* Hover: glow intensifies, sweep speeds up */
+.scanner-btn:hover {
+  background: rgba(66, 133, 244, 0.18);
+  border-color: rgba(100, 210, 255, 0.5);
+  box-shadow:
+    0 0 25px rgba(66, 133, 244, 0.15),
+    0 0 4px rgba(100, 210, 255, 0.4),
+    0 0 60px rgba(66, 133, 244, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.scanner-btn:hover::before {
+  animation: scanner-sweep-fast 1.8s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(100, 210, 255, 0.12) 20%,
+    rgba(255, 255, 255, 0.35) 50%,
+    rgba(100, 210, 255, 0.12) 80%,
+    transparent 100%
+  );
+}
+
+.scanner-btn:hover::after {
+  opacity: 1;
+}
+
+/* Active / Click: pulse flash */
+.scanner-btn:active {
+  transform: scale(0.98);
+  box-shadow:
+    0 0 40px rgba(66, 133, 244, 0.25),
+    0 0 8px rgba(100, 210, 255, 0.6),
+    inset 0 0 20px rgba(66, 133, 244, 0.1);
+  transition: all 0.1s ease;
+}
+
+/* --- HERO VARIANT: larger, more prominent --- */
+.scanner-btn-hero {
+  background: rgba(66, 133, 244, 0.15);
+  border: 1px solid rgba(66, 133, 244, 0.4);
+  box-shadow:
+    0 0 20px rgba(66, 133, 244, 0.12),
+    0 0 3px rgba(100, 210, 255, 0.4),
+    0 0 80px rgba(66, 133, 244, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.scanner-btn-hero::before {
+  width: 60px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(100, 210, 255, 0.1) 20%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(100, 210, 255, 0.1) 80%,
+    transparent 100%
+  );
+  animation: scanner-sweep 3s ease-in-out infinite;
+}
+
+.scanner-btn-hero:hover {
+  background: rgba(66, 133, 244, 0.22);
+  border-color: rgba(100, 210, 255, 0.55);
+  box-shadow:
+    0 0 35px rgba(66, 133, 244, 0.2),
+    0 0 6px rgba(100, 210, 255, 0.5),
+    0 0 100px rgba(66, 133, 244, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px) scale(1.02);
+}
+
+.scanner-btn-hero:hover::before {
+  width: 80px;
+  animation: scanner-sweep-fast 1.5s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(100, 210, 255, 0.15) 15%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(100, 210, 255, 0.15) 85%,
+    transparent 100%
+  );
+}
+
+/* --- NAV VARIANT: compact --- */
+.scanner-btn-nav {
+  background: rgba(66, 133, 244, 0.1);
+  border: 1px solid rgba(66, 133, 244, 0.3);
+  box-shadow:
+    0 0 10px rgba(66, 133, 244, 0.06),
+    0 0 1px rgba(100, 210, 255, 0.25);
+}
+
+.scanner-btn-nav::before {
+  width: 25px;
+  animation: scanner-sweep 4s ease-in-out infinite;
+}
+
+.scanner-btn-nav:hover {
+  background: rgba(66, 133, 244, 0.16);
+}
+
+/* --- GHOST VARIANT: outline / secondary --- */
+.scanner-btn-ghost {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.scanner-btn-ghost::before {
+  width: 30px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 30%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.06) 70%,
+    transparent 100%
+  );
+  animation: scanner-sweep 5s ease-in-out infinite;
+}
+
+.scanner-btn-ghost:hover {
+  background: rgba(66, 133, 244, 0.06);
+  border-color: rgba(66, 133, 244, 0.3);
+  box-shadow: 0 0 15px rgba(66, 133, 244, 0.08);
+  transform: translateY(-1px);
+}
+
+.scanner-btn-ghost:hover::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(100, 210, 255, 0.08) 25%,
+    rgba(100, 210, 255, 0.2) 50%,
+    rgba(100, 210, 255, 0.08) 75%,
+    transparent 100%
+  );
+  animation: scanner-sweep-fast 2.2s ease-in-out infinite;
+}
+
+/* --- INLINE VARIANT: small in-context buttons --- */
+.scanner-btn-inline {
+  background: rgba(66, 133, 244, 0.06);
+  border: 1px solid rgba(66, 133, 244, 0.2);
+  box-shadow: 0 0 6px rgba(66, 133, 244, 0.04);
+}
+
+.scanner-btn-inline::before {
+  width: 18px;
+  animation: scanner-sweep 4.5s ease-in-out infinite;
+}
+
+.scanner-btn-inline:hover {
+  background: rgba(66, 133, 244, 0.12);
+  border-color: rgba(100, 210, 255, 0.35);
+}
+
+/* --- KEYFRAMES --- */
+@keyframes scanner-sweep {
+  0% { left: -60px; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { left: calc(100% + 60px); opacity: 0; }
+}
+
+@keyframes scanner-sweep-fast {
+  0% { left: -80px; opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { left: calc(100% + 80px); opacity: 0; }
+}
+
+/* Text layer stays above the sweep */
+.scanner-btn > *,
+.scanner-btn-hero > *,
+.scanner-btn-nav > *,
+.scanner-btn-ghost > *,
+.scanner-btn-inline > * {
+  position: relative;
+  z-index: 2;
+}

@@ -1,0 +1,58 @@
+# =============================================================================
+# argus-frontend — .gitignore (Nuxt 4 / Vue 3 / TypeScript)
+# =============================================================================
+
+# ── Nuxt build artifacts ────────────────────────────────────────────────────
+.nuxt/
+.output/
+.nitro/
+.cache/
+dist/
+
+# ── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Environment & Secrets (CRITICAL: never commit) ──────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# ── TypeScript build info ───────────────────────────────────────────────────
+*.tsbuildinfo
+
+# ── Package manager ─────────────────────────────────────────────────────────
+.pnpm-store/
+.yarn/
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# ── Editor / IDE ─────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+.fleet/
+*.swp
+*.swo
+*~
+\#*\#
+.#*
+
+# ── Temporary / Generated ───────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+tmp/
+
+# ── OS metadata ─────────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
