@@ -9,6 +9,7 @@ package grpc
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -53,6 +54,12 @@ func ProtoEventToDomain(pbEvent *pb.ProctoringEvent, peerAddr string) *entity.Pr
 	// Marshal the oneof payload to JSON bytes for downstream storage.
 	// The PayloadType discriminator is set based on which oneof variant is present.
 	e.Payload, e.PayloadType = marshalOneofPayload(pbEvent)
+
+	// ---------------------------------------------------------------------------
+	// Extract denormalized AI fields from oneof payload for ClickHouse columnar
+	// storage. This avoids JSON parsing at query time for hot-path analytics.
+	// ---------------------------------------------------------------------------
+	extractAIFields(pbEvent, e)
 
 	// Map client metadata. IP address is always set server-side from the
 	// gRPC peer address for security — never trust the client-supplied value.
@@ -222,6 +229,18 @@ func marshalOneofPayload(pbEvent *pb.ProctoringEvent) ([]byte, string) {
 	case *pb.ProctoringEvent_Kernel:
 		payload = p.Kernel
 		ptype = "kernel"
+	case *pb.ProctoringEvent_HeadPose:
+		payload = p.HeadPose
+		ptype = "head_pose"
+	case *pb.ProctoringEvent_Liveness:
+		payload = p.Liveness
+		ptype = "liveness"
+	case *pb.ProctoringEvent_AudioAnalysis:
+		payload = p.AudioAnalysis
+		ptype = "audio_analysis"
+	case *pb.ProctoringEvent_FaceEmbedding:
+		payload = p.FaceEmbedding
+		ptype = "face_embedding"
 	default:
 		return nil, ""
 	}
@@ -241,6 +260,49 @@ func marshalOneofPayload(pbEvent *pb.ProctoringEvent) ([]byte, string) {
 	}
 
 	return data, ptype
+}
+
+// ---------------------------------------------------------------------------
+//  AI Field Extraction — Proto → Denormalized Domain Fields
+// ---------------------------------------------------------------------------
+
+// extractAIFields populates the denormalized AI columns on the domain entity
+// from the protobuf oneof payload. These fields are written directly to
+// ClickHouse columnar storage for efficient range scans and aggregations
+// without parsing the JSON payload column at query time.
+func extractAIFields(pbEvent *pb.ProctoringEvent, e *entity.ProctoringEvent) {
+	// Default sentinel values match ClickHouse column defaults.
+	e.LivenessScore = -1
+	e.FaceSimilarity = -1
+	e.AudioRmsDb = -100
+
+	switch p := pbEvent.GetPayload().(type) {
+	case *pb.ProctoringEvent_HeadPose:
+		if hp := p.HeadPose; hp != nil {
+			e.HeadYaw = hp.GetYaw()
+			e.HeadPitch = hp.GetPitch()
+			e.HeadRoll = hp.GetRoll()
+			e.FaceBBox = fmt.Sprintf(`{"x":%f,"y":%f,"w":%f,"h":%f}`,
+				hp.GetFaceX(), hp.GetFaceY(), hp.GetFaceW(), hp.GetFaceH())
+		}
+	case *pb.ProctoringEvent_Liveness:
+		if lv := p.Liveness; lv != nil {
+			e.LivenessScore = lv.GetLivenessScore()
+		}
+	case *pb.ProctoringEvent_FaceEmbedding:
+		if fe := p.FaceEmbedding; fe != nil {
+			e.FaceEmbedding = fe.GetEmbedding()
+			e.FaceSimilarity = fe.GetSimilarity()
+		}
+	case *pb.ProctoringEvent_AudioAnalysis:
+		if aa := p.AudioAnalysis; aa != nil {
+			e.AudioRmsDb = aa.GetRmsDb()
+			e.VADActive = aa.GetVadActive()
+			e.AudioClassification = aa.GetClassification()
+			e.SpeakerCount = uint8(aa.GetSpeakerCount())
+			e.SpeakerMatch = aa.GetSpeakerMatch()
+		}
+	}
 }
 
 // unmarshalOneofPayload deserializes JSON bytes back into the appropriate
@@ -295,6 +357,26 @@ func unmarshalOneofPayload(pbEvent *pb.ProctoringEvent, data []byte, payloadType
 		var p pb.KernelPayload
 		if json.Unmarshal(data, &p) == nil {
 			pbEvent.Payload = &pb.ProctoringEvent_Kernel{Kernel: &p}
+		}
+	case "head_pose":
+		var p pb.HeadPosePayload
+		if json.Unmarshal(data, &p) == nil {
+			pbEvent.Payload = &pb.ProctoringEvent_HeadPose{HeadPose: &p}
+		}
+	case "liveness":
+		var p pb.LivenessPayload
+		if json.Unmarshal(data, &p) == nil {
+			pbEvent.Payload = &pb.ProctoringEvent_Liveness{Liveness: &p}
+		}
+	case "audio_analysis":
+		var p pb.AudioAnalysisPayload
+		if json.Unmarshal(data, &p) == nil {
+			pbEvent.Payload = &pb.ProctoringEvent_AudioAnalysis{AudioAnalysis: &p}
+		}
+	case "face_embedding":
+		var p pb.FaceEmbeddingPayload
+		if json.Unmarshal(data, &p) == nil {
+			pbEvent.Payload = &pb.ProctoringEvent_FaceEmbedding{FaceEmbedding: &p}
 		}
 	}
 }

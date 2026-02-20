@@ -88,6 +88,11 @@ message ProctoringEvent {
     PsychometryPayload       psychometry = 26;
     NetworkPayload           network = 27;
     KernelPayload            kernel = 28;
+    // AI Vision & Audio payloads
+    HeadPosePayload          head_pose = 29;
+    LivenessPayload          liveness = 31;
+    AudioAnalysisPayload     audio_analysis = 32;
+    FaceEmbeddingPayload     face_embedding = 33;
   }
 
   // Client metadata for forensic analysis.
@@ -109,6 +114,11 @@ enum EventType {
   MULTIPLE_PERSONS             = 5;
   DYNAMIC_FACE_RECHECK_FAIL    = 6;
 
+  // AI Vision events (biometric inference)
+  HEAD_POSE_ANOMALY            = 7;   // Yaw/Pitch/Roll outside threshold
+  LIVENESS_CHECK_FAILED        = 8;   // Eye-blink + texture liveness failure
+  FACE_OCCLUDED                = 9;   // Partial face occlusion detected
+
   // Object detection events
   PHONE_DETECTED               = 10;
   BOOK_DETECTED                = 11;
@@ -120,6 +130,11 @@ enum EventType {
   AUDIO_ANOMALY                = 21;
   AUDIO_PERIPHERY_DETECTED     = 22;
   SMART_NOISE_CLASSIFIED       = 23;
+
+  // AI Audio events (sound activity detection)
+  WHISPER_DETECTED             = 24;  // Low-amplitude speech (<40dB)
+  SECOND_SPEAKER_DETECTED      = 25;  // Voice embedding mismatch
+  AUDIO_PLAYBACK_DETECTED      = 26;  // TTS/recorded audio fingerprint
 
   // Browser events
   TAB_SWITCH                   = 30;
@@ -153,6 +168,11 @@ enum EventType {
   MOUSE_TELEMETRY              = 101;
   KEYBOARD_TELEMETRY           = 102;
   FOCUS_SCORE_UPDATE           = 103;
+
+  // AI Telemetry (continuous inference streams)
+  HEAD_POSE_TELEMETRY          = 104;  // Continuous yaw/pitch/roll
+  FACE_EMBEDDING_TELEMETRY     = 105;  // Periodic face embedding snapshot
+  AUDIO_LEVEL_TELEMETRY        = 106;  // Continuous dB + VAD stream
 }
 
 enum Severity {
@@ -289,6 +309,95 @@ message KernelPayload {
   int32 monitor_count = 6;
   // Whether any monitor is virtual.
   bool virtual_monitor = 7;
+}
+
+// ============================================================================
+//  AI VISION PAYLOADS
+// ============================================================================
+
+// Head pose estimation from 3D face landmark regression.
+// Euler angles in degrees; (0,0,0) = facing camera directly.
+message HeadPosePayload {
+  // Yaw: horizontal rotation. Negative = looking left, positive = right.
+  float yaw = 1;
+  // Pitch: vertical rotation. Negative = looking down, positive = up.
+  float pitch = 2;
+  // Roll: in-plane rotation. Negative = tilted left, positive = right.
+  float roll = 3;
+  // Face bounding box (normalized 0-1 of frame dimensions).
+  float face_x = 4;
+  float face_y = 5;
+  float face_w = 6;
+  float face_h = 7;
+  // Inter-pupillary distance in pixels (proxy for distance-to-camera).
+  float ipd_px = 8;
+  // Number of 3D landmarks used (68 or 478 for MediaPipe).
+  int32 landmark_count = 9;
+  // Inference latency in milliseconds (for performance monitoring).
+  float inference_ms = 10;
+}
+
+// Liveness verification payload — multi-factor anti-spoofing.
+message LivenessPayload {
+  // Overall liveness probability (0.0 = spoof, 1.0 = real).
+  float liveness_score = 1;
+  // Eye-blink detection: true if natural blink pattern detected.
+  bool blink_detected = 2;
+  // Blink rate per minute over sliding window.
+  float blink_rate_per_min = 3;
+  // Texture analysis score (detects printed photos, screen replays).
+  float texture_score = 4;
+  // Depth consistency score (detects flat surfaces like photos/screens).
+  float depth_score = 5;
+  // Type of spoof suspected if liveness_score < threshold.
+  string spoof_vector = 6; // "photo", "screen_replay", "mask", "deepfake", "none"
+  // Frame quality score (blur, exposure, occlusion).
+  float frame_quality = 7;
+}
+
+// Face embedding for continuous identity verification.
+message FaceEmbeddingPayload {
+  // 512-dimensional face embedding vector (ArcFace/FaceNet).
+  repeated float embedding = 1;
+  // Cosine similarity to enrolled reference embedding.
+  float similarity = 2;
+  // Whether identity match passed threshold (>0.65 = match).
+  bool identity_match = 3;
+  // Embedding model version for forward compatibility.
+  string model_version = 4;
+  // Face alignment quality (0-1, pre-embedding).
+  float alignment_quality = 5;
+}
+
+// ============================================================================
+//  AI AUDIO PAYLOADS
+// ============================================================================
+
+// Audio analysis payload — sound activity detection + anomaly classification.
+// All processing is local (browser-side). No raw audio leaves the device.
+message AudioAnalysisPayload {
+  // RMS dB level (calibrated, A-weighted).
+  float rms_db = 1;
+  // Voice Activity Detection result.
+  bool vad_active = 2;
+  // VAD confidence (0-1).
+  float vad_confidence = 3;
+  // Spectral centroid in Hz (voice ~300-3000Hz, music ~1000-8000Hz).
+  float spectral_centroid_hz = 4;
+  // Zero-crossing rate (speech ~0.02-0.10, noise >0.10).
+  float zcr = 5;
+  // Classified audio source.
+  string classification = 6; // "silence", "speech", "whisper", "music", "keyboard", "ambient"
+  // Classification confidence (0-1).
+  float classification_confidence = 7;
+  // Number of distinct speakers detected (speaker diarization).
+  int32 speaker_count = 8;
+  // Whether detected voice matches enrolled voiceprint.
+  bool speaker_match = 9;
+  // Speaker embedding cosine similarity to enrolled reference.
+  float speaker_similarity = 10;
+  // Duration of current audio segment in milliseconds.
+  int64 segment_duration_ms = 11;
 }
 
 // ============================================================================

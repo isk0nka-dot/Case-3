@@ -60,11 +60,26 @@ const (
 	VirtualMonitorDetected   EventType = 66
 	VirtualMachineDetected   EventType = 67
 
+	// AI Vision events (biometric inference results)
+	HeadPoseAnomaly          EventType = 7  // Yaw/Pitch/Roll outside threshold
+	LivenessCheckFailed      EventType = 8  // Eye-blink + texture liveness failure
+	FaceOccluded             EventType = 9  // Partial face occlusion detected
+
+	// AI Audio events (sound activity detection)
+	WhisperDetected          EventType = 24 // Low-amplitude speech (<40dB)
+	SecondSpeakerDetected    EventType = 25 // Voice embedding mismatch
+	AudioPlaybackDetected    EventType = 26 // TTS/recorded audio fingerprint
+
 	// Telemetry (high-frequency, low-severity)
 	GazeTelemetry            EventType = 100
 	MouseTelemetry           EventType = 101
 	KeyboardTelemetry        EventType = 102
 	FocusScoreUpdate         EventType = 103
+
+	// AI Telemetry (continuous inference streams)
+	HeadPoseTelemetry        EventType = 104 // Continuous yaw/pitch/roll
+	FaceEmbeddingTelemetry   EventType = 105 // Periodic face embedding snapshot
+	AudioLevelTelemetry      EventType = 106 // Continuous dB + VAD stream
 )
 
 // IsTelemetry returns true for high-frequency telemetry event types.
@@ -114,10 +129,19 @@ func (et EventType) String() string {
 		HardwareIDMismatch:       "hardware_id_mismatch",
 		VirtualMonitorDetected:   "virtual_monitor_detected",
 		VirtualMachineDetected:   "virtual_machine_detected",
+		HeadPoseAnomaly:          "head_pose_anomaly",
+		LivenessCheckFailed:      "liveness_check_failed",
+		FaceOccluded:             "face_occluded",
+		WhisperDetected:          "whisper_detected",
+		SecondSpeakerDetected:    "second_speaker_detected",
+		AudioPlaybackDetected:    "audio_playback_detected",
 		GazeTelemetry:            "gaze_telemetry",
 		MouseTelemetry:           "mouse_telemetry",
 		KeyboardTelemetry:        "keyboard_telemetry",
 		FocusScoreUpdate:         "focus_score_update",
+		HeadPoseTelemetry:        "head_pose_telemetry",
+		FaceEmbeddingTelemetry:   "face_embedding_telemetry",
+		AudioLevelTelemetry:      "audio_level_telemetry",
 	}
 	if name, ok := names[et]; ok {
 		return name

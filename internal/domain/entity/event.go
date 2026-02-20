@@ -35,6 +35,27 @@ type ProctoringEvent struct {
 	Payload        []byte  // JSON-encoded type-specific payload
 	PayloadType    string  // discriminator for payload deserialization
 	ClientMeta     ClientMeta
+
+	// ----- AI Inference Fields (populated by payload extractor) -----
+	// These are denormalized from the JSON payload for direct ClickHouse
+	// columnar storage, enabling efficient range scans and aggregations
+	// without parsing JSON at query time.
+
+	// Vision AI
+	HeadYaw        float32   // head pose yaw in degrees (-90 to +90)
+	HeadPitch      float32   // head pose pitch in degrees (-90 to +90)
+	HeadRoll       float32   // head pose roll in degrees (-180 to +180)
+	FaceBBox       string    // JSON: {"x":0.1,"y":0.2,"w":0.3,"h":0.4}
+	LivenessScore  float32   // liveness probability (0=spoof, 1=real, -1=not computed)
+	FaceEmbedding  []float32 // 512-dim face embedding vector (ArcFace)
+	FaceSimilarity float32   // cosine similarity to enrolled reference (-1=not computed)
+
+	// Audio AI
+	AudioRmsDb          float32 // A-weighted RMS dB level (-100=silence)
+	VADActive           bool    // voice activity detection flag
+	AudioClassification string  // silence, speech, whisper, music, keyboard, ambient
+	SpeakerCount        uint8   // number of distinct speakers detected
+	SpeakerMatch        bool    // whether voice matches enrolled voiceprint
 }
 
 // ClientMeta holds browser/client metadata attached to every event.

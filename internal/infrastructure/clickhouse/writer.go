@@ -501,7 +501,11 @@ func (w *Writer) insertBatch(events []*entity.ProctoringEvent) error {
 			server_timestamp, client_timestamp, video_timestamp_sec,
 			label, confidence, payload, payload_type,
 			user_agent, sdk_version, resolution,
-			timezone_offset_min, ip_address, region
+			timezone_offset_min, ip_address, region,
+			head_yaw, head_pitch, head_roll, face_bbox,
+			liveness_score, face_embedding, face_similarity,
+			audio_rms_db, vad_active, audio_classification,
+			speaker_count, speaker_match
 		)
 	`)
 	if err != nil {
@@ -509,6 +513,16 @@ func (w *Writer) insertBatch(events []*entity.ProctoringEvent) error {
 	}
 
 	for _, event := range events {
+		// Convert VAD bool to UInt8 for ClickHouse
+		var vadActive uint8
+		if event.VADActive {
+			vadActive = 1
+		}
+		var speakerMatch uint8
+		if event.SpeakerMatch {
+			speakerMatch = 1
+		}
+
 		if err := batch.Append(
 			event.EventID,
 			event.SessionID,
@@ -531,6 +545,18 @@ func (w *Writer) insertBatch(events []*entity.ProctoringEvent) error {
 			event.ClientMeta.TimezoneOffsetMin,
 			event.ClientMeta.IPAddress,
 			event.ClientMeta.Region,
+			event.HeadYaw,
+			event.HeadPitch,
+			event.HeadRoll,
+			event.FaceBBox,
+			event.LivenessScore,
+			event.FaceEmbedding,
+			event.FaceSimilarity,
+			event.AudioRmsDb,
+			vadActive,
+			event.AudioClassification,
+			event.SpeakerCount,
+			speakerMatch,
 		); err != nil {
 			return fmt.Errorf("append to batch failed: %w", err)
 		}
