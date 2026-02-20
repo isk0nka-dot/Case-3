@@ -127,6 +127,9 @@ type ForensicReport struct {
 
 	// Forensic ledger
 	LedgerSummary LedgerSummary        `json:"ledgerSummary"`
+
+	// Secondary camera (Fix 9)
+	Sidecam      SidecamSummary        `json:"sidecam"`
 }
 
 // TimelineEntry is a violation in the timeline.
@@ -147,6 +150,21 @@ type DeviceInfo struct {
 	IPAddress    string `json:"ipAddress"`
 	Region       string `json:"region"`
 	Timezone     int32  `json:"timezone"`
+}
+
+// SidecamSummary holds secondary camera forensic data for the report (Fix 9).
+type SidecamSummary struct {
+	WasPaired           bool    `json:"wasPaired"`
+	DeviceModel         string  `json:"deviceModel"`
+	Calibrated          bool    `json:"calibrated"`
+	CalibrationAngle    float64 `json:"calibrationAngle"`
+	TotalAnomalies      int     `json:"totalAnomalies"`
+	DisplacementEvents  int     `json:"displacementEvents"`
+	HandsOffDeskEvents  int     `json:"handsOffDeskEvents"`
+	StreamDropEvents    int     `json:"streamDropEvents"`
+	BatteryCritEvents   int     `json:"batteryCritEvents"`
+	CalibrationFailures int     `json:"calibrationFailures"`
+	ThermalThrottles    int     `json:"thermalThrottles"`
 }
 
 // LedgerSummary is a summary of the forensic ledger state.
@@ -193,6 +211,13 @@ var penaltyRules = []penaltyRule{
 	{"EARBUDS_DETECTED", 8, 24, "Обнаружены наушники"},
 	{"WHISPER_DETECTED", 5, 15, "Обнаружен шёпот"},
 	{"AUDIO_PLAYBACK_DETECTED", 10, 20, "Обнаружено воспроизведение аудио"},
+	// Fix 8: Secondary camera penalty rules (6 new rules → total 29)
+	{"SIDECAM_DEVICE_DISPLACED", 10, 0, "Перемещение устройства (боковая камера)"},
+	{"SIDECAM_HANDS_OFF_DESK", 3, 15, "Руки вне рабочей зоны (боковая камера)"},
+	{"SIDECAM_BATTERY_CRITICAL", 5, 5, "Критический заряд батареи (боковая камера)"},
+	{"SIDECAM_STREAM_DISCONNECTED", 8, 0, "Потеря связи (боковая камера)"},
+	{"SIDECAM_CALIBRATION_FAILED", 5, 10, "Неудачная калибровка (боковая камера)"},
+	{"SIDECAM_THERMAL_THROTTLE", 2, 6, "Термоограничение FPS (боковая камера)"},
 }
 
 // ---------------------------------------------------------------------------
@@ -536,6 +561,61 @@ func (s *Scorer) QueryDeviceInfo(ctx context.Context, sessionID string) (*Device
 		return &DeviceInfo{}, nil
 	}
 	return &info, nil
+}
+
+// QuerySidecamSummary retrieves secondary camera anomaly data from ClickHouse (Fix 9).
+func (s *Scorer) QuerySidecamSummary(ctx context.Context, sessionID string) (*SidecamSummary, error) {
+	qctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	summary := &SidecamSummary{}
+
+	// Query sidecam event counts
+	rows, err := s.chConn.Query(qctx, `
+		SELECT
+			event_type,
+			count() AS cnt
+		FROM proctoring_events
+		WHERE session_id = ?
+		  AND source = 'SIDE_CAMERA'
+		GROUP BY event_type`,
+		sessionID,
+	)
+	if err != nil {
+		return summary, nil // Non-fatal
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var eventType string
+		var cnt uint64
+		if err := rows.Scan(&eventType, &cnt); err != nil {
+			continue
+		}
+		c := int(cnt)
+		summary.TotalAnomalies += c
+		switch eventType {
+		case "SIDECAM_DEVICE_DISPLACED":
+			summary.DisplacementEvents = c
+		case "SIDECAM_HANDS_OFF_DESK":
+			summary.HandsOffDeskEvents = c
+		case "SIDECAM_STREAM_DISCONNECTED":
+			summary.StreamDropEvents = c
+		case "SIDECAM_BATTERY_CRITICAL":
+			summary.BatteryCritEvents = c
+		case "SIDECAM_CALIBRATION_FAILED":
+			summary.CalibrationFailures = c
+		case "SIDECAM_THERMAL_THROTTLE":
+			summary.ThermalThrottles = c
+		}
+	}
+
+	// If any sidecam events exist, the camera was paired
+	if summary.TotalAnomalies > 0 {
+		summary.WasPaired = true
+	}
+
+	return summary, nil
 }
 
 // ---------------------------------------------------------------------------

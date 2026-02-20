@@ -44,6 +44,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"net"
@@ -75,6 +77,8 @@ import (
 	"github.com/argus-ai/event-collector/internal/infrastructure/session"
 	"github.com/argus-ai/event-collector/internal/infrastructure/sidecam"
 	"github.com/argus-ai/event-collector/internal/infrastructure/postgres"
+	"github.com/argus-ai/event-collector/internal/domain/entity"
+	"github.com/argus-ai/event-collector/internal/domain/valueobject"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	grpcTransport "github.com/argus-ai/event-collector/internal/transport/grpc"
 	"github.com/argus-ai/event-collector/internal/transport/grpcweb"
@@ -607,7 +611,68 @@ func run() error {
 		// QR pairing, spatial calibration, device telemetry,
 		// stream health, and session gating for mobile secondary cameras.
 		// =============================================================
-		sidecamOrchestrator := sidecam.NewOrchestrator(logger, adminJWTKey, fmt.Sprintf(":%d", cfg.Server.HTTPPort))
+
+		// Fix 7: Event emitter closure — bridges sidecam anomalies into ClickHouse
+		sidecamEventEmitter := func(sessionID, studentID, examID, orgID, eventType, severity, label string) {
+			// Map string event type to valueobject.EventType constant
+			etMap := map[string]valueobject.EventType{
+				"SIDECAM_DEVICE_DISPLACED":    valueobject.SidecamDeviceDisplaced,
+				"SIDECAM_HANDS_OFF_DESK":      valueobject.SidecamHandsOffDesk,
+				"SIDECAM_BATTERY_CRITICAL":    valueobject.SidecamBatteryCritical,
+				"SIDECAM_STREAM_DISCONNECTED": valueobject.SidecamStreamDisconnected,
+				"SIDECAM_CALIBRATION_FAILED":  valueobject.SidecamCalibrationFailed,
+				"SIDECAM_THERMAL_THROTTLE":    valueobject.SidecamThermalThrottle,
+			}
+
+			sevMap := map[string]valueobject.Severity{
+				"critical": valueobject.SeverityCritical,
+				"warning":  valueobject.SeverityWarning,
+				"info":     valueobject.SeverityInfo,
+			}
+
+			et, ok := etMap[eventType]
+			if !ok {
+				logger.Warn("sidecam: unknown event type for emission", zap.String("event_type", eventType))
+				return
+			}
+			sev := sevMap[severity]
+			if sev == valueobject.SeverityUnspecified {
+				sev = valueobject.SeverityWarning
+			}
+
+			// Generate a unique event ID
+			idBytes := make([]byte, 16)
+			rand.Read(idBytes)
+			eid := hex.EncodeToString(idBytes)
+
+			now := time.Now().UTC()
+			evt := &entity.ProctoringEvent{
+				EventID:        eid,
+				SessionID:      sessionID,
+				StudentID:      studentID,
+				ExamID:         examID,
+				OrgID:          orgID,
+				EventType:      et,
+				Severity:       sev,
+				Source:         valueobject.SourceSideCamera,
+				ServerTimestamp: now,
+				ClientTimestamp: now,
+				Label:          label,
+				Confidence:     1.0,
+			}
+
+			if chWriter != nil {
+				if err := chWriter.Write(context.Background(), evt); err != nil {
+					logger.Error("sidecam: failed to write event to clickhouse",
+						zap.String("session_id", sessionID),
+						zap.String("event_type", eventType),
+						zap.Error(err),
+					)
+				}
+			}
+		}
+
+		sidecamOrchestrator := sidecam.NewOrchestrator(logger, adminJWTKey, fmt.Sprintf(":%d", cfg.Server.HTTPPort), sidecamEventEmitter)
 		sidecamHandler := adminHTTP.NewSidecamHandler(sidecamOrchestrator, pgRepo, logger, adminJWTKey)
 		sidecamHandler.RegisterRoutes(httpMux)
 

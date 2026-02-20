@@ -65,10 +65,11 @@ func (h *SidecamHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sidecam/pair/initiate", h.requireAuth(h.handleInitiatePairing))
 	mux.HandleFunc("POST /api/v1/sidecam/pair/complete", h.handleCompletePairing) // No auth — mobile device uses pairing token
 	mux.HandleFunc("POST /api/v1/sidecam/validate-start", h.requireAuth(h.handleValidateStart))
-	mux.HandleFunc("POST /api/v1/sidecam/calibrate", h.handleCalibrate) // Token-based auth via pairing
-	mux.HandleFunc("POST /api/v1/sidecam/telemetry", h.handleTelemetry)
-	mux.HandleFunc("POST /api/v1/sidecam/heartbeat", h.handleHeartbeat)
-	mux.HandleFunc("POST /api/v1/sidecam/hands", h.handleHandsDetection)
+	// Fix 4: Device-token auth for mobile endpoints (post-pairing)
+	mux.HandleFunc("POST /api/v1/sidecam/calibrate", h.requireDeviceToken(h.handleCalibrate))
+	mux.HandleFunc("POST /api/v1/sidecam/telemetry", h.requireDeviceToken(h.handleTelemetry))
+	mux.HandleFunc("POST /api/v1/sidecam/heartbeat", h.requireDeviceToken(h.handleHeartbeat))
+	mux.HandleFunc("POST /api/v1/sidecam/hands", h.requireDeviceToken(h.handleHandsDetection))
 	mux.HandleFunc("GET /api/v1/sidecam/session/{sessionId}", h.requireAuth(h.handleGetSession))
 	mux.HandleFunc("DELETE /api/v1/sidecam/session/{sessionId}", h.requireAuth(h.handleCleanupSession))
 }
@@ -199,14 +200,15 @@ func (h *SidecamHandler) handleCompletePairing(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Return updated session state
+	// Return updated session state + device token (Fix 4)
 	session, _ := h.orchestrator.GetPairingSession(req.SessionID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":  "paired",
-		"session": session,
+		"status":      "paired",
+		"session":     session,
+		"deviceToken": session.DeviceToken, // Fix 4: issued for post-pairing device auth
 	})
 }
 
@@ -378,6 +380,39 @@ func (h *SidecamHandler) handleCleanupSession(w http.ResponseWriter, r *http.Req
 // ==========================================================================
 // Auth + Helpers (follows existing handler pattern)
 // ==========================================================================
+
+// requireDeviceToken validates the X-Device-Token header for mobile endpoints (Fix 4).
+// The device token is issued at pairing completion and must be sent with all post-pairing requests.
+func (h *SidecamHandler) requireDeviceToken(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		deviceToken := r.Header.Get("X-Device-Token")
+		if deviceToken == "" {
+			h.jsonError(w, "Missing X-Device-Token header", http.StatusUnauthorized)
+			return
+		}
+
+		// Extract sessionId from the request body (peek without consuming)
+		// For simplicity, the device token middleware reads sessionId from the header as well
+		sessionID := r.Header.Get("X-Session-ID")
+		if sessionID == "" {
+			// Fallback: try to parse from body by wrapping the request
+			// For now, we require X-Session-ID header for device-authenticated endpoints
+			h.jsonError(w, "Missing X-Session-ID header", http.StatusBadRequest)
+			return
+		}
+
+		if err := h.orchestrator.ValidateDeviceToken(sessionID, deviceToken); err != nil {
+			h.logger.Warn("sidecam: device token validation failed",
+				zap.String("session_id", sessionID),
+				zap.Error(err),
+			)
+			h.jsonError(w, "Invalid device token", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}
 
 func (h *SidecamHandler) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

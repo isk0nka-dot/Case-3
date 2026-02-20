@@ -70,6 +70,14 @@ const (
 	SecondSpeakerDetected    EventType = 25 // Voice embedding mismatch
 	AudioPlaybackDetected    EventType = 26 // TTS/recorded audio fingerprint
 
+	// Secondary Camera (Side Camera) events (Fix 7)
+	SidecamDeviceDisplaced    EventType = 70 // Accelerometer displacement > 2.0
+	SidecamHandsOffDesk       EventType = 71 // Hands left desk area
+	SidecamBatteryCritical    EventType = 72 // Battery < 10%
+	SidecamStreamDisconnected EventType = 73 // Heartbeat timeout
+	SidecamCalibrationFailed  EventType = 74 // Golden angle calibration retry
+	SidecamThermalThrottle    EventType = 75 // FPS throttled due to thermal
+
 	// Telemetry (high-frequency, low-severity)
 	GazeTelemetry            EventType = 100
 	MouseTelemetry           EventType = 101
@@ -135,6 +143,13 @@ func (et EventType) String() string {
 		WhisperDetected:          "whisper_detected",
 		SecondSpeakerDetected:    "second_speaker_detected",
 		AudioPlaybackDetected:    "audio_playback_detected",
+		// Secondary Camera events (Fix 7) — UPPERCASE to match penalty rules
+		SidecamDeviceDisplaced:    "SIDECAM_DEVICE_DISPLACED",
+		SidecamHandsOffDesk:       "SIDECAM_HANDS_OFF_DESK",
+		SidecamBatteryCritical:    "SIDECAM_BATTERY_CRITICAL",
+		SidecamStreamDisconnected: "SIDECAM_STREAM_DISCONNECTED",
+		SidecamCalibrationFailed:  "SIDECAM_CALIBRATION_FAILED",
+		SidecamThermalThrottle:    "SIDECAM_THERMAL_THROTTLE",
 		GazeTelemetry:            "gaze_telemetry",
 		MouseTelemetry:           "mouse_telemetry",
 		KeyboardTelemetry:        "keyboard_telemetry",

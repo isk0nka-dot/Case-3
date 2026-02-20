@@ -274,6 +274,16 @@ func (h *ForensicHandler) buildForensicReport(ctx context.Context, sessionID str
 		return nil, fmt.Errorf("voice biometric query: %w", err)
 	}
 
+	// Fix 9: Secondary camera summary
+	sidecamSummary, err := h.scorer.QuerySidecamSummary(ctx, sessionID)
+	if err != nil {
+		h.logger.Warn("forensic: sidecam summary query failed, continuing",
+			zap.String("session_id", sessionID),
+			zap.Error(err),
+		)
+		sidecamSummary = &forensic.SidecamSummary{}
+	}
+
 	// Integrity verification (hash chain + S3)
 	var ledger forensic.LedgerSummary
 	if h.verifier != nil {
@@ -310,6 +320,7 @@ func (h *ForensicHandler) buildForensicReport(ctx context.Context, sessionID str
 		DeviceInfo:    *deviceInfo,
 		GazeData:      gazeData,
 		LedgerSummary: ledger,
+		Sidecam:       *sidecamSummary,
 	}
 
 	// Compute report hash

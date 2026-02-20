@@ -117,8 +117,9 @@ type PairingSession struct {
 	OrgID           string           `json:"orgId"`
 	Policy          CameraPolicy     `json:"policy"`
 	State           PairingState     `json:"state"`
-	PairingToken    string           `json:"pairingToken"`
-	PairingCode     string           `json:"pairingCode"`
+	PairingToken    string           `json:"-"`             // Cleared after pairing (Fix 1)
+	PairingCode     string           `json:"-"`             // Cleared after pairing (Fix 1)
+	DeviceToken     string           `json:"deviceToken,omitempty"` // Post-pairing device auth (Fix 4)
 	CreatedAt       time.Time        `json:"createdAt"`
 	ExpiresAt       time.Time        `json:"expiresAt"`
 	ConnectedAt     *time.Time       `json:"connectedAt,omitempty"`
@@ -143,6 +144,14 @@ type PairingCodePayload struct {
 }
 
 // ---------------------------------------------------------------------------
+// Event Emission (Fix 6)
+// ---------------------------------------------------------------------------
+
+// EventEmitFn bridges sidecam anomalies into the ClickHouse event pipeline.
+// Parameters: sessionID, studentID, examID, orgID, eventType, severity, label
+type EventEmitFn func(sessionID, studentID, examID, orgID, eventType, severity, label string)
+
+// ---------------------------------------------------------------------------
 // Orchestrator
 // ---------------------------------------------------------------------------
 
@@ -152,6 +161,7 @@ type Orchestrator struct {
 	sessions map[string]*PairingSession // sessionID -> PairingSession
 	logger   *zap.Logger
 	secret   []byte // HMAC signing key for pairing tokens
+	emitFn   EventEmitFn // Bridges anomalies to ClickHouse (Fix 6)
 
 	// Config
 	pairingTTL       time.Duration
@@ -160,11 +170,12 @@ type Orchestrator struct {
 }
 
 // NewOrchestrator creates a new secondary camera orchestrator.
-func NewOrchestrator(logger *zap.Logger, signingKey []byte, serverURL string) *Orchestrator {
+func NewOrchestrator(logger *zap.Logger, signingKey []byte, serverURL string, emitFn EventEmitFn) *Orchestrator {
 	o := &Orchestrator{
 		sessions:         make(map[string]*PairingSession),
 		logger:           logger.Named("sidecam"),
 		secret:           signingKey,
+		emitFn:           emitFn,
 		pairingTTL:       5 * time.Minute,
 		heartbeatTimeout: 15 * time.Second,
 		serverURL:        serverURL,
@@ -174,6 +185,30 @@ func NewOrchestrator(logger *zap.Logger, signingKey []byte, serverURL string) *O
 	go o.healthMonitorLoop()
 
 	return o
+}
+
+// emitEvent safely emits an event if the callback is configured.
+func (o *Orchestrator) emitEvent(ps *PairingSession, eventType, severity, label string) {
+	if o.emitFn != nil {
+		o.emitFn(ps.SessionID, ps.StudentID, ps.ExamID, ps.OrgID, eventType, severity, label)
+	}
+}
+
+// ValidateDeviceToken checks the device-bound session token (Fix 4).
+func (o *Orchestrator) ValidateDeviceToken(sessionID, token string) error {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+
+	ps, ok := o.sessions[sessionID]
+	if !ok {
+		return fmt.Errorf("sidecam: session not found")
+	}
+
+	if ps.DeviceToken == "" || !hmac.Equal([]byte(token), []byte(ps.DeviceToken)) {
+		return fmt.Errorf("sidecam: invalid device token")
+	}
+
+	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -187,6 +222,14 @@ func (o *Orchestrator) InitiatePairing(
 ) (*PairingSession, *PairingCodePayload, error) {
 	if policy == PolicyDisabled {
 		return nil, nil, fmt.Errorf("sidecam: secondary camera is disabled for this exam")
+	}
+
+	// Fix 5: Double-pairing guard — reject if session exists in non-terminal state
+	o.mu.RLock()
+	existing, exists := o.sessions[sessionID]
+	o.mu.RUnlock()
+	if exists && existing.State != PairingFailed && existing.State != PairingDisconnected {
+		return nil, nil, fmt.Errorf("sidecam: pairing session already active (state=%s), cannot re-initiate", existing.State)
 	}
 
 	// Generate ephemeral pairing token
@@ -276,6 +319,17 @@ func (o *Orchestrator) CompletePairing(sessionID, pairingToken string, device *M
 	ps.Health.Connected = true
 	ps.Health.LastHeartbeat = now.Format(time.RFC3339)
 
+	// Fix 1: Invalidate pairing token — prevent replay attacks
+	ps.PairingToken = ""
+	ps.PairingCode = ""
+
+	// Fix 4: Generate device-bound session token for post-pairing auth
+	devTokenBytes := make([]byte, 32)
+	if _, err := rand.Read(devTokenBytes); err != nil {
+		return fmt.Errorf("sidecam: failed to generate device token: %w", err)
+	}
+	ps.DeviceToken = hex.EncodeToString(devTokenBytes)
+
 	o.logger.Info("sidecam: device paired",
 		zap.String("session_id", sessionID),
 		zap.String("device", device.DeviceModel),
@@ -304,12 +358,23 @@ func (o *Orchestrator) ValidateSessionStart(sessionID string, policy CameraPolic
 		return fmt.Errorf("sidecam: mandatory secondary camera required but no pairing session found")
 	}
 
-	if ps.State == PairingPending {
-		return fmt.Errorf("sidecam: mandatory secondary camera not yet connected — scan QR code to pair mobile device")
-	}
-
-	if ps.State == PairingFailed || ps.State == PairingDisconnected {
-		return fmt.Errorf("sidecam: mandatory secondary camera pairing failed or disconnected")
+	// Fix 2: Require PairingReady (calibrated) for mandatory mode.
+	// Previously PairingConnected (uncalibrated) passed — this was the primary bypass vector.
+	if ps.State != PairingReady {
+		switch ps.State {
+		case PairingPending:
+			return fmt.Errorf("sidecam: mandatory secondary camera not yet connected — scan QR code to pair mobile device")
+		case PairingConnected:
+			return fmt.Errorf("sidecam: mandatory secondary camera connected but not calibrated — complete spatial calibration first")
+		case PairingCalibrating:
+			return fmt.Errorf("sidecam: mandatory secondary camera calibration in progress — please wait")
+		case PairingFailed:
+			return fmt.Errorf("sidecam: mandatory secondary camera pairing failed — re-initiate pairing")
+		case PairingDisconnected:
+			return fmt.Errorf("sidecam: mandatory secondary camera disconnected — restore connection")
+		default:
+			return fmt.Errorf("sidecam: mandatory secondary camera in unexpected state: %s", ps.State)
+		}
 	}
 
 	// Check battery
@@ -370,6 +435,12 @@ func (o *Orchestrator) ProcessCalibrationFrame(sessionID string, frame *Calibrat
 			reasons = append(reasons, "клавиатура/экран не видны")
 		}
 		ps.Calibration.Message = fmt.Sprintf("Корректировка: %s", joinStrings(reasons, ", "))
+
+		// Fix 6: Emit calibration failure event after first attempt
+		if ps.Calibration.AttemptCount > 1 {
+			o.emitEvent(ps, "SIDECAM_CALIBRATION_FAILED", "warning",
+				fmt.Sprintf("Calibration attempt %d failed: %s", ps.Calibration.AttemptCount, joinStrings(reasons, ", ")))
+		}
 	}
 
 	return &ps.Calibration, nil
@@ -412,6 +483,9 @@ func (o *Orchestrator) ProcessDeviceTelemetry(sessionID string, device *MobileDe
 		if ps.Policy == PolicyMandatory {
 			directive.PauseSession = true
 		}
+		// Fix 6: Emit battery critical event
+		o.emitEvent(ps, "SIDECAM_BATTERY_CRITICAL", "critical",
+			fmt.Sprintf("Battery at %.0f%%", device.BatteryLevel*100))
 	} else if device.BatteryLevel < 0.20 && !device.IsCharging {
 		directive.Alerts = append(directive.Alerts, DeviceAlert{
 			Type:     "battery_low",
@@ -429,6 +503,9 @@ func (o *Orchestrator) ProcessDeviceTelemetry(sessionID string, device *MobileDe
 			Severity: "critical",
 			Message:  "Перегрев устройства — FPS снижен до 5",
 		})
+		// Fix 6: Emit thermal throttle event
+		o.emitEvent(ps, "SIDECAM_THERMAL_THROTTLE", "warning",
+			fmt.Sprintf("Thermal state critical, FPS throttled to 5"))
 	case "serious":
 		directive.TargetFPS = 10
 		directive.Alerts = append(directive.Alerts, DeviceAlert{
@@ -436,6 +513,9 @@ func (o *Orchestrator) ProcessDeviceTelemetry(sessionID string, device *MobileDe
 			Severity: "warning",
 			Message:  "Высокая температура — FPS снижен до 10",
 		})
+		// Fix 6: Emit thermal throttle event
+		o.emitEvent(ps, "SIDECAM_THERMAL_THROTTLE", "warning",
+			fmt.Sprintf("Thermal state serious, FPS throttled to 10"))
 	case "fair":
 		directive.TargetFPS = 15
 	default:
@@ -456,6 +536,9 @@ func (o *Orchestrator) ProcessDeviceTelemetry(sessionID string, device *MobileDe
 				Severity: "critical",
 				Message:  fmt.Sprintf("Устройство перемещено (Δ=%.1f)", displacement),
 			})
+			// Fix 6: Emit device displacement event
+			o.emitEvent(ps, "SIDECAM_DEVICE_DISPLACED", "critical",
+				fmt.Sprintf("Device displaced, delta=%.1f", displacement))
 		} else {
 			ps.DisplacementAlert = false
 		}
@@ -520,9 +603,14 @@ func (o *Orchestrator) ProcessHeartbeat(sessionID string, clientTs time.Time, fr
 		ps.Health.Quality = "critical"
 	}
 
+	// Fix 3: Heartbeat reconnection guard — promote to PairingConnected (not PairingReady).
+	// Forces re-calibration after disconnect, preventing tampered/repositioned device auto-resume.
 	if ps.State == PairingDisconnected {
-		ps.State = PairingReady
-		o.logger.Info("sidecam: stream recovered",
+		ps.State = PairingConnected
+		ps.Calibration.Passed = false
+		ps.Calibration.Message = "Reconnected — re-calibration required"
+		ps.AccelCalibrated = false // Reset accelerometer baseline
+		o.logger.Info("sidecam: stream recovered (re-calibration required)",
 			zap.String("session_id", sessionID),
 		)
 	}
@@ -544,8 +632,14 @@ func (o *Orchestrator) ProcessHandsDetection(sessionID string, handsVisible bool
 		return
 	}
 
+	wasOnDesk := ps.HandsOnDesk
 	ps.HandsOnDesk = handsVisible
 	ps.LastHandsCheck = time.Now()
+
+	// Fix 6: Emit hands-off-desk event on transition
+	if wasOnDesk && !handsVisible {
+		o.emitEvent(ps, "SIDECAM_HANDS_OFF_DESK", "warning", "Hands left desk area")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -595,6 +689,7 @@ func (o *Orchestrator) healthMonitorLoop() {
 			if ps.State == PairingReady || ps.State == PairingConnected || ps.State == PairingCalibrating {
 				lastHB, err := time.Parse(time.RFC3339, ps.Health.LastHeartbeat)
 				if err == nil && now.Sub(lastHB) > o.heartbeatTimeout {
+					prevState := ps.State
 					ps.State = PairingDisconnected
 					ps.Health.Connected = false
 					ps.Health.Quality = "critical"
@@ -603,6 +698,12 @@ func (o *Orchestrator) healthMonitorLoop() {
 						zap.String("session_id", sid),
 						zap.Duration("since_last_hb", now.Sub(lastHB)),
 					)
+
+					// Fix 6: Emit stream disconnected event (only on state transition)
+					if prevState != PairingDisconnected {
+						o.emitEvent(ps, "SIDECAM_STREAM_DISCONNECTED", "critical",
+							fmt.Sprintf("Heartbeat timeout after %.0fs", now.Sub(lastHB).Seconds()))
+					}
 				}
 			}
 

@@ -221,10 +221,40 @@ func (g *PDFGenerator) build(report *ForensicReport) {
 
 	contentStreams = append(contentStreams, page2.String())
 
-	// Page 3: Voice Biometric + Ledger + Hash
+	// Page 3: Secondary Camera + Voice Biometric + Ledger + Hash
 	var page3 strings.Builder
 	g.yPos = g.pageH - g.margin
 
+	// Fix 9: SECONDARY CAMERA section
+	g.pdfText(&page3, g.margin, g.yPos, 14, "left", "SECONDARY CAMERA")
+	g.yPos -= 20
+
+	if report.Sidecam.WasPaired {
+		scRows := [][]string{
+			{"Device Model", report.Sidecam.DeviceModel},
+			{"Calibrated", boolStr(report.Sidecam.Calibrated)},
+			{"Calibration Angle", fmt.Sprintf("%.0f deg", report.Sidecam.CalibrationAngle)},
+			{"Total Anomalies", fmt.Sprintf("%d", report.Sidecam.TotalAnomalies)},
+			{"Device Displaced", fmt.Sprintf("%d", report.Sidecam.DisplacementEvents)},
+			{"Hands Off Desk", fmt.Sprintf("%d", report.Sidecam.HandsOffDeskEvents)},
+			{"Stream Drops", fmt.Sprintf("%d", report.Sidecam.StreamDropEvents)},
+			{"Battery Critical", fmt.Sprintf("%d", report.Sidecam.BatteryCritEvents)},
+			{"Calibration Failures", fmt.Sprintf("%d", report.Sidecam.CalibrationFailures)},
+			{"Thermal Throttles", fmt.Sprintf("%d", report.Sidecam.ThermalThrottles)},
+		}
+		for _, row := range scRows {
+			g.pdfText(&page3, g.margin+10, g.yPos, 9, "left", row[0]+":")
+			g.pdfText(&page3, g.margin+200, g.yPos, 9, "left", row[1])
+			g.yPos -= 14
+		}
+	} else {
+		g.pdfText(&page3, g.margin+10, g.yPos, 9, "left", "No secondary camera was paired for this session.")
+		g.yPos -= 14
+	}
+	g.yPos -= 10
+
+	g.pdfLine(&page3, g.margin, g.yPos, g.pageW-g.margin, g.yPos, 0.3)
+	g.yPos -= 18
 	g.pdfText(&page3, g.margin, g.yPos, 14, "left", "VOICE BIOMETRIC ANALYSIS")
 	g.yPos -= 20
 
@@ -487,6 +517,13 @@ func VerdictBadge(verdict string) string {
 	default:
 		return `<span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px">FRAUD</span>`
 	}
+}
+
+func boolStr(b bool) string {
+	if b {
+		return "Yes"
+	}
+	return "No"
 }
 
 // unused but avoids import error
