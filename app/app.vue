@@ -53,6 +53,7 @@ const topNavigation = computed(() => {
     { label: 'Комплексные тесты', icon: 'i-lucide-layers', to: '/dashboard/complex-tests' },
     { label: 'Мониторинг', icon: 'i-lucide-video', to: '/monitoring' },
     { label: 'Архив сессий', icon: 'i-lucide-archive', to: '/archive' },
+    { label: 'Форензик', icon: 'i-lucide-file-search', to: '/forensic' },
     { label: 'Апелляции', icon: 'i-lucide-scale', to: '/appeals' },
     { label: 'Экспорт', icon: 'i-lucide-hard-drive-download', to: '/dashboard/exports' },
     { label: 'Аналитика', icon: 'i-lucide-bar-chart-3', to: '/analytics' },

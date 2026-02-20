@@ -499,6 +499,103 @@ export interface IntegritySessionReport {
   durationMs: number
 }
 
+// ── Forensic Report Types ─────────────────────────────────────────────
+
+export interface ForensicPenaltyEntry {
+  eventType: string
+  count: number
+  penaltyPer: number
+  maxPenalty: number
+  applied: number
+  description: string
+}
+
+export interface ForensicIntegrityScore {
+  sessionId: string
+  studentId: string
+  examId: string
+  orgId: string
+  score: number
+  verdict: 'clean' | 'warning' | 'fraud'
+  verdictLabel: string
+  justification: string
+  penalties: ForensicPenaltyEntry[]
+  eventSummary: Record<string, number>
+  topFactors: string[]
+  durationSec: number
+  totalEvents: number
+  criticalCount: number
+  warningCount: number
+  computedAt: string
+}
+
+export interface ForensicVoiceBiometric {
+  totalSegments: number
+  matchedSegments: number
+  mismatchedSegments: number
+  consistencyScore: number
+  speakerChangeCount: number
+  primarySpeakerRatio: number
+  verdict: 'consistent' | 'suspicious' | 'anomalous'
+}
+
+export interface ForensicTimelineEntry {
+  timestamp: string
+  videoSec: number
+  eventType: string
+  severity: string
+  label: string
+  confidence: number
+  source: string
+}
+
+export interface ForensicDeviceInfo {
+  userAgent: string
+  resolution: string
+  ipAddress: string
+  region: string
+  timezone: number
+}
+
+export interface ForensicLedgerSummary {
+  totalFragments: number
+  verifiedOk: number
+  chainValid: boolean
+  s3Verified: number
+  s3Mismatches: number
+}
+
+export interface ForensicGazePoint {
+  x: number
+  y: number
+  timestamp: number
+}
+
+export interface ForensicReport {
+  reportId: string
+  generatedAt: string
+  reportHash: string
+  sessionId: string
+  studentId: string
+  examId: string
+  orgId: string
+  integrity: ForensicIntegrityScore
+  voiceBiometric: ForensicVoiceBiometric
+  timeline: ForensicTimelineEntry[]
+  deviceInfo: ForensicDeviceInfo
+  gazeData: ForensicGazePoint[]
+  ledgerSummary: ForensicLedgerSummary
+}
+
+export interface ForensicVerifyResult {
+  sessionId: string
+  submitted: string
+  expected: string
+  match: boolean
+  verified: boolean
+  verifiedAt: string
+}
+
 export interface AppealDetail {
   id: string
   sessionId: string
@@ -1103,6 +1200,38 @@ export function useAdminAPI() {
     return request<AppealDetail>('GET', `/api/v1/appeals/${appealId}`)
   }
 
+  // ── Forensic Reporting ──────────────────────────────────────────────
+
+  async function getForensicReport(sessionId: string): Promise<ForensicReport> {
+    return request<ForensicReport>('GET', `/api/v1/forensic/session/${sessionId}/report`)
+  }
+
+  async function getForensicScore(sessionId: string): Promise<ForensicIntegrityScore> {
+    return request<ForensicIntegrityScore>('GET', `/api/v1/forensic/session/${sessionId}/score`)
+  }
+
+  function getForensicPDFUrl(sessionId: string): string {
+    const config = useRuntimeConfig()
+    const auth = useAuthStore()
+    const base = config.public.grpcUrl || ''
+    return `${base}/api/v1/forensic/session/${sessionId}/pdf?token=${auth.jwtToken}`
+  }
+
+  function getForensicHeatmapUrl(sessionId: string): string {
+    const config = useRuntimeConfig()
+    const auth = useAuthStore()
+    const base = config.public.grpcUrl || ''
+    return `${base}/api/v1/forensic/session/${sessionId}/heatmap?token=${auth.jwtToken}`
+  }
+
+  async function getForensicVoice(sessionId: string): Promise<ForensicVoiceBiometric> {
+    return request<ForensicVoiceBiometric>('GET', `/api/v1/forensic/session/${sessionId}/voice`)
+  }
+
+  async function verifyForensicReport(sessionId: string, reportHash: string): Promise<ForensicVerifyResult> {
+    return request<ForensicVerifyResult>('POST', '/api/v1/forensic/verify', { sessionId, reportHash })
+  }
+
   // ── Media (WebRTC / LiveKit) ────────────────────────────────────────────
 
   async function getMediaToken(sessionId: string, role: 'student' | 'proctor' = 'proctor'): Promise<{ token: string; wsUrl: string; room: string }> {
@@ -1198,6 +1327,14 @@ export function useAdminAPI() {
     verifySessionIntegrity,
     verifyFragmentIntegrity,
     getIntegrityReport,
+
+    // Forensic Reporting (Integrity Audit)
+    getForensicReport,
+    getForensicScore,
+    getForensicPDFUrl,
+    getForensicHeatmapUrl,
+    getForensicVoice,
+    verifyForensicReport,
 
     // Media (WebRTC / LiveKit)
     getMediaToken,
