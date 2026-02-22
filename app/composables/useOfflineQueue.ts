@@ -80,6 +80,23 @@ export interface OfflineQueueConfig {
   snapshotDrainBatchSize: number
   /** HMAC signing key for tamper-evident local logs. If provided, each event is HMAC-signed before storage. */
   signingKey: string
+  /**
+   * Maximum jitter delay (ms) before the first drain on reconnect.
+   * Desynchronises 5,000+ simultaneous reconnects to prevent a thundering
+   * herd from saturating Kafka. Each client waits a random [0, jitter) ms.
+   * Default: 5000 (0–5 seconds).
+   */
+  reconnectJitterMs: number
+  /**
+   * Backoff multiplier applied to drainIntervalMs after a failed drain batch.
+   * Resets to 1× on successful drain. Capped at maxDrainBackoffMs.
+   * Default: 1.5.
+   */
+  drainBackoffMultiplier: number
+  /**
+   * Maximum drain interval during backoff (ms). Default: 30000 (30 seconds).
+   */
+  maxDrainBackoffMs: number
 }
 
 /** Snapshot metadata for enqueue. */
@@ -117,7 +134,10 @@ const DEFAULT_CONFIG: OfflineQueueConfig = {
   drainIntervalMs: 1000,
   maxRetries: 10,
   snapshotDrainBatchSize: 5,
-  signingKey: ''
+  signingKey: '',
+  reconnectJitterMs: 5000,
+  drainBackoffMultiplier: 1.5,
+  maxDrainBackoffMs: 30_000
 }
 
 // ---------------------------------------------------------------------------
@@ -143,9 +163,11 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
   const isInitialized: Ref<boolean> = ref(false)
 
   // Internal
-  let drainTimer: ReturnType<typeof setInterval> | null = null
+  let drainTimer: ReturnType<typeof setTimeout> | null = null
   let drainUploadFn: ((events: ProctoringEvent[]) => Promise<boolean>) | null = null
   let snapshotUploadFn: ((snapshot: QueuedSnapshot) => Promise<boolean>) | null = null
+  /** Current drain interval — increases on failure (backoff), resets on success. */
+  let currentDrainIntervalMs: number = cfg.drainIntervalMs
 
   // -------------------------------------------------------------------------
   // Priority Mapping
@@ -322,6 +344,7 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
     if (!drainUploadFn) return
 
     isDraining.value = true
+    let drainSucceeded = true
 
     try {
       // 1. Drain events by priority (all priorities in one query, pre-sorted)
@@ -358,6 +381,7 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
             // Upload succeeded — remove from IDB
             await idbRemoveEvents(eventIds)
           } else {
+            drainSucceeded = false
             // Upload failed — revert to pending or mark as failed
             for (let i = 0; i < pendingEvents.length; i++) {
               const evt = pendingEvents[i]!
@@ -403,25 +427,59 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
       void refreshStats()
     } catch (err) {
       console.error('[argus:queue] Drain error:', err)
+      drainSucceeded = false
     } finally {
       isDraining.value = false
     }
+
+    // ── Adaptive backoff: slow down on failure, reset on success ──
+    if (drainSucceeded) {
+      currentDrainIntervalMs = cfg.drainIntervalMs
+    } else {
+      currentDrainIntervalMs = Math.min(
+        currentDrainIntervalMs * cfg.drainBackoffMultiplier,
+        cfg.maxDrainBackoffMs
+      )
+    }
+
+    // Schedule next drain iteration (self-scheduling setTimeout loop).
+    scheduleDrainTick()
+  }
+
+  /**
+   * Schedule the next drain tick using the current (possibly backed-off) interval.
+   * Uses setTimeout instead of setInterval so the interval can adapt dynamically.
+   */
+  function scheduleDrainTick(): void {
+    if (drainTimer === null) return // stopDrain was called
+    drainTimer = setTimeout(() => {
+      void drain()
+    }, currentDrainIntervalMs)
   }
 
   /**
    * Start the background drain loop.
+   * To prevent a thundering herd when thousands of clients reconnect
+   * simultaneously, the first drain is delayed by a random jitter
+   * in [0, reconnectJitterMs) milliseconds. Subsequent drains use
+   * the configured interval with adaptive backoff on failure.
    */
   function startDrain(): void {
     if (drainTimer) return
 
-    drainTimer = setInterval(() => {
-      void drain()
-    }, cfg.drainIntervalMs)
+    // Reset backoff state on fresh start.
+    currentDrainIntervalMs = cfg.drainIntervalMs
 
-    // Immediate first drain
-    void drain()
+    // Jittered initial delay: desynchronise reconnecting clients.
+    const jitter = Math.floor(Math.random() * cfg.reconnectJitterMs)
+
+    // Sentinel value — marks the loop as "active" so stopDrain works.
+    drainTimer = setTimeout(() => {
+      void drain() // drain() will call scheduleDrainTick() internally
+    }, jitter)
 
     console.debug('[argus:queue] Drain loop started', {
+      initialJitterMs: jitter,
       intervalMs: cfg.drainIntervalMs,
       batchSize: cfg.drainBatchSize
     })
@@ -432,9 +490,10 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
    */
   function stopDrain(): void {
     if (drainTimer) {
-      clearInterval(drainTimer)
+      clearTimeout(drainTimer)
       drainTimer = null
     }
+    currentDrainIntervalMs = cfg.drainIntervalMs
     console.debug('[argus:queue] Drain loop stopped')
   }
 
