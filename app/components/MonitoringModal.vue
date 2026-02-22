@@ -15,6 +15,52 @@ const store = useDashboardStore()
 const { isDark, accentBg, errorBg, successBg, warningBg, purpleBg } = useColors()
 const toast = useToast()
 
+// --- SSE Real-Time Stream Integration ---
+const sseSessionId = computed(() => props.session?.id ?? '')
+const sseEnabled = computed(() => !!props.session && (props.isLive ?? props.session?.isOnline ?? true))
+
+const {
+  events: sseEvents,
+  score: sseScore,
+  verdict: sseVerdict,
+  verdictLabel: sseVerdictLabel,
+  terminated: sseTerminated,
+  terminateReason: sseTerminateReason,
+  connected: sseConnected,
+  connect: sseConnect,
+  disconnect: sseDisconnect,
+  reset: sseReset,
+} = useSessionStream(sseSessionId)
+
+// Connect SSE when session opens and is live
+watch(sseEnabled, (enabled) => {
+  if (enabled && sseSessionId.value) {
+    sseConnect()
+  } else {
+    sseDisconnect()
+  }
+}, { immediate: true })
+
+// Update session integrity score from SSE in real-time
+watch(sseScore, (newScore) => {
+  if (props.session && sseConnected.value) {
+    props.session.integrityScore = newScore
+  }
+})
+
+// Handle auto-termination from SSE
+watch(sseTerminated, (terminated) => {
+  if (terminated && props.session) {
+    sessionTerminated.value = true
+    toast.add({
+      title: 'Сессия автоматически завершена',
+      description: sseTerminateReason.value,
+      icon: 'i-lucide-shield-alert',
+      color: 'error' as const,
+    })
+  }
+})
+
 // --- Exception lookup ---
 function hasException(session: { studentName: string, iin: string, examName: string }): boolean {
   return store.getStudentExceptionInfo(session.studentName, session.iin, session.examName) !== null
@@ -300,17 +346,8 @@ const noiseLevel = computed(() => {
   return base + Math.floor(Math.random() * 10)
 })
 
-function noiseLevelColor(level: number): string {
-  if (level > 60) return 'var(--argus-error)'
-  if (level > 40) return 'var(--argus-warning)'
-  return 'var(--argus-success)'
-}
-
-function noiseLevelLabel(level: number): string {
-  if (level > 60) return 'Высокий'
-  if (level > 40) return 'Средний'
-  return 'Тихо'
-}
+// noiseLevelColor/noiseLevelLabel → centralized in useStatusHelpers() composable
+const { noiseLevelColor, noiseLevelLabel } = useStatusHelpers()
 
 // Determine live or recorded status
 const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? true)
@@ -671,10 +708,38 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                     <div class="flex items-center gap-2">
                       <UIcon name="i-lucide-activity" class="size-4" style="color: var(--argus-text-dimmed);" />
                       <h3 class="text-sm font-semibold" style="color: var(--argus-text);">AI Хронология</h3>
+                      <!-- SSE connection badge -->
+                      <span
+                        v-if="sseEnabled"
+                        class="flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+                        :style="{
+                          background: sseConnected ? successBg(0.1) : errorBg(0.1),
+                          color: sseConnected ? 'var(--argus-success)' : 'var(--argus-error)'
+                        }"
+                      >
+                        <span class="relative flex size-1">
+                          <span v-if="sseConnected" class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style="background: var(--argus-success);" />
+                          <span class="relative inline-flex size-1 rounded-full" :style="{ background: sseConnected ? 'var(--argus-success)' : 'var(--argus-error)' }" />
+                        </span>
+                        {{ sseConnected ? 'SSE' : 'OFFLINE' }}
+                      </span>
                     </div>
                     <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }">
                       {{ session.events.length }} событий
                     </span>
+                  </div>
+
+                  <!-- SSE Termination Banner -->
+                  <div
+                    v-if="sseTerminated"
+                    class="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg"
+                    :style="{ background: errorBg(0.1), border: `1px solid ${errorBg(0.2)}` }"
+                  >
+                    <UIcon name="i-lucide-shield-alert" class="size-4 shrink-0" style="color: var(--argus-error);" />
+                    <div>
+                      <p class="text-[10px] font-bold" style="color: var(--argus-error);">Сессия автоматически завершена</p>
+                      <p class="text-[9px] mt-0.5" style="color: var(--argus-text-dimmed);">{{ sseTerminateReason }}</p>
+                    </div>
                   </div>
                 </div>
 
@@ -694,11 +759,15 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                       <p class="text-xs font-bold" :style="{ color: integrityColor(session.integrityScore) }">{{ session.integrityScore }}%</p>
                       <div class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
                         <div
-                          class="h-full rounded-full"
+                          class="h-full rounded-full transition-all duration-500"
                           :style="{ width: `${session.integrityScore}%`, background: integrityGradientLocal(session.integrityScore) }"
                         />
                       </div>
                     </div>
+                    <!-- SSE verdict label -->
+                    <p v-if="sseConnected && sseVerdictLabel" class="text-[8px] font-bold mt-0.5" :style="{ color: sseVerdict === 'fraud' ? 'var(--argus-error)' : sseVerdict === 'warning' ? 'var(--argus-warning)' : 'var(--argus-success)' }">
+                      {{ sseVerdictLabel }}
+                    </p>
                   </div>
                 </div>
 

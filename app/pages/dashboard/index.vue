@@ -5,6 +5,7 @@ import { useAuthStore } from '~/stores/useAuthStore'
 const store = useDashboardStore()
 const authStore = useAuthStore()
 const { isDark, accentBg, errorBg, successBg, warningBg } = useColors()
+const { monitoringStatusLabel: statusLabel, monitoringStatusColor: statusBadgeColor, monitoringStatusBg: statusBadgeBg } = useStatusHelpers()
 const toast = useToast()
 const route = useRoute()
 const router = useRouter()
@@ -52,32 +53,7 @@ const formatTime = formatTimeShort
 const formatStartTime = formatTimeShort
 
 
-function statusBadgeBg(status: string): string {
-  switch (status) {
-    case 'flagged': return errorBg(0.1)
-    case 'active': return warningBg(0.1)
-    case 'clean': return successBg(0.1)
-    default: return 'var(--argus-bg-hover)'
-  }
-}
-
-function statusBadgeColor(status: string): string {
-  switch (status) {
-    case 'flagged': return 'var(--argus-error)'
-    case 'active': return 'var(--argus-warning)'
-    case 'clean': return 'var(--argus-success)'
-    default: return 'var(--argus-text-dimmed)'
-  }
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'flagged': return 'Подозрение'
-    case 'active': return 'Активен'
-    case 'clean': return 'Чисто'
-    default: return status
-  }
-}
+// Status helpers delegated to useStatusHelpers composable
 </script>
 
 <template>
@@ -322,7 +298,7 @@ function statusLabel(status: string): string {
                       </p>
                       <span
                         class="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0"
-                        :style="{ background: statusBadgeBg(student.status), color: statusBadgeColor(student.status) }"
+                        :style="{ background: statusBadgeBg(student.status, 0.1), color: statusBadgeColor(student.status) }"
                       >
                         {{ statusLabel(student.status) }}
                       </span>

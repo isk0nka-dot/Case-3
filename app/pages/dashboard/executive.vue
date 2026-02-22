@@ -20,6 +20,7 @@ ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScal
 const api = useAdminAPI()
 const authStore = useAuthStore()
 const { isDark, accentBg, errorBg, successBg, warningBg } = useColors()
+const { formatTimeShort, formatCompactNumber } = useFormatters()
 const toast = useToast()
 
 // --- State ---
@@ -85,20 +86,14 @@ onUnmounted(() => {
   if (refreshInterval) clearInterval(refreshInterval)
 })
 
-// --- Formatters ---
-function fmtNum(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K'
-  return String(n)
-}
+// fmtNum/fmtTime → replaced by useFormatters() composable (formatCompactNumber, formatTimeShort)
+const fmtNum = formatCompactNumber
 
 function fmtPct(n: number): string {
   return n.toFixed(1) + '%'
 }
 
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-}
+const fmtTime = formatTimeShort
 
 // --- Risk Distribution Pie Chart ---
 const pieData = computed(() => {

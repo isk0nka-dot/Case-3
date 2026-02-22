@@ -153,6 +153,41 @@ export function formatStartTime(iso: string): string {
   return formatTime(iso)
 }
 
+/**
+ * Format an epoch millisecond timestamp as relative time ("только что", "5с назад", "3м назад").
+ * Designed for real-time event feeds with millisecond-precision receivedAt timestamps.
+ */
+export function formatTimeAgoMs(receivedAt: number): string {
+  const seconds = Math.floor((Date.now() - receivedAt) / 1000)
+  if (seconds < 5) return 'только что'
+  if (seconds < 60) return `${seconds}с назад`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}м назад`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}ч назад`
+}
+
+/**
+ * Format a byte count as human-readable file size.
+ * Handles B, KB, MB, GB with appropriate decimal precision.
+ */
+export function formatFileSize(bytes: number | undefined): string {
+  if (!bytes) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+/**
+ * Format a large number as abbreviated string (1.2M, 3.4K, 42).
+ */
+export function formatCompactNumber(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K'
+  return String(n)
+}
+
 // ---------------------------------------------------------------------------
 // Composable Wrapper (for use in Vue components via auto-import)
 // ---------------------------------------------------------------------------
@@ -175,6 +210,9 @@ export function useFormatters() {
     formatTimeShort,
     formatVideoTimestamp,
     formatTimeAgo,
-    formatStartTime
+    formatTimeAgoMs,
+    formatStartTime,
+    formatFileSize,
+    formatCompactNumber
   }
 }

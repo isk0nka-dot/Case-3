@@ -6,12 +6,13 @@
 // Produces a composite health score (0-100) that drives tier selection
 // in the adaptive resilience layer.
 //
-// Metrics:
-//   - FPS (25%):          requestAnimationFrame loop counter
-//   - RTT (25%):          heartbeat response time + /healthz ping
-//   - Packet loss (20%):  failed request ratio from transport metrics
-//   - CPU pressure (15%): microbenchmark + memory pressure
-//   - Bandwidth (15%):    upload throughput from metrics interceptor
+// Metrics (lean — zero synthetic load):
+//   - FPS (35%):          requestAnimationFrame loop counter
+//   - RTT (35%):          heartbeat response time + /healthz ping
+//   - Packet loss (30%):  failed request ratio from transport metrics
+//
+// CPU pressure is derived passively from FPS drop (no microbenchmark).
+// Bandwidth is used only as a hard floor override, not in the composite score.
 //
 // Hysteresis:
 //   - Downgrade: 3 consecutive checks below threshold
@@ -34,7 +35,7 @@ import { ref, computed, type Ref, type ComputedRef } from 'vue'
 
 /** Raw health metrics sampled every 5 seconds. */
 export interface HealthMetrics {
-  /** CPU pressure estimate (0-1). 0 = idle, 1 = maxed out. */
+  /** CPU pressure estimate (0-1). Derived from FPS drop — zero overhead. */
   cpuPressure: number
   /** Measured frames per second (from rAF loop). */
   fps: number
@@ -42,9 +43,9 @@ export interface HealthMetrics {
   rttMs: number
   /** Packet loss ratio (0-1). 0 = no loss, 1 = 100% loss. */
   packetLoss: number
-  /** Estimated upload bandwidth in kbps. */
+  /** Estimated upload bandwidth in kbps. Used for floor override only. */
   bandwidthKbps: number
-  /** Memory usage in MB (if available). */
+  /** Memory usage in MB (reserved, always 0 — Chrome-only API not worth the cost). */
   memoryUsageMB: number
   /** Timestamp of this sample. */
   timestamp: number
@@ -80,8 +81,6 @@ interface MetricWeights {
   fps: number
   rtt: number
   packetLoss: number
-  cpu: number
-  bandwidth: number
 }
 
 // ---------------------------------------------------------------------------
@@ -100,11 +99,9 @@ const DEFAULT_CONFIG: HealthGovernorConfig = {
 }
 
 const WEIGHTS: MetricWeights = {
-  fps: 0.25,
-  rtt: 0.25,
-  packetLoss: 0.20,
-  cpu: 0.15,
-  bandwidth: 0.15
+  fps: 0.35,
+  rtt: 0.35,
+  packetLoss: 0.30
 }
 
 // ---------------------------------------------------------------------------
@@ -145,21 +142,14 @@ function normalizePacketLoss(loss: number): number {
 }
 
 /**
- * Normalize CPU pressure to a 0-100 score.
- * 0 = 100 (idle). 1 = 0 (maxed). Linear.
+ * Derive CPU pressure passively from FPS.
+ * When FPS drops below target (30), CPU is under pressure.
+ * Zero overhead — no microbenchmark needed.
  */
-function normalizeCpu(pressure: number): number {
-  return Math.round(100 * (1 - Math.min(1, Math.max(0, pressure))))
-}
-
-/**
- * Normalize bandwidth to a 0-100 score.
- * > 512kbps = 100. < 64kbps = 0. Linear.
- */
-function normalizeBandwidth(kbps: number): number {
-  if (kbps >= 512) return 100
-  if (kbps <= 64) return 0
-  return Math.round(((kbps - 64) / (512 - 64)) * 100)
+function deriveCpuPressureFromFps(fps: number): number {
+  if (fps >= 30) return 0
+  if (fps <= 5) return 1
+  return Math.round(((30 - fps) / 25) * 100) / 100
 }
 
 // ---------------------------------------------------------------------------
@@ -282,48 +272,7 @@ export function useHealthGovernor(config?: Partial<HealthGovernorConfig>) {
   }
 
   // -------------------------------------------------------------------------
-  // CPU Pressure Estimation
-  // -------------------------------------------------------------------------
-
-  /**
-   * Estimate CPU pressure using a microbenchmark.
-   *
-   * This measures how long a lightweight task takes compared to its
-   * expected duration on an idle system. Under high CPU load, the task
-   * takes longer due to thread contention and scheduling delays.
-   *
-   * Additionally uses Performance API memory info when available.
-   */
-  function estimateCpuPressure(): { pressure: number; memoryMB: number } {
-    // Microbenchmark: time a known workload
-    const iterations = 10_000
-    const start = performance.now()
-    let x = 0
-    for (let i = 0; i < iterations; i++) {
-      x += Math.sqrt(i) * Math.sin(i)
-    }
-    // Prevent dead code elimination
-    if (x === -Infinity) console.log(x)
-    const elapsed = performance.now() - start
-
-    // Baseline: ~2ms on modern hardware idle. >10ms indicates heavy load.
-    const baseline = 2.0
-    const maxPressure = 10.0
-    const pressure = Math.min(1.0, Math.max(0, (elapsed - baseline) / (maxPressure - baseline)))
-
-    // Memory info (Chrome-only)
-    let memoryMB = 0
-    const perfMemory = (performance as unknown as Record<string, unknown>).memory as
-      { usedJSHeapSize?: number } | undefined
-    if (perfMemory?.usedJSHeapSize) {
-      memoryMB = perfMemory.usedJSHeapSize / (1024 * 1024)
-    }
-
-    return { pressure, memoryMB }
-  }
-
-  // -------------------------------------------------------------------------
-  // Bandwidth Estimation
+  // Bandwidth Estimation (used for floor override only — not in score)
   // -------------------------------------------------------------------------
 
   function estimateBandwidth(): number {
@@ -368,17 +317,15 @@ export function useHealthGovernor(config?: Partial<HealthGovernorConfig>) {
   }
 
   // -------------------------------------------------------------------------
-  // Composite Health Score
+  // Composite Health Score (3 metrics — no CPU microbenchmark)
   // -------------------------------------------------------------------------
 
   function computeHealthScore(m: HealthMetrics): number {
     const fpsScore = normalizeFps(m.fps) * WEIGHTS.fps
     const rttScore = normalizeRtt(m.rttMs) * WEIGHTS.rtt
     const lossScore = normalizePacketLoss(m.packetLoss) * WEIGHTS.packetLoss
-    const cpuScore = normalizeCpu(m.cpuPressure) * WEIGHTS.cpu
-    const bwScore = normalizeBandwidth(m.bandwidthKbps) * WEIGHTS.bandwidth
 
-    return Math.round(fpsScore + rttScore + lossScore + cpuScore + bwScore)
+    return Math.round(fpsScore + rttScore + lossScore)
   }
 
   // -------------------------------------------------------------------------
@@ -436,19 +383,21 @@ export function useHealthGovernor(config?: Partial<HealthGovernorConfig>) {
   // -------------------------------------------------------------------------
 
   async function sample(): Promise<void> {
-    // Collect all metrics
+    // Collect metrics — all passive reads, no synthetic workload
     const rttMs = await measureRtt()
-    const { pressure, memoryMB } = estimateCpuPressure()
     const bandwidthKbps = estimateBandwidth()
     const packetLoss = calculatePacketLoss()
 
+    // Derive CPU pressure from FPS (free — no microbenchmark)
+    const cpuPressure = deriveCpuPressureFromFps(currentFps)
+
     const newMetrics: HealthMetrics = {
-      cpuPressure: pressure,
+      cpuPressure,
       fps: currentFps,
       rttMs,
       packetLoss,
       bandwidthKbps,
-      memoryUsageMB: memoryMB,
+      memoryUsageMB: 0,
       timestamp: Date.now()
     }
 
@@ -463,7 +412,7 @@ export function useHealthGovernor(config?: Partial<HealthGovernorConfig>) {
 
     // Bandwidth floor override: force downgrade when bandwidth is critically low,
     // regardless of composite score. This prevents staying in Tier A when bandwidth
-    // is insufficient for video streaming (e.g., 100kbps + perfect FPS/RTT/CPU = 86 score).
+    // is insufficient for video streaming (e.g., 100kbps + perfect FPS/RTT = 100 score).
     if (newMetrics.bandwidthKbps < 128 && proposedTier === 'A') {
       proposedTier = 'C' // Below 128kbps = store-and-forward only
     } else if (newMetrics.bandwidthKbps < 256 && proposedTier === 'A') {

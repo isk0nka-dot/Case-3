@@ -612,6 +612,89 @@ export interface AppealDetail {
 }
 
 // ---------------------------------------------------------------------------
+// Proctoring Settings Types (Dynamic Config Registry)
+// ---------------------------------------------------------------------------
+
+export interface ProctoringSettings {
+  orgId: string
+  examId: string
+
+  // Identity & Anti-Fraud
+  requireSideCamera: boolean
+  faceVerification: boolean
+  dynamicFaceRecheck: boolean
+  antiSpoofing: boolean
+  roomScan360: boolean
+  objectDetectionPhone: boolean
+  objectDetectionPerson: boolean
+
+  // AI Sensitivity
+  gazeTracking: boolean
+  gazeSensitivity: number
+  gazeDeviationLimitSec: number
+  voiceDetectionThreshold: number
+  voiceActivityDetection: boolean
+  audioPeripheryDetection: boolean
+  smartNoiseFilter: boolean
+
+  // Psychometrics & AI Analytics
+  emotionStressAnalysis: boolean
+  focusLossScore: boolean
+  blinkPatternAnalysis: boolean
+
+  // Browser Restrictions
+  forceFullscreen: boolean
+  fullscreenExitDetection: boolean
+  webDisplayMonitoring: boolean
+  tabSwitchingLimit: number
+  blockCopyPaste: boolean
+  blockPrintScreen: boolean
+  blockVirtualMachine: boolean
+  blockMultiDesktop: boolean
+  blockRemoteAccess: boolean
+  blockContextMenu: boolean
+
+  // Network
+  vpnProxyDetection: boolean
+  localNetworkScan: boolean
+
+  // Advanced Security (Kernel-Level)
+  typingDynamics: boolean
+  handCursorSync: boolean
+  processScanning: boolean
+  hardwareDeviceDetection: boolean
+  advancedRemoteBlock: boolean
+  hardwareIdBinding: boolean
+  deepMultiMonitorCheck: boolean
+  forceLowSpecMode: boolean
+
+  // Verdict Thresholds
+  cleanThreshold: number
+  warningThreshold: number
+
+  // Auto-Terminate
+  autoTerminate: boolean
+  autoTerminateAt: number
+
+  // Metadata
+  updatedAt?: string
+  updatedBy?: string
+}
+
+export interface ProctoringRuleInfo {
+  eventType: string
+  penaltyPer: number
+  maxPenalty: number
+  description: string
+}
+
+export interface ProctoringRuleRegistryResponse {
+  rules: ProctoringRuleInfo[]
+  toggleMap: Record<string, string[]>
+  defaults: ProctoringSettings
+}
+
+// ---------------------------------------------------------------------------
 // Secondary Camera (Mobile) Orchestration Types
 // ---------------------------------------------------------------------------
 
@@ -1405,6 +1488,36 @@ export function useAdminAPI() {
     )
   }
 
+  // ── Proctoring Settings (Dynamic Config Registry) ─────────────────────
+
+  async function getProctoringSettings(orgId: string, examId: string): Promise<ProctoringSettings> {
+    return request<ProctoringSettings>('GET', `/api/v1/proctoring/settings/${orgId}/${examId}`)
+  }
+
+  async function saveProctoringSettings(orgId: string, examId: string, settings: ProctoringSettings): Promise<ProctoringSettings> {
+    return request<ProctoringSettings>('PUT', `/api/v1/proctoring/settings/${orgId}/${examId}`, settings)
+  }
+
+  async function deleteProctoringSettings(orgId: string, examId: string): Promise<{ status: string }> {
+    return request<{ status: string }>('DELETE', `/api/v1/proctoring/settings/${orgId}/${examId}`)
+  }
+
+  async function listProctoringSettingsByOrg(orgId: string): Promise<ProctoringSettings[]> {
+    return request<ProctoringSettings[]>('GET', `/api/v1/proctoring/settings/${orgId}`)
+  }
+
+  async function getRuleRegistry(): Promise<ProctoringRuleRegistryResponse> {
+    return request<ProctoringRuleRegistryResponse>('GET', '/api/v1/proctoring/rule-registry')
+  }
+
+  // ── SSE Session Stream URL Builder ────────────────────────────────────
+
+  function getSessionStreamUrl(sessionId: string): string {
+    const base = baseURL.value
+    const token = authStore.jwtToken || ''
+    return `${base}/api/v1/monitoring/sessions/${sessionId}/stream?token=${token}`
+  }
+
   return {
     // Auth
     login,
@@ -1506,6 +1619,16 @@ export function useAdminAPI() {
     // Media (WebRTC / LiveKit)
     getMediaToken,
     getMediaRooms,
+
+    // Proctoring Settings (Dynamic Config Registry)
+    getProctoringSettings,
+    saveProctoringSettings,
+    deleteProctoringSettings,
+    listProctoringSettingsByOrg,
+    getRuleRegistry,
+
+    // SSE Session Stream
+    getSessionStreamUrl,
 
     // Error class for instanceof checks
     AdminAPIError

@@ -18,7 +18,9 @@ import {
   sourceColor as _sourceColor,
   isSideEvent,
   integrityColor,
-  integrityGradient as _integrityGradient
+  integrityGradient as _integrityGradient,
+  noiseLevelColor,
+  noiseLevelLabel
 } from '~/composables/useStatusHelpers'
 
 const store = useDashboardStore()
@@ -251,22 +253,8 @@ const noiseLevel = computed(() => {
   return Math.round(Math.max(10, base + variation))
 })
 
-function noiseLevelColor(level: number): string {
-  if (level > 55) return 'var(--argus-error)'
-  if (level > 35) return 'var(--argus-warning)'
-  return 'var(--argus-success)'
-}
-
-function noiseLevelLabel(level: number): string {
-  if (level > 55) return 'Высокий'
-  if (level > 35) return 'Средний'
-  return 'Тихо'
-}
-
-// Check if event is audio-related
-function isAudioEvent(type: string): boolean {
-  return type === 'audio_anomaly' || type === 'background_voices' || type === 'whispering'
-}
+// noiseLevelColor/noiseLevelLabel → centralized in useStatusHelpers()
+// isAudioEvent → centralized in useStatusHelpers()
 
 // --- Appeal state ---
 const appealFormOpen = ref(false)

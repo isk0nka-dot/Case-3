@@ -54,13 +54,8 @@ function getSeverityClasses(severity: Severity): string {
   }
 }
 
-function formatTimeAgoMs(receivedAt: number): string {
-  const seconds = Math.floor((Date.now() - receivedAt) / 1000)
-  if (seconds < 5) return 'только что'
-  if (seconds < 60) return `${seconds}с назад`
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}м назад`
-}
+// formatTimeAgoMs → centralized in useFormatters() composable
+const { formatTimeAgoMs } = useFormatters()
 
 function isSilenced(event: FeedEvent): boolean {
   return inspectorStore.silenceMode && event.severity !== Severity.CRITICAL

@@ -53,7 +53,7 @@ export function sessionStatusIcon(status: string): string {
 export function sessionStatusBg(
   status: string,
   opacity: number,
-  colors: { successBg: ColorFn; warningBg: ColorFn; errorBg: ColorFn }
+  colors: { successBg: ColorFn, warningBg: ColorFn, errorBg: ColorFn }
 ): string {
   switch (status) {
     case 'reviewed': return colors.successBg(opacity)
@@ -105,7 +105,7 @@ export function appealStatusIcon(status: string): string {
 export function appealStatusBg(
   status: string,
   opacity: number,
-  colors: { accentBg: ColorFn; warningBg: ColorFn; successBg: ColorFn; errorBg: ColorFn; infoBg: ColorFn }
+  colors: { accentBg: ColorFn, warningBg: ColorFn, successBg: ColorFn, errorBg: ColorFn, infoBg: ColorFn }
 ): string {
   switch (status) {
     case 'submitted': return colors.accentBg(opacity)
@@ -119,6 +119,48 @@ export function appealStatusBg(
 
 export function isAppealTerminal(status: string): boolean {
   return ['upheld', 'overturned', 'withdrawn'].includes(status)
+}
+
+// ---------------------------------------------------------------------------
+// Review Decision Helpers (proctor review panel)
+// ---------------------------------------------------------------------------
+
+export type ReviewDecisionType = 'confirmed' | 'dismissed' | 'escalated'
+
+export function reviewDecisionLabel(d: string): string {
+  switch (d) {
+    case 'confirmed': return 'Подтверждено'
+    case 'dismissed': return 'Отклонено'
+    case 'escalated': return 'Эскалировано'
+    default: return d
+  }
+}
+
+export function reviewDecisionColor(d: string): string {
+  switch (d) {
+    case 'confirmed': return 'var(--argus-error)'
+    case 'dismissed': return 'var(--argus-success)'
+    case 'escalated': return 'var(--argus-warning)'
+    default: return 'var(--argus-text-dimmed)'
+  }
+}
+
+export function reviewDecisionBg(d: string, isDark: boolean): string {
+  switch (d) {
+    case 'confirmed': return isDark ? 'rgba(248, 113, 113, 0.1)' : 'rgba(224, 62, 62, 0.08)'
+    case 'dismissed': return isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(16, 163, 74, 0.08)'
+    case 'escalated': return isDark ? 'rgba(251, 191, 36, 0.1)' : 'rgba(230, 126, 34, 0.08)'
+    default: return 'transparent'
+  }
+}
+
+export function reviewDecisionIcon(d: string): string {
+  switch (d) {
+    case 'confirmed': return 'i-lucide-alert-triangle'
+    case 'dismissed': return 'i-lucide-check-circle'
+    case 'escalated': return 'i-lucide-arrow-up-circle'
+    default: return 'i-lucide-circle'
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +181,7 @@ export function severityColor(severity: string): string {
 export function severityBg(
   severity: string,
   opacity: number,
-  colors: { errorBg: ColorFn; warningBg: ColorFn; infoBg: ColorFn }
+  colors: { errorBg: ColorFn, warningBg: ColorFn, infoBg: ColorFn }
 ): string {
   switch (severity) {
     case 'critical': return colors.errorBg(opacity)
@@ -248,6 +290,156 @@ export function isSideEvent(source: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Monitoring Status Helpers (flagged / active / clean)
+// ---------------------------------------------------------------------------
+
+export type MonitoringStatus = 'flagged' | 'active' | 'clean'
+
+export function monitoringStatusLabel(status: string): string {
+  switch (status) {
+    case 'flagged': return 'Подозрение'
+    case 'active': return 'Активен'
+    case 'clean': return 'Чисто'
+    default: return status
+  }
+}
+
+export function monitoringStatusColor(status: string): string {
+  switch (status) {
+    case 'flagged': return 'var(--argus-error)'
+    case 'active': return 'var(--argus-warning)'
+    case 'clean': return 'var(--argus-success)'
+    default: return 'var(--argus-text-dimmed)'
+  }
+}
+
+export function monitoringStatusBg(
+  status: string,
+  opacity: number,
+  colors: { errorBg: ColorFn, warningBg: ColorFn, successBg: ColorFn }
+): string {
+  switch (status) {
+    case 'flagged': return colors.errorBg(opacity)
+    case 'active': return colors.warningBg(opacity)
+    case 'clean': return colors.successBg(opacity)
+    default: return 'var(--argus-bg-hover)'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Exam Status Helpers (active / completed / scheduled)
+// ---------------------------------------------------------------------------
+
+export type ExamStatus = 'active' | 'completed' | 'scheduled'
+
+export function examStatusLabel(status: string): string {
+  switch (status) {
+    case 'active': return 'Активный'
+    case 'completed': return 'Завершён'
+    case 'scheduled': return 'Запланирован'
+    default: return '—'
+  }
+}
+
+export function examStatusColor(status: string): string {
+  switch (status) {
+    case 'active': return 'var(--argus-success)'
+    case 'completed': return 'var(--argus-text-dimmed)'
+    case 'scheduled': return 'var(--argus-accent)'
+    default: return 'var(--argus-text-dimmed)'
+  }
+}
+
+export function examStatusBg(
+  status: string,
+  opacity: number,
+  colors: { successBg: ColorFn, accentBg: ColorFn },
+  isDark: boolean
+): string {
+  switch (status) {
+    case 'active': return colors.successBg(opacity)
+    case 'completed': return isDark ? `rgba(148, 163, 184, ${opacity})` : `rgba(100, 116, 139, ${opacity})`
+    case 'scheduled': return colors.accentBg(opacity)
+    default: return 'transparent'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Test Status Helpers (active / draft / archived)
+// ---------------------------------------------------------------------------
+
+export type TestStatus = 'active' | 'draft' | 'archived'
+
+export function testStatusLabel(status: string): string {
+  switch (status) {
+    case 'active': return 'Активный'
+    case 'draft': return 'Черновик'
+    case 'archived': return 'Архив'
+    default: return '—'
+  }
+}
+
+export function testStatusColor(status: string): string {
+  switch (status) {
+    case 'active': return 'var(--argus-success)'
+    case 'draft': return 'var(--argus-warning)'
+    case 'archived': return 'var(--argus-text-dimmed)'
+    default: return 'var(--argus-text-dimmed)'
+  }
+}
+
+export function testStatusBg(
+  status: string,
+  opacity: number,
+  colors: { successBg: ColorFn, warningBg: ColorFn },
+  isDark: boolean
+): string {
+  switch (status) {
+    case 'active': return colors.successBg(opacity)
+    case 'draft': return colors.warningBg(opacity)
+    case 'archived': return isDark ? `rgba(148, 163, 184, ${opacity})` : `rgba(100, 116, 139, ${opacity})`
+    default: return 'transparent'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure Status Helpers (healthy / warning / critical)
+// ---------------------------------------------------------------------------
+
+export type InfraStatus = 'healthy' | 'warning' | 'critical'
+
+export function infraStatusLabel(status: string): string {
+  switch (status) {
+    case 'healthy': return 'В норме'
+    case 'warning': return 'Внимание'
+    case 'critical': return 'Критично'
+    default: return 'Неизвестно'
+  }
+}
+
+export function infraStatusColor(status: string): string {
+  switch (status) {
+    case 'healthy': return 'var(--argus-success)'
+    case 'warning': return 'var(--argus-warning)'
+    case 'critical': return 'var(--argus-error)'
+    default: return 'var(--argus-text-dimmed)'
+  }
+}
+
+export function infraStatusBg(
+  status: string,
+  opacity: number,
+  colors: { successBg: ColorFn, warningBg: ColorFn, errorBg: ColorFn }
+): string {
+  switch (status) {
+    case 'healthy': return colors.successBg(opacity)
+    case 'warning': return colors.warningBg(opacity)
+    case 'critical': return colors.errorBg(opacity)
+    default: return 'var(--argus-bg-hover)'
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Integrity Score Helpers
 // ---------------------------------------------------------------------------
 
@@ -302,6 +494,45 @@ export function exportStatusIcon(status: string): string {
   }
 }
 
+export function exportStatusBg(
+  status: string,
+  opacity: number,
+  colors: { warningBg: ColorFn, accentBg: ColorFn, successBg: ColorFn, errorBg: ColorFn },
+  isDark: boolean
+): string {
+  switch (status) {
+    case 'pending': return colors.warningBg(opacity)
+    case 'processing': return colors.accentBg(opacity)
+    case 'completed': return colors.successBg(opacity)
+    case 'failed': return colors.errorBg(opacity)
+    case 'expired': return isDark ? `rgba(100, 116, 139, ${opacity})` : `rgba(148, 163, 184, ${opacity})`
+    default: return 'transparent'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Audio / Noise Level
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns CSS color variable for a noise level (dB).
+ * Thresholds: >55 dB = error (red), >35 dB = warning (yellow), else = success (green).
+ */
+export function noiseLevelColor(level: number): string {
+  if (level > 55) return 'var(--argus-error)'
+  if (level > 35) return 'var(--argus-warning)'
+  return 'var(--argus-success)'
+}
+
+/**
+ * Returns human-readable label for a noise level (dB).
+ */
+export function noiseLevelLabel(level: number): string {
+  if (level > 55) return 'Высокий'
+  if (level > 35) return 'Средний'
+  return 'Тихо'
+}
+
 // ---------------------------------------------------------------------------
 // Composable Wrapper
 // ---------------------------------------------------------------------------
@@ -331,6 +562,12 @@ export function useStatusHelpers() {
     appealStatusBg: (status: string, opacity: number) => appealStatusBg(status, opacity, colors),
     isAppealTerminal,
 
+    // Review decision
+    reviewDecisionLabel,
+    reviewDecisionColor,
+    reviewDecisionBg: (d: string) => reviewDecisionBg(d, colors.isDark.value),
+    reviewDecisionIcon,
+
     // Severity
     severityColor,
     severityBg: (severity: string, opacity: number) => severityBg(severity, opacity, colors),
@@ -355,6 +592,31 @@ export function useStatusHelpers() {
     // Export status
     exportStatusLabel,
     exportStatusColor,
-    exportStatusIcon
+    exportStatusIcon,
+    exportStatusBg: (status: string, opacity: number) => exportStatusBg(status, opacity, colors, colors.isDark.value),
+
+    // Audio / Noise level
+    noiseLevelColor,
+    noiseLevelLabel,
+
+    // Monitoring status (flagged / active / clean)
+    monitoringStatusLabel,
+    monitoringStatusColor,
+    monitoringStatusBg: (status: string, opacity: number) => monitoringStatusBg(status, opacity, colors),
+
+    // Exam status (active / completed / scheduled)
+    examStatusLabel,
+    examStatusColor,
+    examStatusBg: (status: string, opacity: number) => examStatusBg(status, opacity, colors, colors.isDark.value),
+
+    // Test status (active / draft / archived)
+    testStatusLabel,
+    testStatusColor,
+    testStatusBg: (status: string, opacity: number) => testStatusBg(status, opacity, colors, colors.isDark.value),
+
+    // Infrastructure status (healthy / warning / critical)
+    infraStatusLabel,
+    infraStatusColor,
+    infraStatusBg: (status: string, opacity: number) => infraStatusBg(status, opacity, colors)
   }
 }

@@ -3,6 +3,7 @@ import { useAuthStore } from '~/stores/useAuthStore'
 
 const authStore = useAuthStore()
 const { isDark, accentBg, errorBg, successBg, warningBg } = useColors()
+const { formatDateTime, formatTimeAgo, formatFileSize } = useFormatters()
 
 // --- Types ---
 interface ExportJob {
@@ -32,50 +33,10 @@ const error = ref('')
 const showCreateModal = ref(false)
 const newExportSessionIds = ref('')
 
-// --- Helpers ---
-// Status helpers — alias exports page-specific names to shared helpers
-const statusLabel = exportStatusLabel
-const statusColor = exportStatusColor
-const statusIcon = exportStatusIcon
-function statusBgColor(status: string, opacity: number): string {
-  switch (status) {
-    case 'pending': return warningBg(opacity)
-    case 'processing': return accentBg(opacity)
-    case 'completed': return successBg(opacity)
-    case 'failed': return errorBg(opacity)
-    case 'expired': return isDark.value ? `rgba(100, 116, 139, ${opacity})` : `rgba(148, 163, 184, ${opacity})`
-    default: return 'transparent'
-  }
-}
+// --- Helpers (delegated to useStatusHelpers composable) ---
+const { exportStatusLabel: statusLabel, exportStatusColor: statusColor, exportStatusIcon: statusIcon, exportStatusBg: statusBgColor } = useStatusHelpers()
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-function formatRelative(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'только что'
-  if (mins < 60) return `${mins} мин. назад`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} ч. назад`
-  const days = Math.floor(hours / 24)
-  return `${days} дн. назад`
-}
-
-function formatFileSize(bytes: number | undefined): string {
-  if (!bytes) return '—'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
-}
+// formatDate/formatRelative/formatFileSize → replaced by useFormatters() composable
 
 // --- Stats ---
 const stats = computed(() => {
@@ -351,8 +312,8 @@ onUnmounted(() => {
 
               <!-- Created -->
               <td class="px-5 py-3.5">
-                <p class="text-xs" style="color: var(--argus-text-muted);">{{ formatRelative(job.createdAt) }}</p>
-                <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">{{ formatDate(job.createdAt) }}</p>
+                <p class="text-xs" style="color: var(--argus-text-muted);">{{ formatTimeAgo(job.createdAt) }}</p>
+                <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">{{ formatDateTime(job.createdAt) }}</p>
               </td>
 
               <!-- SHA-256 -->
@@ -397,7 +358,7 @@ onUnmounted(() => {
                     class="text-[9px] px-2 py-1 rounded-md"
                     :style="{ background: 'var(--argus-bg-elevated)', color: 'var(--argus-text-dimmed)' }"
                   >
-                    Истекает: {{ formatRelative(job.expiresAt) }}
+                    Истекает: {{ formatTimeAgo(job.expiresAt) }}
                   </span>
                 </div>
               </td>

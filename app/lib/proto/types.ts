@@ -93,6 +93,22 @@ export enum EventType {
   VIRTUAL_MONITOR_DETECTED = 66,
   VIRTUAL_MACHINE_DETECTED = 67,
 
+  // Secondary Camera events (70-75)
+  SIDECAM_DEVICE_DISPLACED = 70,
+  SIDECAM_HANDS_OFF_DESK = 71,
+  SIDECAM_BATTERY_CRITICAL = 72,
+  SIDECAM_STREAM_DISCONNECTED = 73,
+  SIDECAM_CALIBRATION_FAILED = 74,
+  SIDECAM_THERMAL_THROTTLE = 75,
+
+  // Backend AI deep scan events (80-85)
+  BACKEND_AI_FACE_MISMATCH = 80,
+  BACKEND_AI_SCREEN_REFLECTION = 81,
+  BACKEND_AI_MICRO_EXPRESSION = 82,
+  BACKEND_AI_HIDDEN_OBJECT = 83,
+  BACKEND_AI_DEEPFAKE_DETECTED = 84,
+  BACKEND_AI_VOICE_SYNTH = 85,
+
   // Telemetry (high frequency, low severity: 100-103)
   GAZE_TELEMETRY = 100,
   MOUSE_TELEMETRY = 101,
@@ -121,7 +137,8 @@ export enum EventSource {
   SYSTEM = 3,
   BROWSER = 4,
   KERNEL_AGENT = 5,
-  NETWORK_PROBE = 6
+  NETWORK_PROBE = 6,
+  BACKEND_AI = 7
 }
 
 /** Telemetry frequency mode — server-controlled via SessionDirective. */
@@ -177,6 +194,18 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   [EventType.HARDWARE_ID_MISMATCH]: 'Токен аттестации устройства',
   [EventType.VIRTUAL_MONITOR_DETECTED]: 'Виртуальный монитор',
   [EventType.VIRTUAL_MACHINE_DETECTED]: 'Виртуальная машина',
+  [EventType.SIDECAM_DEVICE_DISPLACED]: 'Боковая камера смещена',
+  [EventType.SIDECAM_HANDS_OFF_DESK]: 'Руки вне стола',
+  [EventType.SIDECAM_BATTERY_CRITICAL]: 'Критический заряд камеры',
+  [EventType.SIDECAM_STREAM_DISCONNECTED]: 'Боковая камера отключена',
+  [EventType.SIDECAM_CALIBRATION_FAILED]: 'Калибровка камеры не пройдена',
+  [EventType.SIDECAM_THERMAL_THROTTLE]: 'Перегрев боковой камеры',
+  [EventType.BACKEND_AI_FACE_MISMATCH]: 'AI: Несоответствие лица',
+  [EventType.BACKEND_AI_SCREEN_REFLECTION]: 'AI: Отражение на экране',
+  [EventType.BACKEND_AI_MICRO_EXPRESSION]: 'AI: Микро-выражение',
+  [EventType.BACKEND_AI_HIDDEN_OBJECT]: 'AI: Скрытый объект',
+  [EventType.BACKEND_AI_DEEPFAKE_DETECTED]: 'AI: Дипфейк обнаружен',
+  [EventType.BACKEND_AI_VOICE_SYNTH]: 'AI: Синтез голоса',
   [EventType.GAZE_TELEMETRY]: 'Телеметрия взгляда',
   [EventType.MOUSE_TELEMETRY]: 'Телеметрия мыши',
   [EventType.KEYBOARD_TELEMETRY]: 'Телеметрия клавиатуры',
@@ -218,7 +247,8 @@ export const EVENT_SOURCE_LABELS: Record<EventSource, string> = {
   [EventSource.SYSTEM]: 'Система',
   [EventSource.BROWSER]: 'Браузер',
   [EventSource.KERNEL_AGENT]: 'Ядро',
-  [EventSource.NETWORK_PROBE]: 'Сеть'
+  [EventSource.NETWORK_PROBE]: 'Сеть',
+  [EventSource.BACKEND_AI]: 'Серверный AI'
 }
 
 // ---------------------------------------------------------------------------
@@ -513,6 +543,8 @@ export function getEventCategory(eventType: EventType): string {
   if (val >= 40 && val <= 41) return 'network'
   if (val >= 50 && val <= 52) return 'psychometry'
   if (val >= 60 && val <= 67) return 'kernel'
+  if (val >= 70 && val <= 75) return 'sidecam'
+  if (val >= 80 && val <= 85) return 'backend_ai'
   if (val >= 100 && val <= 106) return 'telemetry'
   return 'unknown'
 }

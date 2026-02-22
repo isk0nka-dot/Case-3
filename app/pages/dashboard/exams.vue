@@ -5,6 +5,7 @@ import { useAuthStore } from '~/stores/useAuthStore'
 const store = useDashboardStore()
 const authStore = useAuthStore()
 const { isDark, accentBg, errorBg, successBg, warningBg, purpleBg } = useColors()
+const { formatDate, formatDateTime } = useFormatters()
 
 // --- Search ---
 const searchQuery = ref('')
@@ -38,13 +39,87 @@ const totalParticipants = computed(() => orgAwareExamConfigs.value.reduce((s, e)
 const selectedExam = ref<ExamProctoringConfig | null>(null)
 const activeTab = ref<'settings' | 'exceptions'>('settings')
 
-function openSettings(exam: ExamProctoringConfig) {
+// --- Backend persistence state ---
+const api = useAdminAPI()
+const settingsSaving = ref(false)
+const settingsSaved = ref(false)
+const settingsError = ref('')
+const settingsHydrating = ref(false)
+const settingsDirty = ref(false)
+
+// Snapshot of server-persisted settings for dirty tracking
+let serverSettingsSnapshot: string | null = null
+
+async function openSettings(exam: ExamProctoringConfig) {
   selectedExam.value = exam
   activeTab.value = 'settings'
+  settingsSaved.value = false
+  settingsError.value = ''
+  settingsDirty.value = false
+
+  // Hydrate from backend
+  if (exam.orgId && exam.id) {
+    settingsHydrating.value = true
+    try {
+      const remote = await api.getProctoringSettings(exam.orgId, exam.id)
+      // Merge backend settings into local settings (excluding metadata fields)
+      const { orgId: _o, examId: _e, updatedAt: _u, updatedBy: _b, cleanThreshold: _ct, warningThreshold: _wt, autoTerminate: _at, autoTerminateAt: _ata, forceLowSpecMode: _f, ...toggles } = remote as any
+      Object.assign(exam.settings, toggles)
+      serverSettingsSnapshot = JSON.stringify(exam.settings)
+    } catch {
+      // No server settings — use local defaults (first time)
+      serverSettingsSnapshot = JSON.stringify(exam.settings)
+    } finally {
+      settingsHydrating.value = false
+    }
+  }
 }
+
+async function saveSettings() {
+  if (!selectedExam.value) return
+
+  settingsSaving.value = true
+  settingsError.value = ''
+  settingsSaved.value = false
+
+  try {
+    const exam = selectedExam.value
+    await api.saveProctoringSettings(exam.orgId, exam.id, {
+      orgId: exam.orgId,
+      examId: exam.id,
+      ...exam.settings,
+      // Add verdict thresholds with defaults
+      cleanThreshold: 80,
+      warningThreshold: 50,
+      autoTerminate: false,
+      autoTerminateAt: 30,
+    } as any)
+
+    settingsSaved.value = true
+    settingsDirty.value = false
+    serverSettingsSnapshot = JSON.stringify(exam.settings)
+    setTimeout(() => { settingsSaved.value = false }, 3000)
+  } catch (err: any) {
+    settingsError.value = err.message || 'Ошибка сохранения настроек'
+  } finally {
+    settingsSaving.value = false
+  }
+}
+
+// Track dirty state when settings change
+watch(
+  () => selectedExam.value?.settings,
+  () => {
+    if (!selectedExam.value || !serverSettingsSnapshot) return
+    settingsDirty.value = JSON.stringify(selectedExam.value.settings) !== serverSettingsSnapshot
+  },
+  { deep: true }
+)
 
 function closeSettings() {
   selectedExam.value = null
+  settingsDirty.value = false
+  serverSettingsSnapshot = null
   clearParticipant()
 }
 
@@ -368,41 +443,10 @@ function overrideDisplayValue(value: any): string {
   return String(value)
 }
 
-// --- Formatters ---
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+// formatDate/formatDatetime → replaced by useFormatters() composable
 
-function formatDatetime(iso: string): string {
-  return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'active': return 'Активный'
-    case 'completed': return 'Завершён'
-    case 'scheduled': return 'Запланирован'
-    default: return '—'
-  }
-}
-
-function statusColor(status: string): string {
-  switch (status) {
-    case 'active': return 'var(--argus-success)'
-    case 'completed': return 'var(--argus-text-dimmed)'
-    case 'scheduled': return 'var(--argus-accent)'
-    default: return 'var(--argus-text-dimmed)'
-  }
-}
-
-function statusBg(status: string, opacity: number): string {
-  switch (status) {
-    case 'active': return successBg(opacity)
-    case 'completed': return isDark.value ? `rgba(148, 163, 184, ${opacity})` : `rgba(100, 116, 139, ${opacity})`
-    case 'scheduled': return accentBg(opacity)
-    default: return 'transparent'
-  }
-}
+// Exam status helpers delegated to useStatusHelpers composable
+const { examStatusLabel: statusLabel, examStatusColor: statusColor, examStatusBg: statusBg } = useStatusHelpers()
 
 function sensitivityLabel(val: number): string {
   if (val >= 65) return 'Высокая'
@@ -489,7 +533,7 @@ function exceptionProfileIcon(_profile: string): string {
           :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)' }"
         >
           <UIcon name="i-lucide-cloud" class="size-3.5" style="color: var(--argus-text-dimmed);" />
-          <span class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">{{ formatDatetime(store.eduserLastSync) }}</span>
+          <span class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">{{ formatDateTime(store.eduserLastSync) }}</span>
         </div>
         <button
           class="flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
@@ -2095,12 +2139,48 @@ function exceptionProfileIcon(_profile: string): string {
             <!-- Footer -->
             <div class="flex items-center justify-between px-6 py-4 border-t shrink-0" style="border-color: var(--argus-border);">
               <div class="flex items-center gap-2">
-                <UIcon name="i-lucide-info" class="size-3.5" style="color: var(--argus-text-dimmed);" />
-                <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Настройки применяются автоматически</span>
+                <!-- Hydrating indicator -->
+                <template v-if="settingsHydrating">
+                  <div class="animate-spin rounded-full size-3 border-2 border-t-transparent" style="border-color: var(--argus-accent); border-top-color: transparent;" />
+                  <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Загрузка с сервера...</span>
+                </template>
+                <!-- Error -->
+                <template v-else-if="settingsError">
+                  <UIcon name="i-lucide-alert-circle" class="size-3.5" style="color: var(--argus-error);" />
+                  <span class="text-[10px]" style="color: var(--argus-error);">{{ settingsError }}</span>
+                </template>
+                <!-- Saved confirmation -->
+                <template v-else-if="settingsSaved">
+                  <UIcon name="i-lucide-check-circle" class="size-3.5" style="color: var(--argus-success);" />
+                  <span class="text-[10px] font-medium" style="color: var(--argus-success);">Сохранено на сервере</span>
+                </template>
+                <!-- Dirty (unsaved changes) -->
+                <template v-else-if="settingsDirty">
+                  <UIcon name="i-lucide-circle-dot" class="size-3.5" style="color: var(--argus-warning);" />
+                  <span class="text-[10px]" style="color: var(--argus-warning);">Несохранённые изменения</span>
+                </template>
+                <!-- Default -->
+                <template v-else>
+                  <UIcon name="i-lucide-cloud-check" class="size-3.5" style="color: var(--argus-text-dimmed);" />
+                  <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Синхронизировано с сервером</span>
+                </template>
               </div>
-              <button class="px-5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer" :style="{ background: 'var(--argus-accent)', color: '#fff' }" @click="closeSettings">
-                Готово
-              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="settingsDirty"
+                  class="px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                  :style="{ background: 'var(--argus-accent)', color: '#fff', opacity: settingsSaving ? '0.6' : '1' }"
+                  :disabled="settingsSaving"
+                  @click="saveSettings"
+                >
+                  <div v-if="settingsSaving" class="animate-spin rounded-full size-3 border-2 border-t-transparent" style="border-color: #fff; border-top-color: transparent;" />
+                  <UIcon v-else name="i-lucide-save" class="size-3.5" />
+                  {{ settingsSaving ? 'Сохранение...' : 'Сохранить' }}
+                </button>
+                <button class="px-5 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer" :style="{ background: settingsDirty ? 'var(--argus-bg-hover)' : 'var(--argus-accent)', color: settingsDirty ? 'var(--argus-text)' : '#fff' }" @click="closeSettings">
+                  {{ settingsDirty ? 'Закрыть' : 'Готово' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>

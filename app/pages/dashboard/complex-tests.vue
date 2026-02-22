@@ -2,7 +2,7 @@
 import { useDashboardStore, type ComplexTestItem } from '~/stores/useDashboardStore'
 
 const store = useDashboardStore()
-const { isDark, accentBg, errorBg, successBg, warningBg, purpleBg } = useColors()
+const { isDark, accentBg, errorBg, successBg, purpleBg } = useColors()
 
 // --- Search ---
 const searchQuery = ref('')
@@ -46,33 +46,8 @@ function cancelDelete() {
   testToDelete.value = null
 }
 
-// --- Formatters ---
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'active': return 'Активный'
-    case 'draft': return 'Черновик'
-    case 'archived': return 'Архив'
-    default: return '—'
-  }
-}
-
-function statusColor(status: string): string {
-  switch (status) {
-    case 'active': return 'var(--argus-success)'
-    case 'draft': return 'var(--argus-warning)'
-    case 'archived': return 'var(--argus-text-dimmed)'
-    default: return 'var(--argus-text-dimmed)'
-  }
-}
-
-function statusBgFn(status: string, opacity: number): string {
-  switch (status) {
-    case 'active': return successBg(opacity)
-    case 'draft': return warningBg(opacity)
-    case 'archived': return isDark.value ? `rgba(148, 163, 184, ${opacity})` : `rgba(100, 116, 139, ${opacity})`
-    default: return 'transparent'
-  }
-}
+// --- Formatters (delegated to useStatusHelpers composable) ---
+const { testStatusLabel: statusLabel, testStatusColor: statusColor, testStatusBg: statusBgFn } = useStatusHelpers()
 </script>
 
 <template>

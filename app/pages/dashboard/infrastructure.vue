@@ -4,7 +4,7 @@ import { useAuthStore } from '~/stores/useAuthStore'
 
 const adminAPI = useAdminAPI()
 const authStore = useAuthStore()
-const { isDark, accentBg, errorBg, successBg, warningBg } = useColors()
+const { isDark, accentBg } = useColors()
 
 // ---------------------------------------------------------------------------
 // Reactive state — populated from the real API
@@ -109,34 +109,9 @@ const overallStatusLabel = computed(() => {
 })
 
 // ---------------------------------------------------------------------------
-// UI Helpers
+// UI Helpers (delegated to useStatusHelpers composable)
 // ---------------------------------------------------------------------------
-function statusColor(status: string): string {
-  switch (status) {
-    case 'healthy': return 'var(--argus-success)'
-    case 'warning': return 'var(--argus-warning)'
-    case 'critical': return 'var(--argus-error)'
-    default: return 'var(--argus-text-dimmed)'
-  }
-}
-
-function statusBg(status: string, opacity: number): string {
-  switch (status) {
-    case 'healthy': return successBg(opacity)
-    case 'warning': return warningBg(opacity)
-    case 'critical': return errorBg(opacity)
-    default: return 'var(--argus-bg-hover)'
-  }
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case 'healthy': return 'В норме'
-    case 'warning': return 'Внимание'
-    case 'critical': return 'Критично'
-    default: return 'Неизвестно'
-  }
-}
+const { infraStatusColor: statusColor, infraStatusBg: statusBg, infraStatusLabel: statusLabel } = useStatusHelpers()
 
 function loadGradient(value: number): string {
   if (value >= 85) {

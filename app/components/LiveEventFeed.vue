@@ -67,14 +67,8 @@ function getSeverityDot(severity: Severity): string {
   }
 }
 
-// Time-ago formatting (takes epoch ms, not ISO string).
-function formatTimeAgoMs(receivedAt: number): string {
-  const seconds = Math.floor((Date.now() - receivedAt) / 1000)
-  if (seconds < 5) return 'только что'
-  if (seconds < 60) return `${seconds}с назад`
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}м назад`
-}
+// formatTimeAgoMs → centralized in useFormatters() composable
+const { formatTimeAgoMs } = useFormatters()
 
 // Selected event for detail view.
 const selectedEvent = ref<FeedEvent | null>(null)
