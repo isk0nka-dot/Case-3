@@ -38,10 +38,18 @@ const (
 
 const (
 	// QueueCritical is the high-priority queue for export and forensic jobs.
+	// These are lightweight, CPU-bound tasks (PDF, TAR.GZ) that must not be
+	// starved by GPU-heavy inference workloads.
 	QueueCritical = "critical"
 
 	// QueueDefault is the standard-priority queue.
 	QueueDefault = "default"
+
+	// QueueInference is the isolated queue for GPU-bound AI analysis tasks.
+	// Separated from QueueCritical to prevent inference from starving
+	// lightweight export/forensic jobs. Concurrency is independently
+	// controlled via config.Redis.InferenceConcurrency.
+	QueueInference = "inference"
 
 	// QueueLow is the low-priority queue for deferred tasks.
 	QueueLow = "low"

@@ -399,17 +399,30 @@ func run() error {
 	// =================================================================
 	var jwtVerifier *auth.Verifier
 	if cfg.Auth.Enabled {
-		jwtVerifier, err = auth.NewVerifier(auth.VerifierConfig{
-			SigningKeyBase64:      cfg.Auth.SigningKey,
+		// Determine algorithm — default to RS256 (asymmetric, recommended).
+		algorithm := cfg.Auth.Algorithm
+		if algorithm == "" {
+			algorithm = auth.AlgorithmRS256
+		}
+
+		verifierCfg := auth.VerifierConfig{
+			Algorithm:            algorithm,
+			PublicKeyPath:        cfg.Auth.PublicKeyPath,
+			PrivateKeyPath:       cfg.Auth.PrivateKeyPath,
+			SigningKeyBase64:     cfg.Auth.SigningKey, // Legacy HS256 fallback.
 			Issuer:               cfg.Auth.Issuer,
 			Audience:             cfg.Auth.Audience,
 			ClockSkew:            cfg.Auth.ClockSkew,
 			RequireSessionSecret: cfg.Auth.RequireSessionSecret,
-		})
+		}
+
+		jwtVerifier, err = auth.NewVerifier(verifierCfg)
 		if err != nil {
 			return fmt.Errorf("failed to initialise jwt verifier: %w", err)
 		}
 		logger.Info("jwt verifier initialised",
+			zap.String("algorithm", jwtVerifier.Algorithm()),
+			zap.Bool("can_sign", jwtVerifier.CanSign()),
 			zap.String("issuer", cfg.Auth.Issuer),
 			zap.String("audience", cfg.Auth.Audience),
 			zap.Duration("clock_skew", cfg.Auth.ClockSkew),
@@ -417,7 +430,7 @@ func run() error {
 		)
 	} else {
 		logger.Warn("JWT authentication is DISABLED — all requests are accepted without verification",
-			zap.String("note", "Set auth.enabled=true and provide a signing key for production"),
+			zap.String("note", "Set auth.enabled=true and provide RSA key paths for production"),
 		)
 	}
 

@@ -43,8 +43,23 @@ type Config struct {
 	Export     ExportConfig     `yaml:"export"`
 	Telegram   TelegramConfig   `yaml:"telegram"`
 	DLQ        DLQConfig        `yaml:"dlq"`
-	Redis      RedisConfig      `yaml:"redis"`
-	Inference  InferenceConfig  `yaml:"inference"`
+	Redis       RedisConfig       `yaml:"redis"`
+	Inference   InferenceConfig   `yaml:"inference"`
+	CryptoErase CryptoEraseConfig `yaml:"crypto_erasure"`
+}
+
+// CryptoEraseConfig holds GDPR cryptographic erasure settings.
+// When enabled, all evidence and sensitive event fields are encrypted with
+// per-student envelope encryption (AES-256-GCM). Destroying a student's
+// KEK renders all their data irrecoverable.
+type CryptoEraseConfig struct {
+	// Enabled activates envelope encryption for evidence storage. Default: false.
+	Enabled bool `yaml:"enabled"`
+
+	// KEKHex is the system-wide Key Encryption Key, hex-encoded (64 hex chars = 32 bytes).
+	// CRITICAL: Must be loaded from a secrets manager in production.
+	// Set via ARGUS_CRYPTO_KEK environment variable.
+	KEKHex string `yaml:"kek_hex"`
 }
 
 // TelegramConfig holds Telegram Bot API alerting credentials.
@@ -94,9 +109,16 @@ type RedisConfig struct {
 	// DB is the Redis database number. Default: 0.
 	DB int `yaml:"db"`
 
-	// WorkerConcurrency is the number of concurrent asynq worker goroutines.
+	// WorkerConcurrency is the number of concurrent asynq worker goroutines
+	// for non-inference queues (critical, default, low).
 	// Only used by cmd/worker. Default: 10.
 	WorkerConcurrency int `yaml:"worker_concurrency"`
+
+	// InferenceConcurrency is the number of concurrent inference-queue
+	// worker goroutines. This isolates GPU-bound AI analysis from lightweight
+	// tasks (export, forensic PDF, alerts) preventing resource starvation.
+	// Only used by cmd/worker. Default: 2.
+	InferenceConcurrency int `yaml:"inference_concurrency"`
 }
 
 // InferenceConfig controls the backend AI inference service.
@@ -253,6 +275,17 @@ type RateLimitConfig struct {
 
 	// HTTPPerIPBurst is the burst allowance per client IP.
 	HTTPPerIPBurst int `yaml:"http_per_ip_burst"`
+
+	// ReconnectBurstRPS is the aggregate RPS cap applied to the first batch
+	// of events from sessions that have been offline. This prevents a
+	// thundering herd when thousands of clients reconnect simultaneously
+	// after a network partition and drain their offline queues in unison.
+	// Default: 5000.
+	ReconnectBurstRPS float64 `yaml:"reconnect_burst_rps"`
+
+	// ReconnectBurstSize is the token bucket burst for reconnect admission.
+	// Default: 10000.
+	ReconnectBurstSize int `yaml:"reconnect_burst_size"`
 }
 
 // WorkerPoolConfig sizes the goroutine pool that processes incoming events
@@ -272,10 +305,34 @@ type AuthConfig struct {
 	// for local development without the Eduser system. Default: true.
 	Enabled bool `yaml:"enabled"`
 
+	// Algorithm selects the JWT signing/verification algorithm.
+	// "RS256" (default, recommended): RSA-SHA256 asymmetric — private key signs,
+	//   public key verifies. A compromised worker CANNOT forge admin tokens.
+	// "HS256" (legacy): HMAC-SHA256 symmetric — same shared secret signs and
+	//   verifies. A compromised worker CAN forge admin tokens.
+	Algorithm string `yaml:"algorithm"`
+
+	// ── RSA-256 fields (recommended) ─────────────────────────────────
+
+	// PrivateKeyPath is the filesystem path to the PEM-encoded RSA private key.
+	// Only the API server needs this. Workers MUST NOT have access.
+	// Set via EVENT_COLLECTOR_JWT_PRIVATE_KEY_PATH environment variable.
+	PrivateKeyPath string `yaml:"private_key_path"`
+
+	// PublicKeyPath is the filesystem path to the PEM-encoded RSA public key.
+	// Both API server and workers need this for token verification.
+	// Set via EVENT_COLLECTOR_JWT_PUBLIC_KEY_PATH environment variable.
+	PublicKeyPath string `yaml:"public_key_path"`
+
+	// ── HMAC-SHA256 fields (legacy, deprecated) ──────────────────────
+
 	// SigningKey is the HMAC-SHA256 shared secret for JWT verification.
+	// DEPRECATED: Use RS256 with PrivateKeyPath/PublicKeyPath instead.
 	// In production, set via EVENT_COLLECTOR_JWT_SIGNING_KEY environment variable.
 	// Must be at least 32 bytes for HMAC-SHA256 security.
 	SigningKey string `yaml:"signing_key"`
+
+	// ── Common fields ────────────────────────────────────────────────
 
 	// Issuer is the expected JWT "iss" claim. Must match the value set by
 	// the Eduser system when issuing tokens. Default: "eduser".
@@ -667,6 +724,12 @@ func applyDefaults(cfg *Config) {
 	if cfg.RateLimit.HTTPPerIPBurst == 0 {
 		cfg.RateLimit.HTTPPerIPBurst = 200
 	}
+	if cfg.RateLimit.ReconnectBurstRPS == 0 {
+		cfg.RateLimit.ReconnectBurstRPS = 5000
+	}
+	if cfg.RateLimit.ReconnectBurstSize == 0 {
+		cfg.RateLimit.ReconnectBurstSize = 10000
+	}
 
 	// --- Worker Pool ---
 	if cfg.WorkerPool.Size == 0 {
@@ -782,6 +845,9 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Redis.WorkerConcurrency == 0 {
 		cfg.Redis.WorkerConcurrency = 10
+	}
+	if cfg.Redis.InferenceConcurrency == 0 {
+		cfg.Redis.InferenceConcurrency = 2
 	}
 
 	// --- Inference (backend AI gateway) ---
@@ -906,7 +972,18 @@ func applyEnvOverrides(cfg *Config) {
 		}
 	}
 
-	// Auth — JWT signing key (CRITICAL: always set via env in production).
+	// Auth — JWT configuration (CRITICAL: always set via env in production).
+	if v := os.Getenv("EVENT_COLLECTOR_JWT_ALGORITHM"); v != "" {
+		cfg.Auth.Algorithm = v
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_JWT_PRIVATE_KEY_PATH"); v != "" {
+		cfg.Auth.PrivateKeyPath = v
+		cfg.Auth.Enabled = true // Auto-enable auth when key path is provided.
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_JWT_PUBLIC_KEY_PATH"); v != "" {
+		cfg.Auth.PublicKeyPath = v
+		cfg.Auth.Enabled = true // Auto-enable auth when key path is provided.
+	}
 	if v := os.Getenv("EVENT_COLLECTOR_JWT_SIGNING_KEY"); v != "" {
 		cfg.Auth.SigningKey = v
 		cfg.Auth.Enabled = true // Auto-enable auth when key is provided.
@@ -961,6 +1038,11 @@ func applyEnvOverrides(cfg *Config) {
 			cfg.Redis.WorkerConcurrency = c
 		}
 	}
+	if v := os.Getenv("EVENT_COLLECTOR_REDIS_INFERENCE_CONCURRENCY"); v != "" {
+		if c, err := strconv.Atoi(v); err == nil {
+			cfg.Redis.InferenceConcurrency = c
+		}
+	}
 
 	// Inference (backend AI gateway).
 	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_GRPC_PORT"); v != "" {
@@ -978,6 +1060,14 @@ func applyEnvOverrides(cfg *Config) {
 		if c, err := strconv.Atoi(v); err == nil {
 			cfg.Inference.Concurrency = c
 		}
+	}
+
+	// Crypto-erasure (GDPR envelope encryption).
+	if v := os.Getenv("ARGUS_CRYPTO_ENABLED"); v != "" {
+		cfg.CryptoErase.Enabled = v == "true" || v == "1"
+	}
+	if v := os.Getenv("ARGUS_CRYPTO_KEK"); v != "" {
+		cfg.CryptoErase.KEKHex = v
 	}
 }
 
@@ -1074,11 +1164,26 @@ func validate(cfg *Config) error {
 
 	// --- Auth ---
 	if cfg.Auth.Enabled {
-		if cfg.Auth.SigningKey == "" {
-			return fmt.Errorf("auth.signing_key must not be empty when auth is enabled")
+		alg := cfg.Auth.Algorithm
+		if alg == "" {
+			alg = "RS256" // Default to RS256.
 		}
-		if len(cfg.Auth.SigningKey) < 32 {
-			return fmt.Errorf("auth.signing_key must be at least 32 characters for HMAC-SHA256, got %d", len(cfg.Auth.SigningKey))
+		switch alg {
+		case "RS256":
+			// RS256 requires at least a public key path (or private key path
+			// from which the public key is derived).
+			if cfg.Auth.PublicKeyPath == "" && cfg.Auth.PrivateKeyPath == "" {
+				return fmt.Errorf("auth: RS256 requires public_key_path or private_key_path when auth is enabled")
+			}
+		case "HS256":
+			if cfg.Auth.SigningKey == "" {
+				return fmt.Errorf("auth.signing_key must not be empty when auth is enabled with HS256")
+			}
+			if len(cfg.Auth.SigningKey) < 32 {
+				return fmt.Errorf("auth.signing_key must be at least 32 characters for HMAC-SHA256, got %d", len(cfg.Auth.SigningKey))
+			}
+		default:
+			return fmt.Errorf("auth.algorithm must be RS256 or HS256, got %q", alg)
 		}
 	}
 

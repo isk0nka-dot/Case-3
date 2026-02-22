@@ -192,54 +192,86 @@ func run() error {
 	)
 
 	// =================================================================
-	// STEP 10: Create and configure asynq server.
+	// STEP 10: Create and configure asynq servers.
+	//
+	// Two isolated servers prevent GPU-bound AI inference from starving
+	// lightweight export/forensic/alert tasks:
+	//
+	//   Server 1 (general): critical + default + low queues
+	//     → concurrency: cfg.Redis.WorkerConcurrency (default 10)
+	//
+	//   Server 2 (inference): inference queue only
+	//     → concurrency: cfg.Redis.InferenceConcurrency (default 2)
+	//
+	// This guarantees that even if all inference slots are occupied with
+	// 15-minute GPU scans, exports and forensic PDFs continue processing.
 	// =================================================================
-	srv := asynq.NewServer(
-		asynq.RedisClientOpt{
-			Addr:     cfg.Redis.Addr,
-			Password: cfg.Redis.Password,
-			DB:       cfg.Redis.DB,
-		},
-		asynq.Config{
-			Concurrency: cfg.Redis.WorkerConcurrency,
-			Queues: map[string]int{
-				worker.QueueCritical: 6,
-				worker.QueueDefault:  3,
-				worker.QueueLow:      1,
-			},
-			RetryDelayFunc: func(n int, err error, t *asynq.Task) time.Duration {
-				// Exponential backoff: 10s, 40s, 90s, ...
-				return time.Duration(n*n) * 10 * time.Second
-			},
-			ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
-				retried, _ := asynq.GetRetryCount(ctx)
-				maxRetry, _ := asynq.GetMaxRetry(ctx)
-				logger.Error("asynq task failed",
-					zap.String("type", task.Type()),
-					zap.Int("retry", retried),
-					zap.Int("max_retry", maxRetry),
-					zap.Error(err),
-				)
 
-				// Only send Telegram alert on final failure (all retries exhausted).
-				if retried >= maxRetry {
-					worker.NotifyJobFailed(telegramAlerter, task.Type(), task.ResultWriter().TaskID(), err)
-				}
-			}),
-			Logger: &asynqZapLogger{logger: logger.Named("asynq")},
-		},
-	)
+	redisOpt := asynq.RedisClientOpt{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	}
 
-	// Register handlers.
+	retryFunc := func(n int, err error, t *asynq.Task) time.Duration {
+		// Exponential backoff: 10s, 40s, 90s, ...
+		return time.Duration(n*n) * 10 * time.Second
+	}
+
+	errorHandler := asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
+		retried, _ := asynq.GetRetryCount(ctx)
+		maxRetry, _ := asynq.GetMaxRetry(ctx)
+		logger.Error("asynq task failed",
+			zap.String("type", task.Type()),
+			zap.Int("retry", retried),
+			zap.Int("max_retry", maxRetry),
+			zap.Error(err),
+		)
+
+		// Only send Telegram alert on final failure (all retries exhausted).
+		if retried >= maxRetry {
+			worker.NotifyJobFailed(telegramAlerter, task.Type(), task.ResultWriter().TaskID(), err)
+		}
+	})
+
+	// ── Server 1: General (critical + default + low) ──────────────────
+	srv := asynq.NewServer(redisOpt, asynq.Config{
+		Concurrency: cfg.Redis.WorkerConcurrency,
+		Queues: map[string]int{
+			worker.QueueCritical: 6,
+			worker.QueueDefault:  3,
+			worker.QueueLow:      1,
+		},
+		StrictPriority: true, // critical always drained before default/low
+		RetryDelayFunc: retryFunc,
+		ErrorHandler:   errorHandler,
+		Logger:         &asynqZapLogger{logger: logger.Named("asynq.general")},
+	})
+
 	mux := asynq.NewServeMux()
 	mux.Handle(worker.TypeVideoExport, videoExportHandler)
 	mux.Handle(worker.TypeForensicReport, forensicReportHandler)
-	mux.Handle(worker.TypeAIAnalysis, aiAnalysisHandler)
 
-	logger.Info("asynq handlers registered",
-		zap.String(worker.TypeVideoExport, "VideoExportHandler"),
-		zap.String(worker.TypeForensicReport, "ForensicReportHandler"),
-		zap.String(worker.TypeAIAnalysis, "AIAnalysisHandler"),
+	// ── Server 2: Inference (isolated GPU queue) ──────────────────────
+	inferenceSrv := asynq.NewServer(redisOpt, asynq.Config{
+		Concurrency: cfg.Redis.InferenceConcurrency,
+		Queues: map[string]int{
+			worker.QueueInference: 1,
+		},
+		RetryDelayFunc: retryFunc,
+		ErrorHandler:   errorHandler,
+		Logger:         &asynqZapLogger{logger: logger.Named("asynq.inference")},
+	})
+
+	inferenceMux := asynq.NewServeMux()
+	inferenceMux.Handle(worker.TypeAIAnalysis, aiAnalysisHandler)
+
+	logger.Info("asynq handlers registered (dual-server isolation)",
+		zap.String(worker.TypeVideoExport, "VideoExportHandler → general"),
+		zap.String(worker.TypeForensicReport, "ForensicReportHandler → general"),
+		zap.String(worker.TypeAIAnalysis, "AIAnalysisHandler → inference"),
+		zap.Int("general_concurrency", cfg.Redis.WorkerConcurrency),
+		zap.Int("inference_concurrency", cfg.Redis.InferenceConcurrency),
 	)
 
 	// =================================================================
@@ -254,10 +286,10 @@ func run() error {
 	}
 
 	// =================================================================
-	// STEP 12: Start server (blocks until signal).
+	// STEP 12: Start both servers (blocks until signal).
 	// =================================================================
 
-	// Capture SIGINT/SIGTERM for graceful shutdown logging.
+	// Capture SIGINT/SIGTERM for graceful shutdown of both servers.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
@@ -265,12 +297,29 @@ func run() error {
 		sig := <-sigCh
 		logger.Info("received shutdown signal", zap.String("signal", sig.String()))
 		srv.Shutdown()
+		inferenceSrv.Shutdown()
+	}()
+
+	// Start inference server in a background goroutine.
+	inferenceErrCh := make(chan error, 1)
+	go func() {
+		logger.Info("inference worker starting", zap.Int("concurrency", cfg.Redis.InferenceConcurrency))
+		if err := inferenceSrv.Run(inferenceMux); err != nil {
+			inferenceErrCh <- fmt.Errorf("inference asynq server error: %w", err)
+		}
+		close(inferenceErrCh)
 	}()
 
 	logger.Info("argus-worker running — waiting for tasks...")
 
+	// General server runs in the main goroutine.
 	if err := srv.Run(mux); err != nil {
-		return fmt.Errorf("asynq server error: %w", err)
+		return fmt.Errorf("general asynq server error: %w", err)
+	}
+
+	// Wait for inference server to finish.
+	if err := <-inferenceErrCh; err != nil {
+		return err
 	}
 
 	// =================================================================

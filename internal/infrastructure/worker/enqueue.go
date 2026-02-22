@@ -49,8 +49,9 @@ func NewForensicReportTask(payload ForensicReportPayload) (*asynq.Task, error) {
 }
 
 // NewAIAnalysisTask creates an asynq task for backend AI deep scan.
-// The task is enqueued on the "default" queue (not critical — post-session)
-// with a 15-minute timeout and up to 2 retries.
+// The task is enqueued on the isolated "inference" queue to prevent
+// GPU-heavy analysis from starving lightweight export/forensic jobs.
+// 15-minute timeout and up to 2 retries.
 func NewAIAnalysisTask(payload AIAnalysisPayload) (*asynq.Task, error) {
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -61,7 +62,7 @@ func NewAIAnalysisTask(payload AIAnalysisPayload) (*asynq.Task, error) {
 		data,
 		asynq.MaxRetry(2),
 		asynq.Timeout(15*time.Minute),
-		asynq.Queue(QueueDefault),
+		asynq.Queue(QueueInference),
 		asynq.TaskID(fmt.Sprintf("ai:%s", payload.SessionID)),
 	), nil
 }

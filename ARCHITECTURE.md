@@ -22,6 +22,12 @@
 12. [Observability](#observability)
 13. [Deployment Architecture](#deployment-architecture)
 14. [Decision Log (ADRs)](#decision-log-adrs)
+    - ADR-001: gRPC + gRPC-Web
+    - ADR-002: ClickHouse over TimescaleDB
+    - ADR-003: In-memory ring buffer
+    - ADR-004: Single binary → API/Worker split (superseded by ADR-006)
+    - ADR-005: HMAC-SHA256 → RSA-256 JWT (superseded by ADR-006)
+    - ADR-006: Microservice Split & Distributed Inference
 
 ---
 
@@ -61,19 +67,34 @@ low-frequency admin operations (correctness-sensitive).
            /api/ │    │          │  /argus.proctoring.*
                  │    │          │  (gRPC-Web)
     ┌────────────▼─┐  │     ┌────▼──────────────────┐
-    │  Nuxt 3 SPA  │  │     │    argus-backend       │
-    │ (argus-front)│  │     │    :8080 (HTTP)        │
+    │  Nuxt 3 SPA  │  │     │    argus-backend       │  RSA Private Key (sign)
+    │ (argus-front)│  │     │    :8080 (HTTP)        │  RSA Public Key (verify)
     └──────────────┘  │     │    :50051 (gRPC)       │
-                      │     └──┬──────────────┬──────┘
-             REST ────┘        │              │
-                          ┌────▼────┐   ┌─────▼──────┐
-                          │  Kafka  │   │ ClickHouse │
-                          │(stream) │   │(analytics) │
-                          └─────────┘   └────────────┘
+                      │     └──┬─────────┬─────┬─────┘
+             REST ────┘        │         │     │
+                               │  asynq  │     │
+                    ┌──────────┘  tasks   │     │
+                    │         ┌───┘       │     │
+               ┌────▼────┐  ┌▼───────┐   │     │
+               │  Kafka  │  │ Redis  │   │     │
+               │(3-broker│  │ (4GB)  │   │     │
+               │ cluster)│  │ AOF+RDB│   │     │
+               └─────────┘  └───┬────┘   │     │
+                                │        │     │
+                    ┌───────────▼──┐     │     │
+                    │ argus-worker │     │     │  RSA Public Key (verify only)
+                    │ (background) │     │     │
+                    └──────────────┘     │     │
+                                   ┌────▼──────────┐
+                                   │  ClickHouse   │
+                                   │ (3-node HA    │
+                                   │  + 3 Keepers) │
+                                   └───────────────┘
                                │
                     ┌──────────▼──────────┐
                     │     PostgreSQL      │
-                    │  (transactional)    │
+                    │  (transactional +   │
+                    │   outbox_jobs)      │
                     └─────────────────────┘
                                │
                     ┌──────────▼──────────┐
@@ -140,7 +161,7 @@ grpcweb.Handler (internal/transport/grpcweb/proxy.go)
 gRPC Interceptor Chain (internal/transport/grpc/interceptors.go)
     │  1. Recovery      — panic → graceful error (prevents goroutine leak)
     │  2. RateLimit     — token bucket (global 50K RPS + per-session 100 RPS)
-    │  3. Auth          — JWT verification (HMAC-SHA256) + session cache lookup
+    │  3. Auth          — JWT verification (RS256 asymmetric) + session cache lookup
     │  4. Logging       — structured zap entry with request metadata
     ▼
 grpcTransport.Server.StreamEvents() (internal/transport/grpc/server.go)
@@ -459,6 +480,11 @@ and pre-aggregated materialized views for dashboard queries.
 | `argus.evidence.chain` | Configurable | Full evidence chain with metadata |
 | `argus.forensic.ledger` | Permanent | Minimal hash proof for auditors |
 
+**Cluster configuration (3-broker KRaft):**
+- 3 brokers with `replication.factor = 3` and `min.insync.replicas = 2`
+- KRaft mode (no ZooKeeper dependency) — combined controller + broker nodes
+- Survives 1 broker failure with zero data loss
+
 **Producer configuration:**
 - `idempotent = true` — exactly-once delivery per partition
 - `required_acks = -1` — all in-sync replicas must ACK
@@ -487,16 +513,22 @@ Client  ──POST /api/v1/auth/login──►  AdminHandler.handleLogin()
                                           ▼  bcrypt.CompareHashAndPassword()
                                       PostgreSQL (users table, password_hash)
                                           │
-                                          ▼  auth.NewToken(claims)
-                                      HMAC-SHA256 signed JWT
+                                          ▼  auth.GenerateTokenRS256(claims, privateKey)
+                                      RSA-SHA256 signed JWT (RS256)
                                           │
                                           ▼  HTTP 200 {"token": "..."}
 Client  ──Authorization: Bearer <jwt>──►  Any protected endpoint
                                           │
                                           ▼  auth.VerifyToken(jwt)
-                                      Inline JWT verification (no DB call)
+                                      RS256 verification (public key only — no DB call)
+                                      Algorithm confusion attack prevention
                                       Claims: {sub, org_id, role, exp}
 ```
+
+**Key Separation (ADR-006):**
+- **API Server:** Holds RSA private key (sign) + public key (verify)
+- **Workers:** Hold ONLY RSA public key (verify). Cannot forge tokens.
+- **Migration:** HMAC-SHA256 (HS256) retained as legacy fallback (set `algorithm: HS256`)
 
 ### Defense in Depth
 
@@ -506,13 +538,16 @@ Client  ──Authorization: Bearer <jwt>──►  Any protected endpoint
 | Network | HSTS preload | Nginx (`Strict-Transport-Security: max-age=63072000`) |
 | Network | Rate limiting | Nginx (auth: 5 RPS) + backend (global + per-IP) |
 | Transport | CORS | `pkg/cors` (explicit allowlist, no wildcards in production) |
-| Application | JWT auth | `pkg/auth` (HMAC-SHA256, 24h expiry) |
+| Application | JWT auth | `pkg/auth` (RS256 asymmetric, 24h expiry, algorithm confusion prevention) |
+| Application | Key separation | RSA-4096: private key (API server only), public key (workers) |
 | Application | RBAC | Per-handler role checks (`super_admin` > `org_admin` > `proctor` > `viewer`) |
 | Application | Security headers | `pkg/securityheaders` (CSP, X-Frame-Options, Referrer-Policy) |
 | Data | Tenant isolation | `org_id` in every ClickHouse event and JWT claim |
 | Data | Password hashing | `bcrypt` (cost factor 12) |
+| Data | Outbox pattern | PostgreSQL `outbox_jobs` ensures task durability before Redis dispatch |
 | Evidence | Tamper detection | SHA-256 hash chaining (Forensic Ledger) |
 | Evidence | WORM protection | MinIO Object Lock (GOVERNANCE mode, 365-day retention) |
+| Evidence | Crypto-erasure | AES-256-GCM envelope encryption, per-student KEK (GDPR Art. 17) |
 
 ---
 
@@ -565,10 +600,17 @@ Kubernetes should use `/readyz` for `readinessProbe` and `/healthz` for `livenes
 
 ## Deployment Architecture
 
-### Single Binary, Multiple Interfaces
+### Binary Architecture (API Server + Worker Split)
 
-The entire service is a single Go binary — no separate processes for gRPC vs REST.
-This simplifies deployment, logging, and resource accounting.
+The system ships as two binaries (see ADR-006):
+
+- **`cmd/server`** — API server: gRPC event ingestion, REST admin API, evidence recording.
+  Holds the RSA private key for token signing.
+- **`cmd/worker`** — Background worker: video export, forensic PDF, AI analysis, alerts.
+  Holds only the RSA public key for token verification. Cannot forge tokens.
+
+Both binaries share the same Clean Architecture codebase. The split isolates CPU-heavy
+background jobs (video encoding, AI inference) from latency-sensitive event ingestion.
 
 ### Container Image
 
@@ -656,32 +698,147 @@ performance gain.
 
 ---
 
-### ADR-004: Single binary over microservices
+### ADR-004: Single binary → API/Worker split (superseded by ADR-006)
 
-**Decision:** Ship all functionality (gRPC ingestion, REST admin API, evidence recorder,
-export worker) as a single Go binary.
+**Original Decision (v1):** Ship all functionality as a single Go binary.
 
-**Rationale:** The current scale (10,000 sessions) does not justify the operational overhead
-of a microservices architecture (service mesh, inter-service authentication, distributed tracing
-setup). A single binary with clean internal boundaries (Clean Architecture) can be trivially
-split into microservices if load requires it — the port interfaces are already the split boundaries.
+**Superseded by ADR-006 (v2):** The system has been split into two binaries:
+- `cmd/server` — API server (gRPC ingestion + REST admin API)
+- `cmd/worker` — Background worker (video export, forensic PDF, AI analysis)
 
-**Trade-off:** Single binary means all features scale together. If the export worker starts
-consuming significant CPU, it would affect event ingestion latency. Mitigation: export workers
-run as a background goroutine with their own concurrency limits.
+See ADR-006 for the rationale behind this change.
 
 ---
 
-### ADR-005: HMAC-SHA256 JWT over RSA JWT
+### ADR-005: HMAC-SHA256 JWT → RSA-256 JWT (superseded by ADR-006)
 
-**Decision:** Use HMAC-SHA256 (symmetric) for JWT signing instead of RSA-256 (asymmetric).
+**Original Decision (v1):** Use HMAC-SHA256 (symmetric) for JWT signing.
 
-**Rationale:** There is currently only one service that both issues and verifies tokens —
-the event-collector itself. RSA asymmetric signing is necessary when verification happens
-in a different service (e.g., API gateway) that should not have the signing key. In our
-architecture, the backend both signs (at login) and verifies (at every request), so symmetric
-is simpler and faster (~3x performance advantage).
+**Superseded (v2):** RSA-256 (asymmetric) is now the default algorithm. The API/Worker
+split (ADR-006) introduced a second binary that verifies tokens. With HMAC-SHA256, a
+compromised worker could forge admin tokens — this is unacceptable for a proctoring
+system handling examination integrity. RS256 ensures workers can verify but CANNOT sign.
 
-**Trade-off:** If we ever add a separate API gateway that needs to verify tokens without the
-signing key, we would need to rotate to RSA. The `pkg/auth` interface is designed to support
-this migration with a config flag.
+HMAC-SHA256 is retained as a legacy fallback (set `algorithm: HS256` in config) for
+backward compatibility during migration.
+
+See ADR-006 for the complete security rationale.
+
+---
+
+### ADR-006: Microservice Split & Distributed Inference
+
+**Status:** Accepted
+**Date:** 2026-02-22
+**Supersedes:** ADR-004 (single binary), ADR-005 (HMAC-SHA256 JWT)
+
+#### Context
+
+The Argus system was initially designed as a single Go binary (ADR-004) with HMAC-SHA256
+JWT authentication (ADR-005). Two critical production requirements forced a re-architecture:
+
+1. **Resource starvation:** CPU-heavy background jobs (video export, AI inference with
+   ONNX models) running in-process competed with latency-sensitive gRPC event ingestion.
+   A single long-running forensic PDF generation could spike p99 latency from 5ms to 200ms+.
+
+2. **Security boundary violation:** HMAC-SHA256 uses a shared secret for both signing and
+   verification. In a single binary this is acceptable. With a separate worker binary, the
+   worker possesses the signing key — a compromised worker could forge admin-level JWTs,
+   granting unrestricted access to modify exam results, delete evidence, or impersonate proctors.
+
+#### Decision
+
+Split the system into two binaries with asymmetric JWT authentication:
+
+| Binary | Role | JWT Key | Background Jobs |
+|--------|------|---------|-----------------|
+| `cmd/server` | API server: gRPC ingestion, REST admin, evidence recording | RSA private key (sign + verify) | None |
+| `cmd/worker` | Background processor: video export, forensic PDF, AI analysis, alerts | RSA public key (verify only) | All asynq queues |
+
+Job dispatch uses the **Transactional Outbox Pattern**:
+1. Business logic writes the job to PostgreSQL `outbox_jobs` table within the same DB transaction.
+2. A background relay goroutine polls `outbox_jobs` and dispatches to Redis (asynq).
+3. If Redis is unavailable, jobs remain safely in PostgreSQL with retry logic.
+4. This eliminates the dual-write problem (business data + Redis) and guarantees zero task loss.
+
+#### Infrastructure High Availability
+
+| Component | Configuration | Fault Tolerance |
+|-----------|--------------|-----------------|
+| Kafka | 3-broker KRaft cluster, replication-factor 3, min.insync.replicas 2 | Survives 1 broker failure with zero data loss |
+| ClickHouse | 3-node replicated cluster + 3 ClickHouse Keepers | Survives 1 node failure, automatic failover |
+| Redis | 4GB maxmemory, AOF (appendfsync everysec) + RDB snapshots, noeviction | ≤1 second data loss window on crash, OOM returns error (never drops jobs) |
+| PostgreSQL | Single node + outbox_jobs table | Transactional outbox guarantees task persistence |
+
+#### JWT Security Model (RS256)
+
+```
+┌─────────────────┐     RS256 Private Key     ┌─────────────────┐
+│   API Server    │ ─────── (sign) ──────────► │   JWT Token     │
+│  (cmd/server)   │                            │  alg: RS256     │
+│                 │ ◄────── (verify) ────────── │  sub: user_id   │
+│  Private + Pub  │     RS256 Public Key       │  org_id: ...    │
+└─────────────────┘                            └────────┬────────┘
+                                                        │
+                     RS256 Public Key (only)             │
+┌─────────────────┐ ◄────── (verify) ──────────────────┘
+│    Worker       │
+│  (cmd/worker)   │     ❌ CANNOT sign (no private key)
+│                 │     ❌ CANNOT forge admin tokens
+│  Public Key     │     ✅ CAN verify token authenticity
+└─────────────────┘
+```
+
+**Algorithm confusion attack prevention:** The verifier reads the JWT header's `alg`
+field and rejects tokens whose algorithm does not match the server's configured algorithm.
+This prevents an attacker from crafting an HS256 token with the public key as the HMAC secret.
+
+#### Queue Architecture (Dual asynq Servers)
+
+The worker runs two independent asynq server instances to prevent GPU-bound AI tasks
+from starving lightweight administrative tasks:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    cmd/worker                              │
+│                                                            │
+│  ┌─────────────────────────┐  ┌──────────────────────────┐ │
+│  │  General Server         │  │  Inference Server        │ │
+│  │  Concurrency: 10        │  │  Concurrency: 2          │ │
+│  │                         │  │                          │ │
+│  │  Queues:                │  │  Queue:                  │ │
+│  │   critical  (weight 6)  │  │   inference (weight 10)  │ │
+│  │   default   (weight 3)  │  │                          │ │
+│  │   low       (weight 1)  │  │  Tasks:                  │ │
+│  │                         │  │   AI frame analysis      │ │
+│  │  Tasks:                 │  │   ONNX model inference   │ │
+│  │   Video export          │  │   Deep scan              │ │
+│  │   Forensic PDF          │  │                          │ │
+│  │   Telegram alerts       │  │  GPU-bound, isolated     │ │
+│  │   Integrity checks      │  │  from general queue      │ │
+│  └─────────────────────────┘  └──────────────────────────┘ │
+└────────────────────────────────────────────────────────────┘
+```
+
+#### Consequences
+
+**Positive:**
+- Event ingestion p99 latency guaranteed < 10ms (no in-process CPU contention)
+- Compromised worker cannot escalate privileges (RSA key separation)
+- Workers can be scaled independently (horizontal autoscaling on queue depth)
+- Zero task loss via transactional outbox pattern
+- Infrastructure survives single-node failures across all stateful components
+
+**Negative:**
+- Operational complexity: two binaries to deploy, monitor, and version
+- Redis becomes a critical dependency (mitigated by outbox pattern + AOF persistence)
+- RSA-256 verification is ~50x slower than HMAC-SHA256 (~50µs vs ~1µs per token).
+  At 10,000 RPS this adds ~500ms aggregate CPU per second — acceptable on modern hardware.
+
+#### Migration Path
+
+1. Set `algorithm: HS256` in config to use legacy HMAC-SHA256 during transition
+2. Generate RSA-4096 key pair: `./scripts/generate_jwt_keys.sh`
+3. Set `algorithm: RS256` and provide key paths
+4. Rotate: deploy API server with private key, workers with public key only
+5. Remove `HS256` fallback after all tokens have expired (24h)

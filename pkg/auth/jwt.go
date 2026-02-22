@@ -1,23 +1,22 @@
 // Package auth provides stateless JWT authentication for the Event Collector.
 //
-// Architecture-level design decisions:
+// Architecture-level design decisions (ADR-006 supersedes ADR-005):
 //
 //  1. Stateless verification — no database calls per request.
-//     The Eduser (Java) authentication system issues JWTs signed with a shared
-//     secret (HMAC-SHA256) or an RSA/ECDSA keypair. The Event Collector verifies
-//     the signature and standard claims (exp, iss, aud) without contacting Eduser.
-//     This eliminates a network round-trip on every RPC — critical for 10K+ streams.
+//     The Eduser (Java) authentication system issues JWTs signed with an RSA-256
+//     private key. The Event Collector verifies the signature using only the
+//     public key, without contacting Eduser. This eliminates a network round-trip
+//     on every RPC — critical for 10K+ streams.
 //
-//  2. HMAC-SHA256 as default, RSA/ECDSA supported via JWKS.
-//     HMAC is simpler to configure (single shared secret) and faster to verify
-//     (~1µs vs ~100µs for RSA-2048). For cross-team deployments where sharing a
-//     secret is impractical, the JWT can be signed with RSA and verified using a
-//     JWKS endpoint. This package supports both, but defaults to HMAC.
+//  2. RSA-256 (asymmetric) as default, HMAC-SHA256 supported for migration.
+//     RSA-256 provides key separation: the API server holds the private key to
+//     sign tokens; workers and downstream services hold only the public key to
+//     verify. A compromised worker CANNOT forge admin tokens. HMAC-SHA256 remains
+//     supported as a legacy fallback during migration (set Algorithm="HS256").
 //
 //  3. Claims extraction is type-safe.
 //     The ProctoringClaims struct enforces required fields (session_id, student_id,
 //     org_id, exam_id) at parse time. If any field is missing, authentication fails.
-//     This prevents unauthenticated data from leaking into the ingestion pipeline.
 //
 //  4. Context propagation.
 //     Verified claims are injected into the gRPC context via metadata keys. The
@@ -32,9 +31,15 @@ package auth
 
 import (
 	"context"
+	"crypto"
+	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/subtle"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -70,6 +75,22 @@ var (
 
 	// ErrInvalidSession is returned when the session secret validation fails.
 	ErrInvalidSession = errors.New("auth: invalid session secret")
+
+	// ErrInvalidAlgorithm is returned when the JWT header specifies an
+	// algorithm that does not match the verifier's configuration.
+	ErrInvalidAlgorithm = errors.New("auth: algorithm mismatch")
+)
+
+// ---------------------------------------------------------------------------
+// Algorithm constants
+// ---------------------------------------------------------------------------
+
+const (
+	// AlgorithmRS256 indicates RSA-SHA256 asymmetric signing (recommended).
+	AlgorithmRS256 = "RS256"
+
+	// AlgorithmHS256 indicates HMAC-SHA256 symmetric signing (legacy).
+	AlgorithmHS256 = "HS256"
 )
 
 // ---------------------------------------------------------------------------
@@ -134,13 +155,41 @@ func (c *ProctoringClaims) HasRole(role string) bool {
 // VerifierConfig holds JWT verification parameters. All fields are set at
 // startup from the service configuration and treated as immutable.
 type VerifierConfig struct {
-	// SigningKey is the shared HMAC-SHA256 secret for token verification.
-	// In production, this is loaded from a Kubernetes secret or vault.
-	// For RSA/ECDSA, use the PublicKeyPEM field instead.
+	// Algorithm selects the JWT signing algorithm.
+	// "RS256" (default, recommended): RSA-SHA256 asymmetric verification.
+	// "HS256" (legacy): HMAC-SHA256 symmetric verification.
+	Algorithm string `yaml:"algorithm"`
+
+	// ── RSA-256 fields (recommended) ─────────────────────────────────
+
+	// PublicKeyPEM is the PEM-encoded RSA public key for RS256 verification.
+	// The worker only needs the public key — it CANNOT forge tokens.
+	PublicKeyPEM []byte `yaml:"-"`
+
+	// PublicKeyPath is the filesystem path to the PEM-encoded RSA public key.
+	// Used to load PublicKeyPEM at startup.
+	PublicKeyPath string `yaml:"public_key_path"`
+
+	// PrivateKeyPEM is the PEM-encoded RSA private key for RS256 signing.
+	// Only the API server needs this — workers MUST NOT have access.
+	PrivateKeyPEM []byte `yaml:"-"`
+
+	// PrivateKeyPath is the filesystem path to the PEM-encoded RSA private key.
+	// Used to load PrivateKeyPEM at startup.
+	PrivateKeyPath string `yaml:"private_key_path"`
+
+	// ── HMAC-SHA256 fields (legacy, deprecated) ──────────────────────
+
+	// SigningKey is the shared HMAC-SHA256 secret for HS256 token verification.
+	// DEPRECATED: Use RSA-256 (PublicKeyPEM/PrivateKeyPEM) instead.
+	// A shared secret means a compromised worker can forge admin tokens.
 	SigningKey []byte `yaml:"-"`
 
-	// SigningKeyBase64 is the base64-encoded signing key from config/env.
+	// SigningKeyBase64 is the base64-encoded HMAC signing key from config/env.
+	// DEPRECATED: Use RSA-256 key files instead.
 	SigningKeyBase64 string `yaml:"signing_key"`
+
+	// ── Common fields ────────────────────────────────────────────────
 
 	// Issuer is the expected "iss" claim value. Tokens from a different
 	// issuer are rejected. Default: "eduser".
@@ -165,19 +214,20 @@ type VerifierConfig struct {
 // JWT Verifier
 // ---------------------------------------------------------------------------
 
-// Verifier performs stateless JWT verification using HMAC-SHA256. It validates:
+// Verifier performs stateless JWT verification using either RSA-256 (asymmetric)
+// or HMAC-SHA256 (symmetric legacy). It validates:
+//   - Algorithm header matches configuration (prevents algorithm confusion attacks)
 //   - Signature integrity (token has not been tampered with)
 //   - Expiration (exp claim, with configurable clock skew tolerance)
 //   - Issuer (iss claim matches expected value)
 //   - Audience (aud claim contains expected value)
 //   - Required claims (session_id, student_id, org_id, exam_id)
-//
-// This is a simplified HMAC-SHA256 JWT verifier. For production deployments
-// requiring RSA/ECDSA or JWKS rotation, integrate github.com/golang-jwt/jwt/v5
-// or github.com/lestrrat-go/jwx/v2. The interface is designed for drop-in
-// replacement.
 type Verifier struct {
-	cfg VerifierConfig
+	cfg       VerifierConfig
+	algorithm string
+	rsaPubKey *rsa.PublicKey  // RS256 verification key (nil for HS256)
+	rsaPriKey *rsa.PrivateKey // RS256 signing key (nil for verify-only / HS256)
+	hmacKey   []byte          // HS256 signing/verification key (nil for RS256)
 }
 
 // NewVerifier creates a JWT verifier with the given configuration.
@@ -193,24 +243,103 @@ func NewVerifier(cfg VerifierConfig) (*Verifier, error) {
 	if cfg.ClockSkew == 0 {
 		cfg.ClockSkew = 30 * time.Second
 	}
+	if cfg.Algorithm == "" {
+		cfg.Algorithm = AlgorithmRS256
+	}
 
+	v := &Verifier{
+		cfg:       cfg,
+		algorithm: cfg.Algorithm,
+	}
+
+	switch cfg.Algorithm {
+	case AlgorithmRS256:
+		if err := v.initRS256(cfg); err != nil {
+			return nil, err
+		}
+	case AlgorithmHS256:
+		if err := v.initHS256(cfg); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("auth: unsupported algorithm %q (use RS256 or HS256)", cfg.Algorithm)
+	}
+
+	return v, nil
+}
+
+// initRS256 loads RSA keys for asymmetric verification/signing.
+func (v *Verifier) initRS256(cfg VerifierConfig) error {
+	// Load public key from file if path is provided.
+	if len(cfg.PublicKeyPEM) == 0 && cfg.PublicKeyPath != "" {
+		data, err := os.ReadFile(cfg.PublicKeyPath)
+		if err != nil {
+			return fmt.Errorf("auth: failed to read RSA public key from %q: %w", cfg.PublicKeyPath, err)
+		}
+		cfg.PublicKeyPEM = data
+	}
+
+	// Load private key from file if path is provided.
+	if len(cfg.PrivateKeyPEM) == 0 && cfg.PrivateKeyPath != "" {
+		data, err := os.ReadFile(cfg.PrivateKeyPath)
+		if err != nil {
+			return fmt.Errorf("auth: failed to read RSA private key from %q: %w", cfg.PrivateKeyPath, err)
+		}
+		cfg.PrivateKeyPEM = data
+	}
+
+	// Parse public key (required for verification).
+	if len(cfg.PublicKeyPEM) > 0 {
+		pubKey, err := parseRSAPublicKey(cfg.PublicKeyPEM)
+		if err != nil {
+			return fmt.Errorf("auth: invalid RSA public key: %w", err)
+		}
+		v.rsaPubKey = pubKey
+	}
+
+	// Parse private key (optional — only needed for signing).
+	if len(cfg.PrivateKeyPEM) > 0 {
+		priKey, err := parseRSAPrivateKey(cfg.PrivateKeyPEM)
+		if err != nil {
+			return fmt.Errorf("auth: invalid RSA private key: %w", err)
+		}
+		v.rsaPriKey = priKey
+
+		// Derive public key from private key if public key not explicitly set.
+		if v.rsaPubKey == nil {
+			v.rsaPubKey = &priKey.PublicKey
+		}
+	}
+
+	if v.rsaPubKey == nil {
+		return fmt.Errorf("auth: RS256 requires at least a public key (set public_key_path or private_key_path)")
+	}
+
+	// Enforce minimum RSA key size (2048 bits).
+	if v.rsaPubKey.N.BitLen() < 2048 {
+		return fmt.Errorf("auth: RSA key must be at least 2048 bits, got %d", v.rsaPubKey.N.BitLen())
+	}
+
+	return nil
+}
+
+// initHS256 loads the HMAC key for symmetric verification (legacy).
+func (v *Verifier) initHS256(cfg VerifierConfig) error {
 	// Decode base64 key if raw key is not set.
 	if len(cfg.SigningKey) == 0 && cfg.SigningKeyBase64 != "" {
-		// Accept raw string as key for simplicity in dev environments.
-		// In production, use proper base64 encoding.
 		cfg.SigningKey = []byte(cfg.SigningKeyBase64)
 	}
 
 	if len(cfg.SigningKey) == 0 {
-		return nil, fmt.Errorf("auth: signing key must not be empty")
+		return fmt.Errorf("auth: HS256 requires a signing key")
 	}
 
-	// Enforce minimum key length for HMAC-SHA256 security.
 	if len(cfg.SigningKey) < 32 {
-		return nil, fmt.Errorf("auth: signing key must be at least 32 bytes for HMAC-SHA256 security, got %d", len(cfg.SigningKey))
+		return fmt.Errorf("auth: signing key must be at least 32 bytes for HMAC-SHA256 security, got %d", len(cfg.SigningKey))
 	}
 
-	return &Verifier{cfg: cfg}, nil
+	v.hmacKey = cfg.SigningKey
+	return nil
 }
 
 // VerifyToken parses and validates a JWT token string, returning the verified
@@ -221,11 +350,12 @@ func NewVerifier(cfg VerifierConfig) (*Verifier, error) {
 // Verification steps (in order):
 //  1. Strip "Bearer " prefix if present.
 //  2. Split into header.payload.signature (3 parts).
-//  3. Verify HMAC-SHA256 signature.
-//  4. Decode and parse claims from the payload.
-//  5. Check expiration with clock skew tolerance.
-//  6. Validate issuer and audience.
-//  7. Validate required proctoring claims.
+//  3. Verify algorithm header matches configuration (prevents confusion attacks).
+//  4. Verify signature (RS256 or HS256).
+//  5. Decode and parse claims from the payload.
+//  6. Check expiration with clock skew tolerance.
+//  7. Validate issuer and audience.
+//  8. Validate required proctoring claims.
 func (v *Verifier) VerifyToken(tokenStr string) (*ProctoringClaims, error) {
 	// Strip Bearer prefix.
 	tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
@@ -242,16 +372,36 @@ func (v *Verifier) VerifyToken(tokenStr string) (*ProctoringClaims, error) {
 		return nil, ErrInvalidToken
 	}
 
-	// Verify HMAC-SHA256 signature.
+	// Verify algorithm from header (prevents algorithm confusion attacks).
+	headerBytes, err := base64URLDecode(parts[0])
+	if err != nil {
+		return nil, ErrInvalidToken
+	}
+	headerAlg, err := extractAlgorithm(headerBytes)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidToken, err)
+	}
+	if headerAlg != v.algorithm {
+		return nil, fmt.Errorf("%w: token uses %q, verifier expects %q",
+			ErrInvalidAlgorithm, headerAlg, v.algorithm)
+	}
+
+	// Verify signature based on algorithm.
 	signingInput := parts[0] + "." + parts[1]
-	expectedSig := hmacSHA256([]byte(signingInput), v.cfg.SigningKey)
 	actualSig, err := base64URLDecode(parts[2])
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
 
-	if subtle.ConstantTimeCompare(expectedSig, actualSig) != 1 {
-		return nil, ErrInvalidToken
+	switch v.algorithm {
+	case AlgorithmRS256:
+		if err := v.verifyRS256([]byte(signingInput), actualSig); err != nil {
+			return nil, ErrInvalidToken
+		}
+	case AlgorithmHS256:
+		if err := v.verifyHS256([]byte(signingInput), actualSig); err != nil {
+			return nil, ErrInvalidToken
+		}
 	}
 
 	// Decode payload.
@@ -289,14 +439,43 @@ func (v *Verifier) VerifyToken(tokenStr string) (*ProctoringClaims, error) {
 	return claims, nil
 }
 
+// verifyRS256 verifies an RSA-SHA256 signature against the public key.
+func (v *Verifier) verifyRS256(signingInput, signature []byte) error {
+	hash := sha256.Sum256(signingInput)
+	return rsa.VerifyPKCS1v15(v.rsaPubKey, crypto.SHA256, hash[:], signature)
+}
+
+// verifyHS256 verifies an HMAC-SHA256 signature against the shared key.
+func (v *Verifier) verifyHS256(signingInput, signature []byte) error {
+	expectedSig := hmacSHA256(signingInput, v.hmacKey)
+	if subtle.ConstantTimeCompare(expectedSig, signature) != 1 {
+		return fmt.Errorf("hmac mismatch")
+	}
+	return nil
+}
+
+// CanSign returns true if the verifier has a private key (RS256) or
+// shared secret (HS256) available for token generation.
+func (v *Verifier) CanSign() bool {
+	switch v.algorithm {
+	case AlgorithmRS256:
+		return v.rsaPriKey != nil
+	case AlgorithmHS256:
+		return len(v.hmacKey) > 0
+	}
+	return false
+}
+
+// Algorithm returns the configured JWT algorithm ("RS256" or "HS256").
+func (v *Verifier) Algorithm() string {
+	return v.algorithm
+}
+
 // ---------------------------------------------------------------------------
 // Context helpers — claims propagation through gRPC context
 // ---------------------------------------------------------------------------
 
 // Context metadata keys for propagating verified claims to downstream handlers.
-// These keys are used in gRPC metadata (equivalent to HTTP headers) so the
-// transport server can extract identity information without importing the auth
-// package.
 const (
 	MetaKeySessionID = "x-argus-session-id"
 	MetaKeyStudentID = "x-argus-student-id"
@@ -311,7 +490,6 @@ const (
 type claimsContextKey struct{}
 
 // ContextWithClaims returns a new context with the verified claims attached.
-// This is used by the auth interceptor to propagate claims to RPC handlers.
 func ContextWithClaims(ctx context.Context, claims *ProctoringClaims) context.Context {
 	return context.WithValue(ctx, claimsContextKey{}, claims)
 }
@@ -324,8 +502,6 @@ func ClaimsFromContext(ctx context.Context) *ProctoringClaims {
 }
 
 // InjectClaimsMetadata creates outgoing gRPC metadata from verified claims.
-// This is used when the Event Collector needs to forward identity information
-// to downstream services (e.g., the session management service).
 func InjectClaimsMetadata(ctx context.Context, claims *ProctoringClaims) context.Context {
 	md := metadata.Pairs(
 		MetaKeySessionID, claims.SessionID,
@@ -339,8 +515,7 @@ func InjectClaimsMetadata(ctx context.Context, claims *ProctoringClaims) context
 }
 
 // ExtractClaimsFromMetadata reads proctoring identity from incoming gRPC
-// metadata. This is the reverse of InjectClaimsMetadata — used by downstream
-// services to extract identity without re-verifying the JWT.
+// metadata. This is the reverse of InjectClaimsMetadata.
 func ExtractClaimsFromMetadata(ctx context.Context) *ProctoringClaims {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -373,4 +548,61 @@ func containsAudience(audiences []string, expected string) bool {
 		}
 	}
 	return false
+}
+
+// ---------------------------------------------------------------------------
+// RSA Key Parsing
+// ---------------------------------------------------------------------------
+
+// parseRSAPublicKey parses a PEM-encoded RSA public key. It accepts both
+// PKCS#1 (RSA PUBLIC KEY) and PKIX (PUBLIC KEY) formats.
+func parseRSAPublicKey(pemData []byte) (*rsa.PublicKey, error) {
+	block, _ := pem.Decode(pemData)
+	if block == nil {
+		return nil, fmt.Errorf("no PEM block found")
+	}
+
+	// Try PKIX format first (most common for RSA public keys).
+	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err == nil {
+		rsaPub, ok := pub.(*rsa.PublicKey)
+		if !ok {
+			return nil, fmt.Errorf("not an RSA public key")
+		}
+		return rsaPub, nil
+	}
+
+	// Fall back to PKCS#1 format.
+	rsaPub, err2 := x509.ParsePKCS1PublicKey(block.Bytes)
+	if err2 != nil {
+		return nil, fmt.Errorf("failed to parse RSA public key (tried PKIX and PKCS1): PKIX: %v, PKCS1: %v", err, err2)
+	}
+	return rsaPub, nil
+}
+
+// parseRSAPrivateKey parses a PEM-encoded RSA private key. It accepts both
+// PKCS#1 (RSA PRIVATE KEY) and PKCS#8 (PRIVATE KEY) formats.
+func parseRSAPrivateKey(pemData []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(pemData)
+	if block == nil {
+		return nil, fmt.Errorf("no PEM block found")
+	}
+
+	// Try PKCS#1 format first.
+	priKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err == nil {
+		return priKey, nil
+	}
+
+	// Fall back to PKCS#8 format.
+	key, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err2 != nil {
+		return nil, fmt.Errorf("failed to parse RSA private key (tried PKCS1 and PKCS8): PKCS1: %v, PKCS8: %v", err, err2)
+	}
+
+	rsaKey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("not an RSA private key")
+	}
+	return rsaKey, nil
 }

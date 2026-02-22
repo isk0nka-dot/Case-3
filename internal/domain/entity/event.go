@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/argus-ai/event-collector/internal/domain/valueobject"
+	"github.com/argus-ai/event-collector/pkg/hlc"
 )
 
 // ProctoringEvent is the core aggregate root of the Event Collector domain.
@@ -56,6 +57,13 @@ type ProctoringEvent struct {
 	AudioClassification string  // silence, speech, whisper, music, keyboard, ambient
 	SpeakerCount        uint8   // number of distinct speakers detected
 	SpeakerMatch        bool    // whether voice matches enrolled voiceprint
+
+	// ----- Temporal Integrity (HLC) -----
+	// CausalSequence is the Hybrid Logical Clock value (uint64) assigned
+	// server-side. It guarantees monotonic, causally consistent ordering
+	// immune to client clock manipulation or NTP drift.
+	// Encoded as: [48-bit physical ms][16-bit logical counter].
+	CausalSequence uint64
 }
 
 // ClientMeta holds browser/client metadata attached to every event.
@@ -101,8 +109,23 @@ func (e *ProctoringEvent) Validate() error {
 
 // SetServerTimestamp stamps the event with the current server time.
 // This must be called exactly once during ingestion.
+// Deprecated: Use SetServerTimestampHLC for causally consistent ordering.
 func (e *ProctoringEvent) SetServerTimestamp() {
 	e.ServerTimestamp = time.Now().UTC()
+}
+
+// SetServerTimestampHLC stamps the event with a Hybrid Logical Clock value,
+// guaranteeing monotonic, causally consistent ordering even under NTP drift,
+// clock adjustments, or sub-millisecond event bursts.
+//
+// The HLC timestamp encodes both physical time and a logical counter.
+// ServerTimestamp is set from the HLC's physical component (for human
+// readability and existing query compatibility). CausalSequence stores
+// the full uint64 HLC for precise ordering.
+func (e *ProctoringEvent) SetServerTimestampHLC(clock *hlc.Clock) {
+	ts := clock.Now()
+	e.ServerTimestamp = ts.ToTime()
+	e.CausalSequence = ts.ToUint64()
 }
 
 // IsCritical returns true if this event requires immediate attention.

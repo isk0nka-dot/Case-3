@@ -10,8 +10,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/argus-ai/event-collector/internal/domain/entity"
 	"github.com/argus-ai/event-collector/internal/application/port"
+	"github.com/argus-ai/event-collector/internal/domain/entity"
+	"github.com/argus-ai/event-collector/pkg/hlc"
 )
 
 // EvidenceRecorder is the interface for the evidence capture subsystem.
@@ -34,6 +35,7 @@ type IngestUseCase struct {
 	kafkaWriter      port.EventWriter
 	clickhouseWriter port.EventWriter
 	recorder         EvidenceRecorder // optional — nil when MinIO is unavailable
+	clock            *hlc.Clock       // Hybrid Logical Clock for causal ordering
 	logger           *zap.Logger
 
 	// Metrics (lock-free atomic counters).
@@ -54,6 +56,7 @@ func NewIngestUseCase(
 	uc := &IngestUseCase{
 		kafkaWriter:      kafkaWriter,
 		clickhouseWriter: clickhouseWriter,
+		clock:            hlc.New(),
 		logger:           logger.Named("ingest_usecase"),
 	}
 	for _, opt := range opts {
@@ -102,8 +105,10 @@ func (uc *IngestUseCase) Ingest(ctx context.Context, event *entity.ProctoringEve
 		}
 	}
 
-	// Step 2: Enrich with server-side metadata.
-	event.SetServerTimestamp()
+	// Step 2: Enrich with server-authoritative HLC timestamp.
+	// Uses Hybrid Logical Clock for monotonic, causally consistent ordering
+	// immune to client clock manipulation or NTP drift.
+	event.SetServerTimestampHLC(uc.clock)
 
 	// Step 3: Write to Kafka (primary write — must succeed).
 	if err := uc.kafkaWriter.Write(ctx, event); err != nil {
@@ -181,7 +186,7 @@ func (uc *IngestUseCase) IngestBatch(ctx context.Context, events []*entity.Proct
 			)
 			continue
 		}
-		event.SetServerTimestamp()
+		event.SetServerTimestampHLC(uc.clock)
 		valid = append(valid, event)
 	}
 

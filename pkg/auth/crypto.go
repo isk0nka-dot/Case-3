@@ -1,7 +1,10 @@
 package auth
 
 import (
+	"crypto"
 	"crypto/hmac"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -136,15 +139,69 @@ func parseClaims(payload []byte) (*ProctoringClaims, error) {
 }
 
 // ---------------------------------------------------------------------------
+// JWT Header Parsing
+// ---------------------------------------------------------------------------
+
+// jwtHeader represents the decoded JWT header used for algorithm detection.
+type jwtHeader struct {
+	Alg string `json:"alg"`
+	Typ string `json:"typ"`
+}
+
+// extractAlgorithm reads the "alg" field from a decoded JWT header.
+// This is critical for preventing algorithm confusion attacks: the verifier
+// MUST check that the token's algorithm matches its configuration before
+// attempting signature verification.
+func extractAlgorithm(headerBytes []byte) (string, error) {
+	var h jwtHeader
+	if err := json.Unmarshal(headerBytes, &h); err != nil {
+		return "", fmt.Errorf("failed to parse JWT header: %w", err)
+	}
+	if h.Alg == "" {
+		return "", fmt.Errorf("JWT header missing 'alg' field")
+	}
+	return h.Alg, nil
+}
+
+// ---------------------------------------------------------------------------
 // Token Generation (for testing / internal use)
 // ---------------------------------------------------------------------------
 
-// GenerateToken creates a signed JWT token from the given claims.
-// This is primarily used for testing and for the session validator to issue
-// internal tokens. Production tokens are issued by the Eduser system.
+// GenerateToken creates a signed JWT token from the given claims using
+// HMAC-SHA256 (legacy). For RS256 signing, use GenerateTokenRS256.
+//
+// DEPRECATED: Use GenerateTokenRS256 with an RSA private key instead.
+// This function is retained for backward compatibility during migration.
 func GenerateToken(claims *ProctoringClaims, signingKey []byte) (string, error) {
+	return generateTokenWithAlg(claims, AlgorithmHS256, func(signingInput string) ([]byte, error) {
+		return hmacSHA256([]byte(signingInput), signingKey), nil
+	})
+}
+
+// GenerateTokenRS256 creates a signed JWT token from the given claims using
+// RSA-SHA256 (asymmetric). The private key is used to sign; verification
+// requires only the corresponding public key.
+//
+// This is the recommended signing method for production. Workers that only
+// verify tokens need the public key — they CANNOT forge tokens.
+func GenerateTokenRS256(claims *ProctoringClaims, privateKey *rsa.PrivateKey) (string, error) {
+	if privateKey == nil {
+		return "", fmt.Errorf("auth: RSA private key is required for RS256 signing")
+	}
+	return generateTokenWithAlg(claims, AlgorithmRS256, func(signingInput string) ([]byte, error) {
+		return signRS256([]byte(signingInput), privateKey)
+	})
+}
+
+// generateTokenWithAlg is the internal token generator that supports both
+// HS256 and RS256 via the signFn callback.
+func generateTokenWithAlg(claims *ProctoringClaims, algorithm string, signFn func(string) ([]byte, error)) (string, error) {
 	// Header.
-	header := base64URLEncode([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	headerJSON, err := json.Marshal(jwtHeader{Alg: algorithm, Typ: "JWT"})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal JWT header: %w", err)
+	}
+	header := base64URLEncode(headerJSON)
 
 	// Payload.
 	payload := map[string]interface{}{
@@ -176,7 +233,17 @@ func GenerateToken(claims *ProctoringClaims, signingKey []byte) (string, error) 
 
 	// Signature.
 	signingInput := header + "." + payloadB64
-	signature := base64URLEncode(hmacSHA256([]byte(signingInput), signingKey))
+	sig, err := signFn(signingInput)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign token: %w", err)
+	}
+	signature := base64URLEncode(sig)
 
 	return signingInput + "." + signature, nil
+}
+
+// signRS256 signs the input using RSA-PKCS1v15 with SHA-256.
+func signRS256(input []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
+	hash := sha256.Sum256(input)
+	return rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hash[:])
 }
