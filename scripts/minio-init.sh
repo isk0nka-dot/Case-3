@@ -65,11 +65,17 @@ else
     echo "  Exports bucket created."
 fi
 
+# ── Step 6: Set 30-day ILM expiration lifecycle on exports bucket ───────────
+echo "[6/6] Setting 30-day ILM expiration lifecycle on exports bucket..."
+mc ilm rule add --expiry-days 30 "${MINIO_ALIAS}/${EXPORTS_BUCKET}" || \
+    echo "  Warning: ILM lifecycle rule may already exist or is not supported."
+
 echo ""
 echo "================================================================="
 echo "  MinIO initialization complete."
 echo "  Bucket: ${BUCKET}"
 echo "  Exports: ${EXPORTS_BUCKET}"
 echo "  Object Lock: GOVERNANCE mode"
+echo "  Exports lifecycle: 30-day auto-expiration"
 echo "  S3 endpoint: ${ENDPOINT}"
 echo "================================================================="

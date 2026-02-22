@@ -11,7 +11,7 @@
 CREATE TABLE IF NOT EXISTS export_jobs (
     id                TEXT        PRIMARY KEY,
     org_id            TEXT        NOT NULL REFERENCES organizations(org_id),
-    requested_by      TEXT        NOT NULL REFERENCES users(id),
+    requested_by      UUID        NOT NULL REFERENCES users(id),
     session_ids       TEXT[]      NOT NULL DEFAULT '{}',
     status            TEXT        NOT NULL DEFAULT 'pending'
                                   CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'expired')),

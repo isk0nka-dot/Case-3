@@ -1,4 +1,94 @@
-# argus-infra — The Ecosystem of Argus AI
+# Argus AI
+
+**Sovereign AI-Powered Exam Proctoring Platform**
+
+Real-time fraud detection, forensic evidence chain, and enterprise-grade exam monitoring for 10,000+ concurrent sessions. Built for the national examination infrastructure of Kazakhstan.
+
+---
+
+## Quick Start (Eduser Team)
+
+### Prerequisites
+
+- Docker Engine 24+ and Docker Compose v2.20+
+- 8 GB RAM minimum (16 GB recommended for full stack)
+- 20 GB free disk space
+
+### 1. Clone All Repositories
+
+```bash
+git clone https://gitlab.com/Askadmass/argus-infra.git
+git clone https://gitlab.com/Askadmass/argus-backend.git
+git clone https://gitlab.com/Askadmass/argus-frontend.git
+```
+
+### 2. Configure Environment
+
+```bash
+cd argus-infra/docker
+cp .env.example .env
+```
+
+Edit `.env` and set the **required** variables:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `JWT_SIGNING_KEY` | **Yes** | HMAC-SHA256 signing key (min 32 chars). Generate: `openssl rand -hex 32` |
+| `POSTGRES_PASSWORD` | **Yes** | PostgreSQL password (strong random) |
+| `MINIO_ROOT_PASSWORD` | **Yes** | MinIO admin password (min 8 chars) |
+| `LIVEKIT_API_SECRET` | **Yes** | LiveKit secret (min 32 chars). Generate: `openssl rand -hex 32` |
+| `TELEGRAM_BOT_TOKEN` | No | Telegram alerting bot token (from @BotFather) |
+| `TELEGRAM_CHAT_ID` | No | Telegram admin chat ID |
+| `BACKEND_TAG` | No | Backend image version (default: `latest`) |
+| `FRONTEND_TAG` | No | Frontend image version (default: `latest`) |
+
+### 3. Start the Platform
+
+```bash
+docker compose up -d
+```
+
+### 4. Verify
+
+```bash
+curl http://localhost:8080/healthz    # Backend liveness  -> {"status":"ok"}
+curl http://localhost:8080/readyz     # Backend readiness -> {"status":"ok","checks":[...]}
+open http://localhost:3000            # Frontend dashboard
+```
+
+---
+
+## Service Architecture
+
+| Service | Image | Ports | Role |
+|---------|-------|-------|------|
+| **backend** | `registry.argus.ai/argus/backend` | 50051 (gRPC), 8080 (HTTP) | Event ingestion, REST admin API, health checks |
+| **frontend** | `registry.argus.ai/argus/frontend` | 3000 | Nuxt 4 admin dashboard SPA |
+| **kafka** | `apache/kafka` (KRaft) | 9092, 9094 | Event streaming backbone (7-day retention) |
+| **clickhouse** | `clickhouse/clickhouse-server` | 9000, 8123 | Analytical database (90-day TTL, ReplacingMergeTree) |
+| **postgres** | `postgres:16-alpine` | 5432 | Transactional DB (orgs, users, audit, exports) |
+| **redis** | `redis:7-alpine` | 6379 | Job queue (asynq) + LiveKit session state |
+| **livekit** | `livekit/livekit-server` | 7880-7882 | WebRTC SFU for proctoring video |
+| **minio** | `minio/minio` | 9001, 9002 | S3-compatible evidence storage (365-day WORM) |
+| **minio-init** | `minio/mc` | — | One-shot bucket initialization |
+
+## Repository Map
+
+| Repository | Stack | Purpose |
+|------------|-------|---------|
+| [argus-backend](https://gitlab.com/Askadmass/argus-backend) | Go 1.24, gRPC, Kafka, ClickHouse, PostgreSQL, MinIO | Event ingestion, admin API, DLQ resilience, Telegram alerting |
+| [argus-frontend](https://gitlab.com/Askadmass/argus-frontend) | Nuxt 4, Vue 3, TypeScript, Pinia, gRPC-Web | Admin dashboard SPA with tier-adaptive resilience |
+| [argus-infra](https://gitlab.com/Askadmass/argus-infra) | Docker, Nginx, migrations, CI/CD | Orchestration, deployment, database schemas |
+
+## Architecture Documentation
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full technical specification covering:
+BadgerDB DLQ, ReplacingMergeTree idempotency, Passive Health Governor,
+data retention policies, Shared Proto Registry, and bilingual Telegram alerting.
+
+---
+
+# argus-infra — Operations Guide
 
 > This repository owns everything that **orchestrates and operates** the Argus AI platform —
 > but contains no application source code. It is the ops layer: infrastructure as code,
