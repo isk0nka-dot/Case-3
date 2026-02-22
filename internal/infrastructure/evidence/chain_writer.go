@@ -43,6 +43,11 @@ const KafkaTopic = "argus.evidence.chain"
 // records within a session, enabling independent tamper verification.
 const ForensicLedgerTopic = "argus.forensic.ledger"
 
+// VideoUploadedTopic is the Kafka topic for VIDEO_UPLOADED notifications.
+// Published ONLY after a successful MinIO PutObject — guarantees that
+// consumers never receive a notification for a non-existent object.
+const VideoUploadedTopic = "argus.evidence.video_uploaded"
+
 // GenesisHash is the initial previous_hash for the first record in a session.
 const GenesisHash = "GENESIS"
 
@@ -236,6 +241,41 @@ func (w *ChainWriter) RecordEvidence(ctx context.Context, fragment *entity.Evide
 	return nil
 }
 
+// PublishVideoUploaded emits a lightweight VIDEO_UPLOADED notification to Kafka.
+// This MUST only be called after a confirmed successful MinIO PutObject.
+// If the Kafka publish fails, the error is returned but the upload is NOT rolled back
+// (MinIO is the source of truth; the notification can be retried or reconciled).
+func (w *ChainWriter) PublishVideoUploaded(ctx context.Context, fragment *entity.EvidenceFragment) error {
+	record := videoUploadedRecord{
+		FragmentID: fragment.FragmentID,
+		SessionID:  fragment.SessionID,
+		OrgID:      fragment.OrgID,
+		ExamID:     fragment.ExamID,
+		StudentID:  fragment.StudentID,
+		SHA256Hash: fragment.SHA256Hash,
+		URI:        fragment.URI,
+		SizeBytes:  fragment.SizeBytes,
+		UploadedAt: fragment.CreatedAt.UTC().Format(time.RFC3339Nano),
+	}
+
+	value, err := json.Marshal(record)
+	if err != nil {
+		return fmt.Errorf("video_uploaded: failed to marshal record: %w", err)
+	}
+
+	if err := w.publisher.PublishRaw(ctx, VideoUploadedTopic, fragment.SessionID, value); err != nil {
+		return fmt.Errorf("video_uploaded: kafka publish failed: %w", err)
+	}
+
+	w.logger.Debug("VIDEO_UPLOADED event published",
+		zap.String("fragment_id", fragment.FragmentID),
+		zap.String("session_id", fragment.SessionID),
+		zap.String("topic", VideoUploadedTopic),
+	)
+
+	return nil
+}
+
 // getOrRecoverChainState returns the chain state for a session. If not in memory,
 // it queries ClickHouse for the last sequence_num and record_hash.
 // MUST be called with w.mu held.
@@ -343,6 +383,21 @@ type chainRecord struct {
 	SequenceNum  int64  `json:"sequence_num"`   // Monotonic per-session, starts at 1
 	PreviousHash string `json:"previous_hash"`  // SHA-256 of previous record (or "GENESIS")
 	RecordHash   string `json:"record_hash"`    // SHA-256(seq|prev|fragment_id|sha256|uploaded_at)
+}
+
+// videoUploadedRecord is the JSON format written to the argus.evidence.video_uploaded
+// Kafka topic. A lightweight notification confirming that an evidence fragment
+// has been successfully persisted to MinIO. Published ONLY after PutObject returns.
+type videoUploadedRecord struct {
+	FragmentID string `json:"fragment_id"`
+	SessionID  string `json:"session_id"`
+	OrgID      string `json:"org_id"`
+	ExamID     string `json:"exam_id"`
+	StudentID  string `json:"student_id"`
+	SHA256Hash string `json:"sha256_hash"`
+	URI        string `json:"uri"`
+	SizeBytes  int64  `json:"size_bytes"`
+	UploadedAt string `json:"uploaded_at"`
 }
 
 // forensicLedgerEntry is the JSON format written to the argus.forensic.ledger

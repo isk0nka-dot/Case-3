@@ -24,6 +24,11 @@ type EvidenceChainWriter interface {
 	// The fragment must have a valid SHA256Hash before calling this method.
 	RecordEvidence(ctx context.Context, fragment *entity.EvidenceFragment) error
 
+	// PublishVideoUploaded emits a VIDEO_UPLOADED notification to Kafka
+	// after a successful MinIO PutObject. This MUST only be called after
+	// the upload has been confirmed successful — never speculatively.
+	PublishVideoUploaded(ctx context.Context, fragment *entity.EvidenceFragment) error
+
 	// Close flushes pending writes and releases resources.
 	Close() error
 }

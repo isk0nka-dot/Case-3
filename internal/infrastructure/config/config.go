@@ -41,6 +41,93 @@ type Config struct {
 	CORS       CORSConfig       `yaml:"cors"`
 	Chunk      ChunkConfig      `yaml:"chunk"`
 	Export     ExportConfig     `yaml:"export"`
+	Telegram   TelegramConfig   `yaml:"telegram"`
+	DLQ        DLQConfig        `yaml:"dlq"`
+	Redis      RedisConfig      `yaml:"redis"`
+	Inference  InferenceConfig  `yaml:"inference"`
+}
+
+// TelegramConfig holds Telegram Bot API alerting credentials.
+type TelegramConfig struct {
+	BotToken string `yaml:"bot_token"`
+	ChatID   string `yaml:"chat_id"`
+}
+
+// DLQConfig holds configuration for the BadgerDB dead-letter queue.
+// When enabled, Kafka write failures are caught and persisted locally,
+// then automatically reclaimed when Kafka recovers.
+type DLQConfig struct {
+	// Enabled controls whether the DLQ is active. Default: true.
+	Enabled bool `yaml:"enabled"`
+	// DataDir is the filesystem path for BadgerDB data files. Default: "/tmp/argus-dlq".
+	DataDir string `yaml:"data_dir"`
+	// GCInterval is the BadgerDB value log GC cycle. Default: 5m.
+	GCInterval time.Duration `yaml:"gc_interval"`
+	// GCDiscardRatio is the ratio of discardable data to trigger GC. Default: 0.5.
+	GCDiscardRatio float64 `yaml:"gc_discard_ratio"`
+	// MaxEntries is a safety cap on DLQ size. Default: 1,000,000.
+	MaxEntries int64 `yaml:"max_entries"`
+	// SyncWrites enables fsync on every write. Default: true.
+	SyncWrites bool `yaml:"sync_writes"`
+	// ReclamationInterval is how often the DLQ is drained back to Kafka. Default: 30s.
+	ReclamationInterval time.Duration `yaml:"reclamation_interval"`
+	// ReclamationBatchSize is events per drain cycle. Default: 100.
+	ReclamationBatchSize int `yaml:"reclamation_batch_size"`
+	// HeartbeatInterval is how often a degraded-mode heartbeat is sent to Telegram. Default: 5m.
+	HeartbeatInterval time.Duration `yaml:"heartbeat_interval"`
+	// CircuitBreakerFailureThreshold trips breaker after N consecutive Kafka failures. Default: 5.
+	CircuitBreakerFailureThreshold uint32 `yaml:"cb_failure_threshold"`
+	// CircuitBreakerTimeout is how long the breaker stays open. Default: 30s.
+	CircuitBreakerTimeout time.Duration `yaml:"cb_timeout"`
+}
+
+// RedisConfig holds Redis connection settings for the asynq job queue.
+// When Redis is configured, heavy background jobs (video export, forensic PDF)
+// are dispatched via asynq instead of PostgreSQL polling.
+type RedisConfig struct {
+	// Addr is the Redis server address (host:port). Default: "localhost:6379".
+	Addr string `yaml:"addr"`
+
+	// Password is the Redis AUTH password. Default: "" (no auth).
+	Password string `yaml:"password"`
+
+	// DB is the Redis database number. Default: 0.
+	DB int `yaml:"db"`
+
+	// WorkerConcurrency is the number of concurrent asynq worker goroutines.
+	// Only used by cmd/worker. Default: 10.
+	WorkerConcurrency int `yaml:"worker_concurrency"`
+}
+
+// InferenceConfig controls the backend AI inference service.
+// Used by cmd/inference (standalone GPU gateway) and cmd/worker (gRPC client).
+type InferenceConfig struct {
+	// GRPCPort is the port the inference gRPC server listens on. Default: 50061.
+	GRPCPort int `yaml:"grpc_port"`
+
+	// EngineType selects the AI inference backend. Default: "stub".
+	// Options: "stub" (synthetic results), "onnx" (ONNX Runtime), "python_bridge" (Python sidecar).
+	EngineType string `yaml:"engine_type"`
+
+	// ModelDir is the filesystem path to ONNX model files. Default: "".
+	ModelDir string `yaml:"model_dir"`
+
+	// MaxFrameBytes is the maximum allowed size for a single frame. Default: 10 MiB.
+	MaxFrameBytes int `yaml:"max_frame_bytes"`
+
+	// MaxVideoDurSec is the maximum video segment duration in seconds. Default: 300 (5 min).
+	MaxVideoDurSec int `yaml:"max_video_dur_sec"`
+
+	// FrameSampleRate controls frame sampling for deep scan: analyze every Nth frame. Default: 2.
+	FrameSampleRate int `yaml:"frame_sample_rate"`
+
+	// Concurrency is the number of parallel inference workers. Default: 4.
+	Concurrency int `yaml:"concurrency"`
+}
+
+// GRPCAddr returns the inference gRPC server address as "localhost:{port}".
+func (c InferenceConfig) GRPCAddr() string {
+	return fmt.Sprintf("localhost:%d", c.GRPCPort)
 }
 
 // ---------------------------------------------------------------------------
@@ -658,6 +745,64 @@ func applyDefaults(cfg *Config) {
 	if cfg.Chunk.MaxConcurrentAssemblies == 0 {
 		cfg.Chunk.MaxConcurrentAssemblies = 100
 	}
+
+	// --- DLQ (BadgerDB dead-letter queue) ---
+	// Enabled defaults to true (struct zero-value is false, so we use a separate check).
+	if cfg.DLQ.DataDir == "" {
+		cfg.DLQ.DataDir = "/tmp/argus-dlq"
+	}
+	if cfg.DLQ.GCInterval == 0 {
+		cfg.DLQ.GCInterval = 5 * time.Minute
+	}
+	if cfg.DLQ.GCDiscardRatio == 0 {
+		cfg.DLQ.GCDiscardRatio = 0.5
+	}
+	if cfg.DLQ.MaxEntries == 0 {
+		cfg.DLQ.MaxEntries = 1_000_000
+	}
+	if cfg.DLQ.ReclamationInterval == 0 {
+		cfg.DLQ.ReclamationInterval = 30 * time.Second
+	}
+	if cfg.DLQ.ReclamationBatchSize == 0 {
+		cfg.DLQ.ReclamationBatchSize = 100
+	}
+	if cfg.DLQ.HeartbeatInterval == 0 {
+		cfg.DLQ.HeartbeatInterval = 5 * time.Minute
+	}
+	if cfg.DLQ.CircuitBreakerFailureThreshold == 0 {
+		cfg.DLQ.CircuitBreakerFailureThreshold = 5
+	}
+	if cfg.DLQ.CircuitBreakerTimeout == 0 {
+		cfg.DLQ.CircuitBreakerTimeout = 30 * time.Second
+	}
+
+	// --- Redis (asynq job queue) ---
+	if cfg.Redis.Addr == "" {
+		cfg.Redis.Addr = "localhost:6379"
+	}
+	if cfg.Redis.WorkerConcurrency == 0 {
+		cfg.Redis.WorkerConcurrency = 10
+	}
+
+	// --- Inference (backend AI gateway) ---
+	if cfg.Inference.GRPCPort == 0 {
+		cfg.Inference.GRPCPort = 50061
+	}
+	if cfg.Inference.EngineType == "" {
+		cfg.Inference.EngineType = "stub"
+	}
+	if cfg.Inference.MaxFrameBytes == 0 {
+		cfg.Inference.MaxFrameBytes = 10 * 1024 * 1024 // 10 MiB
+	}
+	if cfg.Inference.MaxVideoDurSec == 0 {
+		cfg.Inference.MaxVideoDurSec = 300 // 5 minutes
+	}
+	if cfg.Inference.FrameSampleRate == 0 {
+		cfg.Inference.FrameSampleRate = 2
+	}
+	if cfg.Inference.Concurrency == 0 {
+		cfg.Inference.Concurrency = 4
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -782,6 +927,58 @@ func applyEnvOverrides(cfg *Config) {
 			cfg.CORS.AllowedOrigins = origins
 		}
 	}
+
+	// Telegram — alerting bot credentials.
+	if v := os.Getenv("TELEGRAM_BOT_TOKEN"); v != "" {
+		cfg.Telegram.BotToken = v
+	}
+	if v := os.Getenv("TELEGRAM_CHAT_ID"); v != "" {
+		cfg.Telegram.ChatID = v
+	}
+
+	// DLQ (BadgerDB dead-letter queue).
+	if v := os.Getenv("EVENT_COLLECTOR_DLQ_ENABLED"); v != "" {
+		cfg.DLQ.Enabled = v == "true" || v == "1"
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_DLQ_DATA_DIR"); v != "" {
+		cfg.DLQ.DataDir = v
+	}
+
+	// Redis (asynq job queue).
+	if v := os.Getenv("EVENT_COLLECTOR_REDIS_ADDR"); v != "" {
+		cfg.Redis.Addr = v
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_REDIS_PASSWORD"); v != "" {
+		cfg.Redis.Password = v
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_REDIS_DB"); v != "" {
+		if db, err := strconv.Atoi(v); err == nil {
+			cfg.Redis.DB = db
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_REDIS_WORKER_CONCURRENCY"); v != "" {
+		if c, err := strconv.Atoi(v); err == nil {
+			cfg.Redis.WorkerConcurrency = c
+		}
+	}
+
+	// Inference (backend AI gateway).
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_GRPC_PORT"); v != "" {
+		if port, err := strconv.Atoi(v); err == nil {
+			cfg.Inference.GRPCPort = port
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_ENGINE_TYPE"); v != "" {
+		cfg.Inference.EngineType = v
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_MODEL_DIR"); v != "" {
+		cfg.Inference.ModelDir = v
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_CONCURRENCY"); v != "" {
+		if c, err := strconv.Atoi(v); err == nil {
+			cfg.Inference.Concurrency = c
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -883,6 +1080,12 @@ func validate(cfg *Config) error {
 		if len(cfg.Auth.SigningKey) < 32 {
 			return fmt.Errorf("auth.signing_key must be at least 32 characters for HMAC-SHA256, got %d", len(cfg.Auth.SigningKey))
 		}
+	}
+
+	// --- Telegram (advisory) ---
+	// Alerting is optional, but log a clear warning so operators know it's disabled.
+	if cfg.Telegram.ChatID == "" {
+		fmt.Fprintln(os.Stderr, "[WARN] TELEGRAM_CHAT_ID is not set — Telegram alerting is DISABLED. Set it to enable critical infrastructure alerts.")
 	}
 
 	return nil

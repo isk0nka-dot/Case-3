@@ -13,9 +13,7 @@ package http
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -23,6 +21,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/argus-ai/event-collector/internal/domain/entity"
+	"github.com/argus-ai/event-collector/pkg/randutil"
 )
 
 // ConsentHandler serves the consent REST API.
@@ -245,7 +244,5 @@ func (h *ConsentHandler) consentJSONError(w http.ResponseWriter, msg string, sta
 }
 
 func generateConsentID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return "cns-" + hex.EncodeToString(b)
+	return randutil.PrefixedID("cns-", 16)
 }

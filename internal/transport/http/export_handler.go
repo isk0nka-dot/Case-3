@@ -15,18 +15,19 @@ package http
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"time"
 
+	"github.com/hibiken/asynq"
 	"github.com/lib/pq"
 	"go.uber.org/zap"
 
 	"github.com/argus-ai/event-collector/internal/domain/entity"
 	"github.com/argus-ai/event-collector/internal/infrastructure/config"
+	"github.com/argus-ai/event-collector/internal/infrastructure/worker"
+	"github.com/argus-ai/event-collector/pkg/randutil"
 )
 
 // ExportHandler serves the bulk export REST API.
@@ -37,15 +38,22 @@ type ExportHandler struct {
 
 	jwtSigningKey []byte
 	repo          adminRepo
+
+	// asynqClient dispatches export jobs to the background worker service.
+	// When nil, the legacy PostgreSQL polling worker picks up jobs instead.
+	asynqClient *asynq.Client
 }
 
 // NewExportHandler creates a new export API handler.
+// If asynqClient is non-nil, export jobs are dispatched via Redis/asynq.
+// If nil, the legacy PostgreSQL polling worker picks up jobs.
 func NewExportHandler(
 	db *sql.DB,
 	cfg config.ExportConfig,
 	repo adminRepo,
 	logger *zap.Logger,
 	jwtSigningKey []byte,
+	asynqClient *asynq.Client,
 ) *ExportHandler {
 	return &ExportHandler{
 		db:            db,
@@ -53,6 +61,7 @@ func NewExportHandler(
 		logger:        logger.Named("export_api"),
 		jwtSigningKey: jwtSigningKey,
 		repo:          repo,
+		asynqClient:   asynqClient,
 	}
 }
 
@@ -159,8 +168,41 @@ func (h *ExportHandler) handleCreateExport(w http.ResponseWriter, r *http.Reques
 		zap.Int("sessions", len(req.SessionIDs)),
 	)
 
+	// Dispatch to asynq worker if Redis queue is configured.
+	// Otherwise, the legacy PostgreSQL polling worker will pick it up.
+	dispatchMode := "polling"
+	if h.asynqClient != nil {
+		task, taskErr := worker.NewVideoExportTask(worker.VideoExportPayload{
+			ExportID:      id,
+			OrgID:         orgID,
+			SessionIDs:    req.SessionIDs,
+			PresignTTLSec: presignTTL,
+		})
+		if taskErr != nil {
+			h.logger.Error("export: failed to create asynq task, falling back to polling",
+				zap.Error(taskErr))
+		} else {
+			info, enqErr := h.asynqClient.Enqueue(task)
+			if enqErr != nil {
+				h.logger.Error("export: failed to enqueue asynq task, falling back to polling",
+					zap.Error(enqErr))
+			} else {
+				dispatchMode = "asynq"
+				h.logger.Info("export job dispatched to asynq",
+					zap.String("export_id", id),
+					zap.String("queue", info.Queue),
+					zap.String("task_id", info.ID),
+				)
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	if dispatchMode == "asynq" {
+		w.WriteHeader(http.StatusAccepted)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":     id,
 		"status": "pending",
@@ -390,7 +432,5 @@ func (h *ExportHandler) exportJSONError(w http.ResponseWriter, msg string, statu
 
 // generateExportID creates a random export ID.
 func generateExportID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return "exp-" + hex.EncodeToString(b)
+	return randutil.PrefixedID("exp-", 16)
 }

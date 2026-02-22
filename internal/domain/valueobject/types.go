@@ -78,6 +78,14 @@ const (
 	SidecamCalibrationFailed  EventType = 74 // Golden angle calibration retry
 	SidecamThermalThrottle    EventType = 75 // FPS throttled due to thermal
 
+	// Backend AI deep scan events (post-session GPU re-analysis)
+	BackendAIFaceMismatch     EventType = 80 // Backend confirmed face doesn't match enrolled
+	BackendAIScreenReflection EventType = 81 // Another person's reflection detected on screen
+	BackendAIMicroExpression  EventType = 82 // Micro-expression indicating deception
+	BackendAIHiddenObject     EventType = 83 // Object detected that frontend missed
+	BackendAIDeepfakeDetected EventType = 84 // Advanced deepfake analysis (backend-only model)
+	BackendAIVoiceSynth       EventType = 85 // Voice synthesis / TTS detected
+
 	// Telemetry (high-frequency, low-severity)
 	GazeTelemetry            EventType = 100
 	MouseTelemetry           EventType = 101
@@ -150,6 +158,13 @@ func (et EventType) String() string {
 		SidecamStreamDisconnected: "SIDECAM_STREAM_DISCONNECTED",
 		SidecamCalibrationFailed:  "SIDECAM_CALIBRATION_FAILED",
 		SidecamThermalThrottle:    "SIDECAM_THERMAL_THROTTLE",
+		// Backend AI deep scan events — UPPERCASE to match penalty rules
+		BackendAIFaceMismatch:     "BACKEND_AI_FACE_MISMATCH",
+		BackendAIScreenReflection: "BACKEND_AI_SCREEN_REFLECTION",
+		BackendAIMicroExpression:  "BACKEND_AI_MICRO_EXPRESSION",
+		BackendAIHiddenObject:     "BACKEND_AI_HIDDEN_OBJECT",
+		BackendAIDeepfakeDetected: "BACKEND_AI_DEEPFAKE_DETECTED",
+		BackendAIVoiceSynth:       "BACKEND_AI_VOICE_SYNTH",
 		GazeTelemetry:            "gaze_telemetry",
 		MouseTelemetry:           "mouse_telemetry",
 		KeyboardTelemetry:        "keyboard_telemetry",
@@ -192,13 +207,14 @@ func (s Severity) String() string {
 type EventSource int32
 
 const (
-	SourceUnspecified EventSource = 0
-	SourceWebcam      EventSource = 1
-	SourceSideCamera  EventSource = 2
-	SourceSystem      EventSource = 3
-	SourceBrowser     EventSource = 4
-	SourceKernelAgent EventSource = 5
+	SourceUnspecified  EventSource = 0
+	SourceWebcam       EventSource = 1
+	SourceSideCamera   EventSource = 2
+	SourceSystem       EventSource = 3
+	SourceBrowser      EventSource = 4
+	SourceKernelAgent  EventSource = 5
 	SourceNetworkProbe EventSource = 6
+	SourceBackendAI    EventSource = 7 // Backend GPU-accelerated inference service
 )
 
 // String returns a human-readable source label.
@@ -216,6 +232,8 @@ func (es EventSource) String() string {
 		return "kernel_agent"
 	case SourceNetworkProbe:
 		return "network_probe"
+	case SourceBackendAI:
+		return "backend_ai"
 	default:
 		return "unspecified"
 	}

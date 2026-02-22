@@ -1056,3 +1056,115 @@ func parsePGArray(s string) []string {
 	}
 	return strings.Split(s, ",")
 }
+
+// ==========================================================================
+// Exam Proctoring Settings
+// ==========================================================================
+
+// EnsureExamProctoringSettingsTable creates the exam_proctoring_settings table
+// if it doesn't exist. Called during startup to auto-migrate.
+func (r *Repository) EnsureExamProctoringSettingsTable(ctx context.Context) error {
+	query := `
+		CREATE TABLE IF NOT EXISTS exam_proctoring_settings (
+			org_id     VARCHAR(64)  NOT NULL,
+			exam_id    VARCHAR(255) NOT NULL,
+			settings   JSONB        NOT NULL DEFAULT '{}',
+			updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+			updated_by VARCHAR(255) NOT NULL DEFAULT '',
+			PRIMARY KEY (org_id, exam_id)
+		);
+		CREATE INDEX IF NOT EXISTS idx_exam_proctoring_settings_org
+			ON exam_proctoring_settings (org_id);
+	`
+	_, err := r.db.ExecContext(ctx, query)
+	return err
+}
+
+// SaveExamProctoringSettings upserts the full proctoring configuration for an exam.
+func (r *Repository) SaveExamProctoringSettings(ctx context.Context, settings *entity.ExamProctoringSettings) error {
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("postgres: marshal proctoring settings: %w", err)
+	}
+
+	query := `
+		INSERT INTO exam_proctoring_settings (org_id, exam_id, settings, updated_at, updated_by)
+		VALUES ($1, $2, $3, NOW(), $4)
+		ON CONFLICT (org_id, exam_id) DO UPDATE SET
+			settings   = EXCLUDED.settings,
+			updated_at = NOW(),
+			updated_by = EXCLUDED.updated_by`
+
+	_, err = r.db.ExecContext(ctx, query,
+		settings.OrgID,
+		settings.ExamID,
+		settingsJSON,
+		settings.UpdatedBy,
+	)
+	if err != nil {
+		return fmt.Errorf("postgres: save proctoring settings: %w", err)
+	}
+	return nil
+}
+
+// GetExamProctoringSettings retrieves the proctoring settings for a specific exam.
+// Returns nil if no custom settings exist (caller should use defaults).
+func (r *Repository) GetExamProctoringSettings(ctx context.Context, orgID, examID string) (*entity.ExamProctoringSettings, error) {
+	query := `SELECT settings FROM exam_proctoring_settings WHERE org_id = $1 AND exam_id = $2`
+
+	var settingsJSON []byte
+	err := r.db.QueryRowContext(ctx, query, orgID, examID).Scan(&settingsJSON)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("postgres: get proctoring settings: %w", err)
+	}
+
+	var settings entity.ExamProctoringSettings
+	if err := json.Unmarshal(settingsJSON, &settings); err != nil {
+		return nil, fmt.Errorf("postgres: unmarshal proctoring settings: %w", err)
+	}
+
+	// Ensure identity fields are populated from the key columns.
+	settings.OrgID = orgID
+	settings.ExamID = examID
+	return &settings, nil
+}
+
+// ListExamProctoringSettingsByOrg returns all exam proctoring settings for an org.
+func (r *Repository) ListExamProctoringSettingsByOrg(ctx context.Context, orgID string) ([]*entity.ExamProctoringSettings, error) {
+	query := `SELECT org_id, exam_id, settings FROM exam_proctoring_settings WHERE org_id = $1 ORDER BY exam_id`
+	rows, err := r.db.QueryContext(ctx, query, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list proctoring settings: %w", err)
+	}
+	defer rows.Close()
+
+	var result []*entity.ExamProctoringSettings
+	for rows.Next() {
+		var oid, eid string
+		var settingsJSON []byte
+		if err := rows.Scan(&oid, &eid, &settingsJSON); err != nil {
+			return nil, fmt.Errorf("postgres: scan proctoring settings: %w", err)
+		}
+		var s entity.ExamProctoringSettings
+		if err := json.Unmarshal(settingsJSON, &s); err != nil {
+			return nil, fmt.Errorf("postgres: unmarshal proctoring settings row: %w", err)
+		}
+		s.OrgID = oid
+		s.ExamID = eid
+		result = append(result, &s)
+	}
+	return result, rows.Err()
+}
+
+// DeleteExamProctoringSettings removes the custom proctoring settings for an exam.
+func (r *Repository) DeleteExamProctoringSettings(ctx context.Context, orgID, examID string) error {
+	query := `DELETE FROM exam_proctoring_settings WHERE org_id = $1 AND exam_id = $2`
+	_, err := r.db.ExecContext(ctx, query, orgID, examID)
+	if err != nil {
+		return fmt.Errorf("postgres: delete proctoring settings: %w", err)
+	}
+	return nil
+}

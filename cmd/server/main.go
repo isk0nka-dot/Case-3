@@ -44,8 +44,6 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"net"
@@ -55,6 +53,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hibiken/asynq"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/time/rate"
@@ -62,14 +61,18 @@ import (
 	"google.golang.org/grpc/keepalive"
 
 	pb "github.com/argus-ai/event-collector/api/proto/v1"
+	"github.com/argus-ai/event-collector/internal/application/port"
 	"github.com/argus-ai/event-collector/internal/application/usecase"
+	"github.com/argus-ai/event-collector/internal/infrastructure/alerting"
 	"github.com/argus-ai/event-collector/internal/infrastructure/chunk"
 	"github.com/argus-ai/event-collector/internal/infrastructure/clickhouse"
 	"github.com/argus-ai/event-collector/internal/infrastructure/config"
 	"github.com/argus-ai/event-collector/internal/infrastructure/evidence"
 	exportInfra "github.com/argus-ai/event-collector/internal/infrastructure/export"
+	"github.com/argus-ai/event-collector/internal/infrastructure/forensic"
 	"github.com/argus-ai/event-collector/internal/infrastructure/health"
 	integrityInfra "github.com/argus-ai/event-collector/internal/infrastructure/integrity"
+	"github.com/argus-ai/event-collector/internal/infrastructure/dlq"
 	"github.com/argus-ai/event-collector/internal/infrastructure/kafka"
 	metricsInfra "github.com/argus-ai/event-collector/internal/infrastructure/metrics"
 	minioStore "github.com/argus-ai/event-collector/internal/infrastructure/minio"
@@ -84,7 +87,9 @@ import (
 	"github.com/argus-ai/event-collector/internal/transport/grpcweb"
 	adminHTTP "github.com/argus-ai/event-collector/internal/transport/http"
 	"github.com/argus-ai/event-collector/pkg/auth"
+	"github.com/argus-ai/event-collector/pkg/circuitbreaker"
 	"github.com/argus-ai/event-collector/pkg/cors"
+	"github.com/argus-ai/event-collector/pkg/randutil"
 	"github.com/argus-ai/event-collector/pkg/ratelimiter"
 	"github.com/argus-ai/event-collector/pkg/securityheaders"
 )
@@ -194,6 +199,88 @@ func run() error {
 	)
 
 	// =================================================================
+	// STEP 5c: Initialise Telegram emergency alerter (optional).
+	// =================================================================
+	telegramAlerter := alerting.NewTelegramProvider(alerting.TelegramConfig{
+		BotToken: cfg.Telegram.BotToken,
+		ChatID:   cfg.Telegram.ChatID,
+	}, logger)
+
+	// Wire alerter into data stores for critical failure notifications.
+	if telegramAlerter != nil {
+		chWriter.SetAlerter(telegramAlerter)
+		kafkaProducer.SetAlerter(telegramAlerter)
+	}
+
+	// =================================================================
+	// STEP 5d: Initialise DLQ (BadgerDB dead-letter queue).
+	//
+	// Wraps the Kafka producer with a ResilientWriter that catches write
+	// failures and persists events to BadgerDB. A background goroutine
+	// automatically drains events back to Kafka when it recovers.
+	// =================================================================
+	var kafkaEventWriter port.EventWriter = kafkaProducer
+	var dlqStatusProvider health.DLQStatusProvider
+
+	if cfg.DLQ.Enabled {
+		dlqStore, dlqErr := dlq.NewStore(dlq.StoreConfig{
+			DataDir:        cfg.DLQ.DataDir,
+			GCInterval:     cfg.DLQ.GCInterval,
+			GCDiscardRatio: cfg.DLQ.GCDiscardRatio,
+			MaxEntries:     cfg.DLQ.MaxEntries,
+			SyncWrites:     cfg.DLQ.SyncWrites,
+		}, logger)
+		if dlqErr != nil {
+			return fmt.Errorf("failed to initialise dlq store: %w", dlqErr)
+		}
+
+		resilientWriter := dlq.NewResilientWriter(
+			kafkaProducer,
+			dlqStore,
+			dlq.ResilientWriterConfig{
+				ReclamationInterval:  cfg.DLQ.ReclamationInterval,
+				ReclamationBatchSize: cfg.DLQ.ReclamationBatchSize,
+				HeartbeatInterval:    cfg.DLQ.HeartbeatInterval,
+				CircuitBreaker: circuitbreaker.Config{
+					Name:             "kafka-dlq",
+					FailureThreshold: cfg.DLQ.CircuitBreakerFailureThreshold,
+					Timeout:          cfg.DLQ.CircuitBreakerTimeout,
+					MaxRequests:      2,
+					Interval:         60 * time.Second,
+					OnOpenCallback: func(name string) {
+						if telegramAlerter != nil {
+							msg := alerting.MsgCircuitBreakerOpen(
+								name,
+								fmt.Sprintf("%d consecutive Kafka write failures", cfg.DLQ.CircuitBreakerFailureThreshold),
+								fmt.Sprintf("Auto-probe in %s", cfg.DLQ.CircuitBreakerTimeout),
+								time.Now().Format("2006-01-02 15:04:05 MST"),
+							)
+							_ = telegramAlerter.SendDirect(msg)
+						}
+					},
+				},
+			},
+			logger,
+		)
+
+		if telegramAlerter != nil {
+			resilientWriter.SetAlerter(telegramAlerter)
+		}
+
+		resilientWriter.Start()
+		kafkaEventWriter = resilientWriter
+		dlqStatusProvider = resilientWriter
+
+		logger.Info("dlq enabled (BadgerDB dead-letter queue)",
+			zap.String("data_dir", cfg.DLQ.DataDir),
+			zap.Duration("reclamation_interval", cfg.DLQ.ReclamationInterval),
+			zap.Int("reclamation_batch_size", cfg.DLQ.ReclamationBatchSize),
+		)
+	} else {
+		logger.Warn("DLQ disabled — Kafka failures will reject events")
+	}
+
+	// =================================================================
 	// STEP 5b: Initialise infrastructure: PostgreSQL (SaaS admin layer).
 	// =================================================================
 	pgRepo, err := postgres.NewRepository(postgres.Config{
@@ -289,7 +376,7 @@ func run() error {
 	if evidenceRecorder != nil {
 		ingestOpts = append(ingestOpts, usecase.WithRecorder(evidenceRecorder))
 	}
-	ingestUC := usecase.NewIngestUseCase(kafkaProducer, chWriter, logger, ingestOpts...)
+	ingestUC := usecase.NewIngestUseCase(kafkaEventWriter, chWriter, logger, ingestOpts...)
 	logger.Info("ingest use-case initialised",
 		zap.Bool("evidence_capture_enabled", evidenceRecorder != nil),
 	)
@@ -468,8 +555,16 @@ func run() error {
 	// from the Nuxt 3 frontend.
 	// =================================================================
 
-	// Health handler with Kafka and ClickHouse health checks.
-	healthHandler := health.NewHandler(logger, kafkaProducer, chWriter)
+	// Health handler with tagged dependency checks:
+	//   - Kafka is critical: failure → 503 (events cannot be ingested)
+	//   - ClickHouse is non-critical: failure → degraded (analytics delayed, Kafka retains data)
+	healthHandler := health.NewHandler(logger,
+		health.Critical(kafkaProducer),
+		health.NonCritical(chWriter),
+	)
+	if dlqStatusProvider != nil {
+		healthHandler.SetDLQProvider(dlqStatusProvider)
+	}
 
 	// HTTP mux for non-gRPC routes.
 	httpMux := http.NewServeMux()
@@ -477,12 +572,34 @@ func run() error {
 	httpMux.HandleFunc("/readyz", healthHandler.ReadinessHandler())
 
 	// Admin API endpoints (REST) — only if PostgreSQL is available.
+	var sidecamOrchestrator *sidecam.Orchestrator
 	if pgRepo != nil {
 		// JWT signing key for admin tokens — reuse the auth signing key,
 		// or use a separate key if auth is disabled.
 		adminJWTKey := []byte(cfg.Auth.SigningKey)
 		if len(adminJWTKey) == 0 {
 			adminJWTKey = []byte("argus-dev-admin-jwt-key-CHANGE-IN-PRODUCTION!")
+		}
+
+		// =============================================================
+		// Asynq Client (Redis-backed job queue) — optional.
+		// When cfg.Redis.Addr is non-empty, export and forensic PDF
+		// jobs are dispatched to the standalone cmd/worker binary via
+		// Redis. When empty, the legacy PostgreSQL polling worker and
+		// synchronous PDF generation remain the default.
+		// =============================================================
+		var asynqClient *asynq.Client
+		if cfg.Redis.Addr != "" {
+			asynqClient = asynq.NewClient(asynq.RedisClientOpt{
+				Addr:     cfg.Redis.Addr,
+				Password: cfg.Redis.Password,
+				DB:       cfg.Redis.DB,
+			})
+			defer asynqClient.Close()
+			logger.Info("asynq client connected",
+				zap.String("redis_addr", cfg.Redis.Addr),
+				zap.Int("redis_db", cfg.Redis.DB),
+			)
 		}
 
 		adminHandler := adminHTTP.NewAdminHandler(pgRepo, logger, adminJWTKey)
@@ -521,6 +638,40 @@ func run() error {
 			logger.Info("monitoring api registered",
 				zap.String("base_path", "/api/v1/monitoring"),
 				zap.Int("endpoints", 3),
+			)
+
+			// =============================================================
+			// v4.0 — Exam Proctoring Settings API (Dynamic Config Registry)
+			// Per-exam rule configuration, toggle-to-penalty mapping, and
+			// configurable verdict thresholds.
+			// =============================================================
+			if err := pgRepo.EnsureExamProctoringSettingsTable(context.Background()); err != nil {
+				logger.Error("failed to create exam_proctoring_settings table", zap.Error(err))
+			} else {
+				logger.Info("exam_proctoring_settings table ensured")
+			}
+
+			proctoringSettingsHandler := adminHTTP.NewProctoringSettingsHandler(pgRepo, logger, adminJWTKey)
+			proctoringSettingsHandler.RegisterRoutes(httpMux)
+
+			logger.Info("proctoring settings api registered",
+				zap.String("base_path", "/api/v1/proctoring"),
+				zap.Int("endpoints", 5),
+			)
+
+			// =============================================================
+			// v4.1 — SSE Real-Time Session Stream
+			// Push-based live monitoring with auto-terminate + Telegram alerting.
+			// =============================================================
+			sseScorer := forensic.NewScorer(chWriter.Conn(), logger)
+			sseHandler := adminHTTP.NewSSEHandler(
+				chWriter.Conn(), sseScorer, pgRepo, telegramAlerter, logger, adminJWTKey,
+			)
+			sseHandler.RegisterRoutes(httpMux)
+
+			logger.Info("sse stream api registered",
+				zap.String("base_path", "/api/v1/monitoring/sessions/*/stream"),
+				zap.Int("endpoints", 1),
 			)
 		}
 
@@ -564,6 +715,7 @@ func run() error {
 				ChunkTTL:                cfg.Chunk.ChunkTTL,
 				MaxConcurrentAssemblies: cfg.Chunk.MaxConcurrentAssemblies,
 			}, logger)
+			chunkAssembler.SetPublisher(kafkaProducer)
 
 			chunkHandler := adminHTTP.NewChunkHandler(chunkAssembler, pgRepo, logger, adminJWTKey)
 			chunkHandler.RegisterRoutes(httpMux)
@@ -596,13 +748,28 @@ func run() error {
 			// voice biometric analysis, and report hash verification.
 			// =============================================================
 			forensicHandler := adminHTTP.NewForensicHandler(
-				chWriter.Conn(), integrityVerifier, pgRepo, logger, adminJWTKey,
+				chWriter.Conn(), integrityVerifier, pgRepo, logger, adminJWTKey, asynqClient,
 			)
 			forensicHandler.RegisterRoutes(httpMux)
 
 			logger.Info("forensic api registered",
 				zap.String("base_path", "/api/v1/forensic"),
-				zap.Int("endpoints", 6),
+				zap.Int("endpoints", 7),
+			)
+		}
+
+		// =============================================================
+		// v4.2 — AI Deep Analysis Trigger API
+		// Allows admins to trigger backend GPU-accelerated analysis
+		// for a specific session via POST /api/v1/sessions/:id/analyze.
+		// =============================================================
+		if asynqClient != nil {
+			aiAnalysisHandler := adminHTTP.NewAIAnalysisHandler(pgRepo, asynqClient, logger, adminJWTKey)
+			aiAnalysisHandler.RegisterRoutes(httpMux)
+
+			logger.Info("ai analysis api registered",
+				zap.String("base_path", "/api/v1/sessions/*/analyze"),
+				zap.Int("endpoints", 1),
 			)
 		}
 
@@ -641,9 +808,7 @@ func run() error {
 			}
 
 			// Generate a unique event ID
-			idBytes := make([]byte, 16)
-			rand.Read(idBytes)
-			eid := hex.EncodeToString(idBytes)
+			eid := randutil.HexToken(16)
 
 			now := time.Now().UTC()
 			evt := &entity.ProctoringEvent{
@@ -672,7 +837,7 @@ func run() error {
 			}
 		}
 
-		sidecamOrchestrator := sidecam.NewOrchestrator(logger, adminJWTKey, fmt.Sprintf(":%d", cfg.Server.HTTPPort), sidecamEventEmitter)
+		sidecamOrchestrator = sidecam.NewOrchestrator(logger, adminJWTKey, fmt.Sprintf(":%d", cfg.Server.HTTPPort), sidecamEventEmitter)
 		sidecamHandler := adminHTTP.NewSidecamHandler(sidecamOrchestrator, pgRepo, logger, adminJWTKey)
 		sidecamHandler.RegisterRoutes(httpMux)
 
@@ -685,7 +850,7 @@ func run() error {
 		// v2.1 — Bulk Export API + Background Worker
 		// Async TAR.GZ archive creation with forensic manifest.
 		// =============================================================
-		exportHandler := adminHTTP.NewExportHandler(pgRepo.DB(), cfg.Export, pgRepo, logger, adminJWTKey)
+		exportHandler := adminHTTP.NewExportHandler(pgRepo.DB(), cfg.Export, pgRepo, logger, adminJWTKey, asynqClient)
 		exportHandler.RegisterRoutes(httpMux)
 
 		logger.Info("export api registered",
@@ -743,9 +908,30 @@ func run() error {
 			zap.String("endpoint", "/metrics"),
 		)
 
+		// =============================================================
+		// Temporary diagnostic: test-alert endpoint
+		// =============================================================
+		httpMux.HandleFunc("POST /api/v1/internal/test-alert", func(w http.ResponseWriter, r *http.Request) {
+			if telegramAlerter == nil {
+				http.Error(w, `{"error":"telegram alerter not configured"}`, http.StatusServiceUnavailable)
+				return
+			}
+			msg := alerting.MsgDiagnosticTest(time.Now().Format("2006-01-02 15:04:05 MST"))
+			if err := telegramAlerter.SendDirect(msg); err != nil {
+				logger.Error("test-alert: send failed", zap.Error(err))
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadGateway)
+				fmt.Fprintf(w, `{"error":"%s"}`, err.Error())
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `{"status":"sent","message":"Test alert fired to Telegram"}`)
+		})
+
 		logger.Info("admin api registered",
 			zap.String("base_path", "/api/v1"),
-			zap.Int("endpoints", 31),
+			zap.Int("endpoints", 32),
 		)
 	}
 
@@ -883,6 +1069,18 @@ func run() error {
 	}()
 
 	// =================================================================
+	// STEP 16b: Telegram startup hello (non-blocking).
+	// =================================================================
+	if telegramAlerter != nil {
+		go func() {
+			msg := alerting.MsgServerStartup(time.Now().Format("2006-01-02 15:04:05 MST"))
+			if err := telegramAlerter.SendDirect(msg); err != nil {
+				logger.Warn("startup hello failed", zap.Error(err))
+			}
+		}()
+	}
+
+	// =================================================================
 	// STEP 17: Block until shutdown signal or fatal server error.
 	// =================================================================
 	select {
@@ -991,12 +1189,24 @@ func run() error {
 		}
 	}
 
+	// Phase 3f: Close sidecam orchestrator (stops health monitor goroutine).
+	if sidecamOrchestrator != nil {
+		logger.Info("phase 3f: closing sidecam orchestrator...")
+		sidecamOrchestrator.Close()
+	}
+
 	// Phase 4: Flush data stores (Kafka + ClickHouse).
 	logger.Info("phase 4: flushing data stores...")
 	if err := ingestUC.Close(); err != nil {
 		logger.Error("ingest use-case close error", zap.Error(err))
 	} else {
 		logger.Info("ingest use-case closed (kafka flushed, clickhouse drained)")
+	}
+
+	// Phase 5: Close alerter (drain pending Telegram messages).
+	if telegramAlerter != nil {
+		logger.Info("phase 5: closing telegram alerter...")
+		telegramAlerter.Close()
 	}
 
 	logger.Info("event-collector shut down successfully",

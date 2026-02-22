@@ -34,7 +34,6 @@ package sidecam
 import (
 	"context"
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -44,6 +43,8 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/argus-ai/event-collector/pkg/randutil"
 )
 
 // ---------------------------------------------------------------------------
@@ -160,8 +161,12 @@ type Orchestrator struct {
 	mu       sync.RWMutex
 	sessions map[string]*PairingSession // sessionID -> PairingSession
 	logger   *zap.Logger
-	secret   []byte // HMAC signing key for pairing tokens
+	secret   []byte      // HMAC signing key for pairing tokens
 	emitFn   EventEmitFn // Bridges anomalies to ClickHouse (Fix 6)
+
+	// Lifecycle
+	done chan struct{}
+	wg   sync.WaitGroup
 
 	// Config
 	pairingTTL       time.Duration
@@ -176,15 +181,25 @@ func NewOrchestrator(logger *zap.Logger, signingKey []byte, serverURL string, em
 		logger:           logger.Named("sidecam"),
 		secret:           signingKey,
 		emitFn:           emitFn,
+		done:             make(chan struct{}),
 		pairingTTL:       5 * time.Minute,
 		heartbeatTimeout: 15 * time.Second,
 		serverURL:        serverURL,
 	}
 
-	// Start health monitor
+	// Start health monitor with graceful shutdown support.
+	o.wg.Add(1)
 	go o.healthMonitorLoop()
 
 	return o
+}
+
+// Close gracefully stops the orchestrator's background goroutines and waits
+// for them to exit. Must be called during server shutdown to prevent goroutine leaks.
+func (o *Orchestrator) Close() {
+	close(o.done)
+	o.wg.Wait()
+	o.logger.Info("sidecam orchestrator closed")
 }
 
 // emitEvent safely emits an event if the callback is configured.
@@ -233,11 +248,7 @@ func (o *Orchestrator) InitiatePairing(
 	}
 
 	// Generate ephemeral pairing token
-	tokenBytes := make([]byte, 32)
-	if _, err := rand.Read(tokenBytes); err != nil {
-		return nil, nil, fmt.Errorf("sidecam: failed to generate pairing token: %w", err)
-	}
-	pairingToken := hex.EncodeToString(tokenBytes)
+	pairingToken := randutil.HexToken(32)
 
 	// Generate HMAC-signed pairing code
 	pairingCode := o.signPairingCode(sessionID, pairingToken)
@@ -324,11 +335,7 @@ func (o *Orchestrator) CompletePairing(sessionID, pairingToken string, device *M
 	ps.PairingCode = ""
 
 	// Fix 4: Generate device-bound session token for post-pairing auth
-	devTokenBytes := make([]byte, 32)
-	if _, err := rand.Read(devTokenBytes); err != nil {
-		return fmt.Errorf("sidecam: failed to generate device token: %w", err)
-	}
-	ps.DeviceToken = hex.EncodeToString(devTokenBytes)
+	ps.DeviceToken = randutil.HexToken(32)
 
 	o.logger.Info("sidecam: device paired",
 		zap.String("session_id", sessionID),
@@ -677,44 +684,80 @@ func (o *Orchestrator) signPairingCode(sessionID, token string) string {
 }
 
 func (o *Orchestrator) healthMonitorLoop() {
+	defer o.wg.Done()
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		o.mu.Lock()
-		now := time.Now()
+	for {
+		select {
+		case <-o.done:
+			return
+		case <-ticker.C:
+			o.checkSessions()
+		}
+	}
+}
 
-		for sid, ps := range o.sessions {
-			// Check heartbeat timeout
-			if ps.State == PairingReady || ps.State == PairingConnected || ps.State == PairingCalibrating {
-				lastHB, err := time.Parse(time.RFC3339, ps.Health.LastHeartbeat)
-				if err == nil && now.Sub(lastHB) > o.heartbeatTimeout {
-					prevState := ps.State
-					ps.State = PairingDisconnected
-					ps.Health.Connected = false
-					ps.Health.Quality = "critical"
+// sessionEvictionTTL is how long a terminal session lingers before auto-eviction.
+const sessionEvictionTTL = 30 * time.Minute
 
-					o.logger.Warn("sidecam: stream disconnected (heartbeat timeout)",
-						zap.String("session_id", sid),
-						zap.Duration("since_last_hb", now.Sub(lastHB)),
-					)
+// checkSessions inspects all active sessions for heartbeat timeouts, expiry,
+// and evicts terminal sessions older than sessionEvictionTTL to prevent
+// unbounded memory growth.
+func (o *Orchestrator) checkSessions() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 
-					// Fix 6: Emit stream disconnected event (only on state transition)
-					if prevState != PairingDisconnected {
-						o.emitEvent(ps, "SIDECAM_STREAM_DISCONNECTED", "critical",
-							fmt.Sprintf("Heartbeat timeout after %.0fs", now.Sub(lastHB).Seconds()))
-					}
+	now := time.Now()
+	var toDelete []string
+
+	for sid, ps := range o.sessions {
+		// Check heartbeat timeout for active sessions
+		if ps.State == PairingReady || ps.State == PairingConnected || ps.State == PairingCalibrating {
+			lastHB, err := time.Parse(time.RFC3339, ps.Health.LastHeartbeat)
+			if err == nil && now.Sub(lastHB) > o.heartbeatTimeout {
+				prevState := ps.State
+				ps.State = PairingDisconnected
+				ps.Health.Connected = false
+				ps.Health.Quality = "critical"
+
+				o.logger.Warn("sidecam: stream disconnected (heartbeat timeout)",
+					zap.String("session_id", sid),
+					zap.Duration("since_last_hb", now.Sub(lastHB)),
+				)
+
+				// Fix 6: Emit stream disconnected event (only on state transition)
+				if prevState != PairingDisconnected {
+					o.emitEvent(ps, "SIDECAM_STREAM_DISCONNECTED", "critical",
+						fmt.Sprintf("Heartbeat timeout after %.0fs", now.Sub(lastHB).Seconds()))
 				}
-			}
-
-			// Cleanup expired pending sessions
-			if ps.State == PairingPending && now.After(ps.ExpiresAt) {
-				ps.State = PairingFailed
-				ps.Calibration.Message = "Время сопряжения истекло"
 			}
 		}
 
-		o.mu.Unlock()
+		// Transition expired pending sessions to failed
+		if ps.State == PairingPending && now.After(ps.ExpiresAt) {
+			ps.State = PairingFailed
+			ps.Calibration.Message = "Время сопряжения истекло"
+		}
+
+		// Auto-evict terminal sessions to prevent unbounded map growth.
+		// Sessions in PairingFailed or PairingDisconnected that are older
+		// than 30 minutes are removed from memory.
+		if (ps.State == PairingFailed || ps.State == PairingDisconnected) &&
+			now.Sub(ps.CreatedAt) > sessionEvictionTTL {
+			toDelete = append(toDelete, sid)
+		}
+	}
+
+	for _, sid := range toDelete {
+		delete(o.sessions, sid)
+	}
+
+	if len(toDelete) > 0 {
+		o.logger.Debug("sidecam: evicted stale sessions",
+			zap.Int("count", len(toDelete)),
+		)
 	}
 }
 

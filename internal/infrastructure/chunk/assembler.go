@@ -22,14 +22,39 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
+
+	"encoding/json"
 
 	"go.uber.org/zap"
 
 	"github.com/argus-ai/event-collector/internal/application/port"
 	"github.com/argus-ai/event-collector/internal/domain/entity"
 )
+
+// videoUploadedTopic is the Kafka topic for post-upload notifications.
+const videoUploadedTopic = "argus.evidence.video_uploaded"
+
+// KafkaPublisher is the interface for publishing raw Kafka messages.
+type KafkaPublisher interface {
+	PublishRaw(ctx context.Context, topic string, key string, value []byte) error
+}
+
+// videoUploadedRecord is the wire format for the VIDEO_UPLOADED notification.
+type videoUploadedRecord struct {
+	FragmentID string `json:"fragment_id"`
+	SessionID  string `json:"session_id"`
+	OrgID      string `json:"org_id"`
+	ExamID     string `json:"exam_id"`
+	StudentID  string `json:"student_id"`
+	SHA256Hash string `json:"sha256_hash"`
+	URI        string `json:"uri"`
+	SizeBytes  int64  `json:"size_bytes"`
+	UploadedAt string `json:"uploaded_at"`
+}
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -56,16 +81,29 @@ type Config struct {
 	// CleanupInterval is how often the background goroutine runs.
 	// Default: 30 seconds.
 	CleanupInterval time.Duration
+
+	// MemoryThreshold is the per-fragment size threshold (bytes) at which
+	// incoming chunks are spilled to disk instead of held in memory.
+	// When a fragment's totalSize exceeds this, new chunks are written to
+	// SpillDir and existing in-memory chunks are evicted to disk.
+	// Default: 10MB (10485760). Set to 0 to disable spill-to-disk.
+	MemoryThreshold int64
+
+	// SpillDir is the directory for temporary spill-to-disk chunk files.
+	// Default: os.TempDir()/argus-chunk-spill
+	SpillDir string
 }
 
 // DefaultConfig returns sensible default configuration for the chunk assembler.
 func DefaultConfig() Config {
 	return Config{
-		MaxChunkSize:            256 * 1024,      // 256KB
-		MaxFragmentSize:         50 * 1024 * 1024, // 50MB
+		MaxChunkSize:            256 * 1024,       // 256KB
+		MaxFragmentSize:         50 * 1024 * 1024,  // 50MB
 		ChunkTTL:                5 * time.Minute,
 		MaxConcurrentAssemblies: 100,
 		CleanupInterval:         30 * time.Second,
+		MemoryThreshold:         10 * 1024 * 1024,  // 10MB — spill to disk above this
+		SpillDir:                filepath.Join(os.TempDir(), "argus-chunk-spill"),
 	}
 }
 
@@ -74,8 +112,10 @@ func DefaultConfig() Config {
 // ---------------------------------------------------------------------------
 
 // chunkData holds the raw bytes and metadata of a single chunk.
+// When spilled to disk, data is nil and diskPath points to the temp file.
 type chunkData struct {
-	data      []byte
+	data      []byte // nil when spilled to disk
+	diskPath  string // non-empty when spilled to disk
 	sha256    string
 	received  bool
 	sizeBytes int
@@ -121,6 +161,7 @@ func (f *fragment) isComplete() bool {
 // and MinIO for final storage. It is safe for concurrent use.
 type Assembler struct {
 	evidenceStore port.EvidenceStore
+	publisher     KafkaPublisher // optional: publishes VIDEO_UPLOADED after upload
 	config        Config
 	logger        *zap.Logger
 
@@ -156,6 +197,23 @@ func NewAssembler(
 	if cfg.CleanupInterval == 0 {
 		cfg.CleanupInterval = defaults.CleanupInterval
 	}
+	if cfg.MemoryThreshold == 0 {
+		cfg.MemoryThreshold = defaults.MemoryThreshold
+	}
+	if cfg.SpillDir == "" {
+		cfg.SpillDir = defaults.SpillDir
+	}
+
+	// Ensure spill directory exists.
+	if cfg.MemoryThreshold > 0 {
+		if err := os.MkdirAll(cfg.SpillDir, 0o750); err != nil {
+			logger.Warn("chunk assembler: failed to create spill dir, disk overflow disabled",
+				zap.String("spill_dir", cfg.SpillDir),
+				zap.Error(err),
+			)
+			cfg.MemoryThreshold = 0 // disable spill-to-disk
+		}
+	}
 
 	a := &Assembler{
 		evidenceStore: evidenceStore,
@@ -175,6 +233,8 @@ func NewAssembler(
 		zap.Int64("max_fragment_size", cfg.MaxFragmentSize),
 		zap.Duration("chunk_ttl", cfg.ChunkTTL),
 		zap.Int("max_concurrent", cfg.MaxConcurrentAssemblies),
+		zap.Int64("memory_threshold", cfg.MemoryThreshold),
+		zap.String("spill_dir", cfg.SpillDir),
 	)
 
 	return a
@@ -235,13 +295,51 @@ func (a *Assembler) ReceiveChunk(ctx context.Context, meta port.ChunkMeta, data 
 			meta.FragmentID, newTotalSize, a.config.MaxFragmentSize)
 	}
 
-	// Store chunk (idempotent overwrite).
-	frag.chunks[meta.ChunkIndex] = chunkData{
-		data:      chunkBytes,
-		sha256:    meta.SHA256Chunk,
-		received:  true,
-		sizeBytes: len(chunkBytes),
+	// Clean up old disk file if replacing a spilled chunk.
+	if frag.chunks[meta.ChunkIndex].diskPath != "" {
+		os.Remove(frag.chunks[meta.ChunkIndex].diskPath)
 	}
+
+	// Determine if this chunk should be spilled to disk.
+	spillToDisk := a.config.MemoryThreshold > 0 && newTotalSize > a.config.MemoryThreshold
+
+	if spillToDisk {
+		// Write new chunk directly to disk.
+		diskPath, err := a.spillChunkToDisk(meta.FragmentID, meta.ChunkIndex, chunkBytes)
+		if err != nil {
+			a.logger.Warn("chunk: disk spill failed, keeping in memory",
+				zap.String("fragment_id", meta.FragmentID),
+				zap.Int("chunk_index", meta.ChunkIndex),
+				zap.Error(err),
+			)
+			// Fallback: keep in memory
+			frag.chunks[meta.ChunkIndex] = chunkData{
+				data:      chunkBytes,
+				sha256:    meta.SHA256Chunk,
+				received:  true,
+				sizeBytes: len(chunkBytes),
+			}
+		} else {
+			frag.chunks[meta.ChunkIndex] = chunkData{
+				diskPath:  diskPath,
+				sha256:    meta.SHA256Chunk,
+				received:  true,
+				sizeBytes: len(chunkBytes),
+			}
+		}
+
+		// Evict any existing in-memory chunks to disk to free memory.
+		a.evictInMemoryChunks(frag)
+	} else {
+		// Store chunk in memory (idempotent overwrite).
+		frag.chunks[meta.ChunkIndex] = chunkData{
+			data:      chunkBytes,
+			sha256:    meta.SHA256Chunk,
+			received:  true,
+			sizeBytes: len(chunkBytes),
+		}
+	}
+
 	frag.totalSize = newTotalSize
 
 	complete := frag.isComplete()
@@ -285,10 +383,21 @@ func (a *Assembler) Assemble(ctx context.Context, fragmentID string) (string, st
 			fragmentID, frag.receivedCount(), frag.totalChunks)
 	}
 
-	// Concatenate all chunks in order.
+	// Concatenate all chunks in order (reading from disk for spilled chunks).
 	var assembledBuf bytes.Buffer
 	for i := 0; i < frag.totalChunks; i++ {
-		assembledBuf.Write(frag.chunks[i].data)
+		chunk := frag.chunks[i]
+		if chunk.diskPath != "" {
+			// Read spilled chunk from disk.
+			diskData, err := os.ReadFile(chunk.diskPath)
+			if err != nil {
+				frag.mu.Unlock()
+				return "", "", 0, fmt.Errorf("chunk: failed to read spilled chunk %d from disk: %w", i, err)
+			}
+			assembledBuf.Write(diskData)
+		} else {
+			assembledBuf.Write(chunk.data)
+		}
 	}
 	// Capture metadata before unlocking.
 	sessionID := frag.sessionID
@@ -359,6 +468,29 @@ func (a *Assembler) Assemble(ctx context.Context, fragmentID string) (string, st
 		zap.String("content_type", contentType),
 	)
 
+	// Publish VIDEO_UPLOADED notification ONLY after confirmed MinIO upload.
+	if a.publisher != nil {
+		record := videoUploadedRecord{
+			FragmentID: fragmentID,
+			SessionID:  sessionID,
+			OrgID:      orgID,
+			ExamID:     examID,
+			StudentID:  studentID,
+			SHA256Hash: computedHash,
+			URI:        uri,
+			SizeBytes:  sizeBytes,
+			UploadedAt: time.Now().UTC().Format(time.RFC3339Nano),
+		}
+		if value, err := json.Marshal(record); err == nil {
+			if pubErr := a.publisher.PublishRaw(ctx, videoUploadedTopic, sessionID, value); pubErr != nil {
+				a.logger.Warn("VIDEO_UPLOADED publish failed (upload succeeded)",
+					zap.String("fragment_id", fragmentID),
+					zap.Error(pubErr),
+				)
+			}
+		}
+	}
+
 	// Cleanup buffered chunks after successful upload.
 	a.cleanupFragment(fragmentID)
 
@@ -398,15 +530,31 @@ func (a *Assembler) Close() error {
 	close(a.stopCh)
 	a.wg.Wait()
 
-	// Clear all fragments.
+	// Clear all fragments and remove disk files.
 	a.mu.Lock()
-	for k := range a.fragments {
+	for k, frag := range a.fragments {
+		frag.mu.Lock()
+		for i := range frag.chunks {
+			if frag.chunks[i].diskPath != "" {
+				os.Remove(frag.chunks[i].diskPath)
+			}
+			frag.chunks[i].data = nil
+		}
+		frag.chunks = nil
+		frag.mu.Unlock()
 		delete(a.fragments, k)
 	}
 	a.mu.Unlock()
 
 	a.logger.Info("chunk assembler closed")
 	return nil
+}
+
+// SetPublisher configures the optional Kafka publisher for VIDEO_UPLOADED
+// notifications. If set, the assembler emits a notification after each
+// successful MinIO upload. Safe to call before any Assemble calls.
+func (a *Assembler) SetPublisher(pub KafkaPublisher) {
+	a.publisher = pub
 }
 
 // ---------------------------------------------------------------------------
@@ -445,15 +593,18 @@ func (a *Assembler) getOrCreateFragment(meta port.ChunkMeta) *fragment {
 	return frag
 }
 
-// cleanupFragment removes a fragment and its buffered chunks from memory.
+// cleanupFragment removes a fragment and its buffered chunks from memory and disk.
 func (a *Assembler) cleanupFragment(fragmentID string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	if frag, exists := a.fragments[fragmentID]; exists {
 		frag.mu.Lock()
-		// Nil out chunk data to help GC.
+		// Nil out chunk data and remove disk files.
 		for i := range frag.chunks {
+			if frag.chunks[i].diskPath != "" {
+				os.Remove(frag.chunks[i].diskPath)
+			}
 			frag.chunks[i].data = nil
 		}
 		frag.chunks = nil
@@ -496,8 +647,11 @@ func (a *Assembler) cleanupStaleFragments() {
 	for id, frag := range a.fragments {
 		frag.mu.Lock()
 		if now.Sub(frag.createdAt) > a.config.ChunkTTL {
-			// Nil out chunk data to help GC.
+			// Nil out chunk data, remove disk files.
 			for i := range frag.chunks {
+				if frag.chunks[i].diskPath != "" {
+					os.Remove(frag.chunks[i].diskPath)
+				}
 				frag.chunks[i].data = nil
 			}
 			frag.chunks = nil
@@ -520,6 +674,45 @@ func (a *Assembler) cleanupStaleFragments() {
 			zap.Int("removed", staleCount),
 			zap.Int("remaining", len(a.fragments)),
 		)
+	}
+}
+
+// spillChunkToDisk writes chunk data to a temporary file on disk and returns the path.
+func (a *Assembler) spillChunkToDisk(fragmentID string, chunkIndex int, data []byte) (string, error) {
+	filename := fmt.Sprintf("chunk-%s-%d.bin", fragmentID[:min(16, len(fragmentID))], chunkIndex)
+	diskPath := filepath.Join(a.config.SpillDir, filename)
+
+	if err := os.WriteFile(diskPath, data, 0o600); err != nil {
+		return "", fmt.Errorf("write spill file: %w", err)
+	}
+
+	a.logger.Debug("chunk spilled to disk",
+		zap.String("fragment_id", fragmentID),
+		zap.Int("chunk_index", chunkIndex),
+		zap.Int("size_bytes", len(data)),
+		zap.String("disk_path", diskPath),
+	)
+
+	return diskPath, nil
+}
+
+// evictInMemoryChunks moves any in-memory chunks of a fragment to disk.
+// Called when the fragment crosses the memory threshold. Caller must hold frag.mu.
+func (a *Assembler) evictInMemoryChunks(frag *fragment) {
+	for i := range frag.chunks {
+		if frag.chunks[i].received && frag.chunks[i].data != nil && frag.chunks[i].diskPath == "" {
+			diskPath, err := a.spillChunkToDisk(frag.fragmentID, i, frag.chunks[i].data)
+			if err != nil {
+				a.logger.Warn("chunk: failed to evict chunk to disk, keeping in memory",
+					zap.String("fragment_id", frag.fragmentID),
+					zap.Int("chunk_index", i),
+					zap.Error(err),
+				)
+				continue
+			}
+			frag.chunks[i].diskPath = diskPath
+			frag.chunks[i].data = nil // free memory
+		}
 	}
 }
 

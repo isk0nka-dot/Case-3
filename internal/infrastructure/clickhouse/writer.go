@@ -46,6 +46,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/argus-ai/event-collector/internal/domain/entity"
+	"github.com/argus-ai/event-collector/internal/infrastructure/alerting"
+	"github.com/argus-ai/event-collector/pkg/circuitbreaker"
 )
 
 // ---------------------------------------------------------------------------
@@ -153,6 +155,14 @@ type Writer struct {
 	overflowMu   sync.Mutex
 	overflowFull atomic.Int64 // Counter: batches dropped due to full overflow.
 
+	// Circuit breaker: fast-fails inserts when ClickHouse is unreachable,
+	// preventing retry storms and backpressure propagation.
+	breaker *circuitbreaker.Breaker
+
+	// Alerter: optional emergency notification provider (Telegram, etc.).
+	// Fires on flush failures and overflow drops.
+	alerter alerting.Provider
+
 	// Lifecycle management.
 	done chan struct{}
 	wg   sync.WaitGroup
@@ -203,6 +213,7 @@ func NewWriter(cfg WriterConfig, logger *zap.Logger) (*Writer, error) {
 		return nil, fmt.Errorf("clickhouse: ping failed (is ClickHouse running?): %w", err)
 	}
 
+	// Writer is allocated first so the circuit breaker callback can capture it.
 	w := &Writer{
 		conn:     conn,
 		logger:   logger.Named("clickhouse_writer"),
@@ -211,6 +222,31 @@ func NewWriter(cfg WriterConfig, logger *zap.Logger) (*Writer, error) {
 		overflow: make([][]*entity.ProctoringEvent, 0, cfg.OverflowQueueSize),
 		done:     make(chan struct{}),
 	}
+
+	// Circuit breaker protects against sustained ClickHouse outages.
+	// Trips after 5 consecutive failures, reopens after 30s for probe requests.
+	// When the breaker opens, a critical Telegram alert fires via SendDirect.
+	cb := circuitbreaker.New(circuitbreaker.Config{
+		Name:             "clickhouse-writer",
+		FailureThreshold: 5,
+		Timeout:          30 * time.Second,
+		MaxRequests:      2,
+		Interval:         60 * time.Second,
+		OnOpenCallback: func(name string) {
+			if w.alerter != nil {
+				msg := alerting.MsgCircuitBreakerOpen(
+					name,
+					"5 consecutive flush failures",
+					"Auto-probe in 30s",
+					time.Now().Format("2006-01-02 15:04:05 MST"),
+				)
+				if err := w.alerter.SendDirect(msg); err != nil {
+					w.logger.Warn("circuit breaker: failed to send Telegram alert", zap.Error(err))
+				}
+			}
+		},
+	}, logger)
+	w.breaker = cb
 
 	// Start the background flusher.
 	w.wg.Add(1)
@@ -310,14 +346,31 @@ func (w *Writer) Close() error {
 // ---------------------------------------------------------------------------
 
 // Check verifies that ClickHouse is reachable via PING.
+// If the circuit breaker is open, returns an error immediately (fast-fail)
+// rather than sending a network probe to an unreachable server.
 // Called by the HTTP /readyz endpoint.
 func (w *Writer) Check(ctx context.Context) error {
+	if w.breaker.State() == "open" {
+		return fmt.Errorf("circuit breaker open (clickhouse unreachable)")
+	}
 	return w.conn.Ping(ctx)
 }
 
 // Name returns the health checker name.
 func (w *Writer) Name() string {
 	return "clickhouse_writer"
+}
+
+// BreakerState returns the current circuit breaker state: "closed", "open", or "half-open".
+// Exposed for the health handler to include in readiness probe responses.
+func (w *Writer) BreakerState() string {
+	return w.breaker.State()
+}
+
+// SetAlerter configures an optional emergency alerting provider.
+// When set, the writer sends alerts on flush failures and overflow drops.
+func (w *Writer) SetAlerter(p alerting.Provider) {
+	w.alerter = p
 }
 
 // Conn returns the underlying ClickHouse driver connection for read queries.
@@ -425,6 +478,15 @@ func (w *Writer) flush() {
 			zap.Int("event_count", len(events)),
 			zap.Error(err),
 		)
+
+		// Fire emergency alert after retry exhaustion.
+		if w.alerter != nil {
+			w.alerter.Send(alerting.Alert{
+				Component: "clickhouse-writer",
+				Severity:  "CRITICAL",
+				Error:     fmt.Sprintf("Batch flush failed after %d retries (%d events). Breaker: %s. Error: %v", w.cfg.MaxRetries, len(events), w.breaker.State(), err),
+			})
+		}
 		return
 	}
 
@@ -461,14 +523,24 @@ func (w *Writer) insertWithRetry(events []*entity.ProctoringEvent) error {
 			time.Sleep(sleep)
 		}
 
-		if err := w.insertBatch(events); err != nil {
-			lastErr = err
+		// Execute the insert through the circuit breaker. If the breaker
+		// is open, the insert is skipped immediately (fast-fail).
+		_, cbErr := w.breaker.Execute(func() (interface{}, error) {
+			return nil, w.insertBatch(events)
+		})
+		if cbErr != nil {
+			lastErr = cbErr
 			w.logger.Warn("clickhouse: insert attempt failed",
 				zap.Int("attempt", attempt+1),
 				zap.Int("max_retries", w.cfg.MaxRetries),
 				zap.Int("event_count", len(events)),
-				zap.Error(err),
+				zap.String("breaker_state", w.breaker.State()),
+				zap.Error(cbErr),
 			)
+			// If circuit is open, skip remaining retries — no point waiting.
+			if w.breaker.State() == "open" {
+				break
+			}
 			continue
 		}
 
@@ -592,6 +664,15 @@ func (w *Writer) pushOverflow(events []*entity.ProctoringEvent) {
 			zap.Int("queue_size", w.cfg.OverflowQueueSize),
 			zap.Int64("total_dropped", w.totalDropped.Load()),
 		)
+
+		// DATA LOSS: fire emergency alert.
+		if w.alerter != nil {
+			w.alerter.Send(alerting.Alert{
+				Component: "clickhouse-writer",
+				Severity:  "CRITICAL",
+				Error:     fmt.Sprintf("DATA LOSS: overflow queue full, dropped %d events. Total dropped: %d", len(dropped), w.totalDropped.Load()),
+			})
+		}
 	}
 
 	w.overflow = append(w.overflow, events)

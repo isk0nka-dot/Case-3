@@ -44,6 +44,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/argus-ai/event-collector/internal/domain/entity"
+	"github.com/argus-ai/event-collector/internal/infrastructure/alerting"
 )
 
 // ---------------------------------------------------------------------------
@@ -145,6 +146,14 @@ type Producer struct {
 	messagesProduced atomic.Int64 // Total messages successfully acknowledged by Kafka.
 	messagesFailed   atomic.Int64 // Total messages that failed after all retries.
 	bytesProduced    atomic.Int64 // Total payload bytes successfully produced.
+
+	// Alerter: optional emergency notification provider.
+	alerter alerting.Provider
+}
+
+// SetAlerter configures an optional emergency alerting provider.
+func (p *Producer) SetAlerter(a alerting.Provider) {
+	p.alerter = a
 }
 
 // NewProducer creates a new Kafka async producer with the given configuration.
@@ -540,6 +549,16 @@ func (p *Producer) handleErrors() {
 			zap.Error(prodErr.Err),
 			zap.Int64("total_failures", p.messagesFailed.Load()),
 		)
+
+		// Fire emergency alert on permanent delivery failure.
+		if p.alerter != nil {
+			p.alerter.Send(alerting.Alert{
+				Component: "kafka-producer",
+				SessionID: key,
+				Severity:  "CRITICAL",
+				Error:     fmt.Sprintf("Message delivery failed permanently. Topic: %s, Key: %s, Error: %v, Total failures: %d", topic, key, prodErr.Err, p.messagesFailed.Load()),
+			})
+		}
 	}
 }
 

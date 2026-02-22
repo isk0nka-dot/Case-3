@@ -45,15 +45,35 @@ const (
 
 // Response is the JSON body returned by both liveness and readiness endpoints.
 type Response struct {
-	Status Status        `json:"status"`
-	Checks []CheckResult `json:"checks,omitempty"`
+	Status    Status        `json:"status"`
+	Checks   []CheckResult `json:"checks,omitempty"`
+	Pipeline *PipelineInfo `json:"pipeline,omitempty"`
+}
+
+// PipelineInfo exposes the Kafka/DLQ pipeline state for observability.
+// Included in readiness responses when a DLQ status provider is configured.
+type PipelineInfo struct {
+	BreakerState string `json:"breaker_state"`
+	DLQSize      int64  `json:"dlq_size"`
+	IsDegraded   bool   `json:"is_degraded"`
+	DegradedFor  string `json:"degraded_for,omitempty"`
+}
+
+// DLQStatusProvider is an optional interface for exposing DLQ/pipeline metrics
+// through the health endpoint. The ResilientWriter implements this.
+type DLQStatusProvider interface {
+	BreakerState() string
+	DLQSize() int64
+	IsDegraded() bool
+	DegradedDuration() time.Duration
 }
 
 // CheckResult is the outcome of a single dependency health check.
 type CheckResult struct {
-	Name   string `json:"name"`
-	Status Status `json:"status"`
-	Error  string `json:"error,omitempty"`
+	Name     string `json:"name"`
+	Status   Status `json:"status"`
+	Critical bool   `json:"critical"`
+	Error    string `json:"error,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -66,22 +86,49 @@ type CheckResult struct {
 // readiness probe and triggering Kubernetes timeouts.
 const checkTimeout = 5 * time.Second
 
-// Handler exposes HTTP endpoints for health checking. It holds references to
-// all port.HealthChecker implementations (Kafka, ClickHouse, etc.) and runs
-// them concurrently during readiness probes.
-type Handler struct {
-	checkers []port.HealthChecker
-	logger   *zap.Logger
+// TaggedChecker wraps a port.HealthChecker with a criticality flag.
+// Critical checkers (e.g. Kafka) cause StatusUnhealthy when they fail.
+// Non-critical checkers (e.g. ClickHouse) cause StatusDegraded — the service
+// can still serve traffic but with reduced functionality.
+type TaggedChecker struct {
+	Checker  port.HealthChecker
+	Critical bool
 }
 
-// NewHandler creates a Handler with the given logger and an arbitrary number
-// of health checkers. Checkers are executed concurrently during readiness
-// probes to minimise latency.
-func NewHandler(logger *zap.Logger, checkers ...port.HealthChecker) *Handler {
+// Critical wraps a checker as critical (failure → unhealthy/503).
+func Critical(c port.HealthChecker) TaggedChecker {
+	return TaggedChecker{Checker: c, Critical: true}
+}
+
+// NonCritical wraps a checker as non-critical (failure → degraded/200).
+func NonCritical(c port.HealthChecker) TaggedChecker {
+	return TaggedChecker{Checker: c, Critical: false}
+}
+
+// Handler exposes HTTP endpoints for health checking. It holds references to
+// all TaggedChecker implementations (Kafka, ClickHouse, etc.) and runs
+// them concurrently during readiness probes.
+type Handler struct {
+	checkers    []TaggedChecker
+	dlqProvider DLQStatusProvider
+	logger      *zap.Logger
+}
+
+// NewHandler creates a Handler with the given logger and tagged health checkers.
+// Each checker is tagged as critical or non-critical:
+//   - Critical failure → StatusUnhealthy (503)
+//   - Non-critical failure only → StatusDegraded (200)
+//   - All pass → StatusOK (200)
+func NewHandler(logger *zap.Logger, checkers ...TaggedChecker) *Handler {
 	return &Handler{
 		checkers: checkers,
 		logger:   logger.Named("health"),
 	}
+}
+
+// SetDLQProvider wires the DLQ status provider for pipeline observability.
+func (h *Handler) SetDLQProvider(p DLQStatusProvider) {
+	h.dlqProvider = p
 }
 
 // LivenessHandler returns an http.HandlerFunc that always responds with
@@ -119,15 +166,26 @@ func (h *Handler) ReadinessHandler() http.HandlerFunc {
 
 		results := h.runChecks(r.Context())
 
-		// Determine overall status.
+		// Determine overall status using criticality tags:
+		//   - Any critical failure   → StatusUnhealthy (503)
+		//   - Non-critical failure   → StatusDegraded  (200)
+		//   - All pass               → StatusOK        (200)
 		overallStatus := StatusOK
 		for _, result := range results {
 			if result.Status != StatusOK {
-				overallStatus = StatusUnhealthy
-				h.logger.Warn("readiness check failed",
-					zap.String("check", result.Name),
-					zap.String("error", result.Error),
-				)
+				if result.Critical {
+					overallStatus = StatusUnhealthy
+					h.logger.Warn("readiness check failed (critical)",
+						zap.String("check", result.Name),
+						zap.String("error", result.Error),
+					)
+				} else if overallStatus != StatusUnhealthy {
+					overallStatus = StatusDegraded
+					h.logger.Warn("readiness check failed (non-critical, degraded)",
+						zap.String("check", result.Name),
+						zap.String("error", result.Error),
+					)
+				}
 			}
 		}
 
@@ -136,8 +194,26 @@ func (h *Handler) ReadinessHandler() http.HandlerFunc {
 			Checks: results,
 		}
 
+		// Include pipeline status if DLQ provider is configured.
+		if h.dlqProvider != nil {
+			pi := &PipelineInfo{
+				BreakerState: h.dlqProvider.BreakerState(),
+				DLQSize:      h.dlqProvider.DLQSize(),
+				IsDegraded:   h.dlqProvider.IsDegraded(),
+			}
+			if pi.IsDegraded {
+				pi.DegradedFor = h.dlqProvider.DegradedDuration().Round(time.Second).String()
+				// Pipeline degradation is non-critical — we're still accepting events.
+				if overallStatus == StatusOK {
+					overallStatus = StatusDegraded
+					resp.Status = overallStatus
+				}
+			}
+			resp.Pipeline = pi
+		}
+
 		httpStatus := http.StatusOK
-		if overallStatus != StatusOK {
+		if overallStatus == StatusUnhealthy {
 			httpStatus = http.StatusServiceUnavailable
 		}
 
@@ -156,28 +232,30 @@ func (h *Handler) runChecks(parentCtx context.Context) []CheckResult {
 	results := make([]CheckResult, len(h.checkers))
 	var wg sync.WaitGroup
 
-	for i, checker := range h.checkers {
+	for i, tc := range h.checkers {
 		wg.Add(1)
-		go func(idx int, c port.HealthChecker) {
+		go func(idx int, tc TaggedChecker) {
 			defer wg.Done()
 
 			ctx, cancel := context.WithTimeout(parentCtx, checkTimeout)
 			defer cancel()
 
-			err := c.Check(ctx)
+			err := tc.Checker.Check(ctx)
 			if err != nil {
 				results[idx] = CheckResult{
-					Name:   c.Name(),
-					Status: StatusUnhealthy,
-					Error:  err.Error(),
+					Name:     tc.Checker.Name(),
+					Status:   StatusUnhealthy,
+					Critical: tc.Critical,
+					Error:    err.Error(),
 				}
 			} else {
 				results[idx] = CheckResult{
-					Name:   c.Name(),
-					Status: StatusOK,
+					Name:     tc.Checker.Name(),
+					Status:   StatusOK,
+					Critical: tc.Critical,
 				}
 			}
-		}(i, checker)
+		}(i, tc)
 	}
 
 	wg.Wait()

@@ -70,6 +70,12 @@ type Config struct {
 	// avoid tripping on small sample sizes.
 	// If set to 0, only FailureThreshold is used.
 	FailureRatio float64 `yaml:"failure_ratio"`
+
+	// OnOpenCallback is an optional function invoked when the breaker transitions
+	// to the Open state. It runs in a goroutine to avoid blocking the calling path.
+	// Use this to fire critical alerts (e.g., Telegram) when a downstream service
+	// is confirmed unhealthy.
+	OnOpenCallback func(name string)
 }
 
 // minRequestsForRatio is the minimum number of total requests required before
@@ -113,11 +119,16 @@ func New(cfg Config, logger *zap.Logger) *Breaker {
 
 		// OnStateChange logs every state transition for operational visibility.
 		// State changes are critical events that should always be visible in logs.
+		// If the breaker transitions to Open and an OnOpenCallback is configured,
+		// the callback fires in a goroutine to avoid blocking the calling path.
 		OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
 			namedLogger.Warn("circuit breaker state changed",
 				zap.String("from", from.String()),
 				zap.String("to", to.String()),
 			)
+			if to == gobreaker.StateOpen && cfg.OnOpenCallback != nil {
+				go cfg.OnOpenCallback(name)
+			}
 		},
 	}
 

@@ -249,6 +249,16 @@ func (r *Recorder) capture(ctx context.Context, event *entity.ProctoringEvent) e
 	fragment.URI = uri
 	fragment.SizeBytes = sizeBytes
 
+	// Step 4b: Publish VIDEO_UPLOADED notification (only after confirmed upload).
+	if err := r.chain.PublishVideoUploaded(ctx, fragment); err != nil {
+		r.logger.Warn("VIDEO_UPLOADED publish failed (upload succeeded, chain record will follow)",
+			zap.String("fragment_id", fragmentID),
+			zap.Error(err),
+		)
+		// Non-fatal: the upload succeeded and chain record below will also
+		// publish to Kafka. The VIDEO_UPLOADED event is a convenience signal.
+	}
+
 	// Step 5: Record chain of custody entry.
 	if err := r.chain.RecordEvidence(ctx, fragment); err != nil {
 		r.logger.Error("chain of custody write failed (evidence is uploaded but unlinked)",

@@ -44,6 +44,7 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/argus-ai/event-collector/internal/domain/entity"
 	"go.uber.org/zap"
 )
 
@@ -187,7 +188,7 @@ type penaltyRule struct {
 	description string
 }
 
-var penaltyRules = []penaltyRule{
+var defaultPenaltyRules = []penaltyRule{
 	{"LIVENESS_CHECK_FAILED", 8, 0, "Провал проверки живости"},
 	{"FACE_SPOOF_DETECTED", 15, 0, "Обнаружена подмена лица"},
 	{"FACE_MISMATCH", 12, 0, "Несоответствие лица"},
@@ -218,6 +219,86 @@ var penaltyRules = []penaltyRule{
 	{"SIDECAM_STREAM_DISCONNECTED", 8, 0, "Потеря связи (боковая камера)"},
 	{"SIDECAM_CALIBRATION_FAILED", 5, 10, "Неудачная калибровка (боковая камера)"},
 	{"SIDECAM_THERMAL_THROTTLE", 2, 6, "Термоограничение FPS (боковая камера)"},
+}
+
+// PenaltyRuleInfo is the public representation of a penalty rule.
+type PenaltyRuleInfo struct {
+	EventType   string  `json:"eventType"`
+	PenaltyPer  float64 `json:"penaltyPer"`
+	MaxPenalty  float64 `json:"maxPenalty"`
+	Description string  `json:"description"`
+}
+
+// GetDefaultPenaltyRules returns the default penalty rules for the rule registry endpoint.
+func GetDefaultPenaltyRules() []PenaltyRuleInfo {
+	rules := make([]PenaltyRuleInfo, len(defaultPenaltyRules))
+	for i, r := range defaultPenaltyRules {
+		rules[i] = PenaltyRuleInfo{
+			EventType:   r.eventType,
+			PenaltyPer:  r.penaltyPer,
+			MaxPenalty:   r.maxPenalty,
+			Description: r.description,
+		}
+	}
+	return rules
+}
+
+// ---------------------------------------------------------------------------
+// Toggle-to-Rule Mapping
+// ---------------------------------------------------------------------------
+//
+// Maps each frontend toggle field name (from ExamProctoringSettings) to the
+// event types it controls. When a toggle is disabled, all mapped event types
+// are skipped during scoring. Empty slices indicate future toggles with no
+// current penalty rule.
+
+// ToggleToRuleMap is the authoritative mapping from frontend toggle names to
+// backend penalty rule event types. Exported for the hard-fail test validator.
+var ToggleToRuleMap = map[string][]string{
+	// Identity & Anti-Fraud
+	"requireSideCamera":     {"SIDECAM_DEVICE_DISPLACED", "SIDECAM_HANDS_OFF_DESK", "SIDECAM_BATTERY_CRITICAL", "SIDECAM_STREAM_DISCONNECTED", "SIDECAM_CALIBRATION_FAILED", "SIDECAM_THERMAL_THROTTLE"},
+	"faceVerification":      {"FACE_MISMATCH", "FACE_NOT_DETECTED"},
+	"dynamicFaceRecheck":    {}, // Future
+	"antiSpoofing":          {"FACE_SPOOF_DETECTED", "LIVENESS_CHECK_FAILED"},
+	"roomScan360":           {}, // Future
+	"objectDetectionPhone":  {"PHONE_DETECTED"},
+	"objectDetectionPerson": {"MULTIPLE_PERSONS"},
+
+	// AI Sensitivity
+	"gazeTracking":            {"GAZE_DEVIATION"},
+	"voiceActivityDetection":  {"AUDIO_ANOMALY", "SECOND_SPEAKER_DETECTED"},
+	"audioPeripheryDetection": {"EARBUDS_DETECTED"},
+	"smartNoiseFilter":        {"WHISPER_DETECTED", "AUDIO_PLAYBACK_DETECTED"},
+
+	// Psychometrics
+	"emotionStressAnalysis": {}, // Future
+	"focusLossScore":        {}, // Future
+	"blinkPatternAnalysis":  {}, // Future
+
+	// Browser Restrictions
+	"forceFullscreen":         {}, // Enforcement-only, no penalty rule
+	"fullscreenExitDetection": {"FULLSCREEN_EXIT"},
+	"webDisplayMonitoring":    {"EXTERNAL_DISPLAY_DETECTED"},
+	"blockCopyPaste":          {"COPY_PASTE_ATTEMPT"},
+	"blockPrintScreen":        {"PRINT_SCREEN_ATTEMPT"},
+	"blockVirtualMachine":     {"VIRTUAL_MACHINE_DETECTED"},
+	"blockMultiDesktop":       {"EXTERNAL_DISPLAY_DETECTED"},
+	"blockRemoteAccess":       {"REMOTE_ACCESS_DETECTED"},
+	"blockContextMenu":        {"CONTEXT_MENU_ATTEMPT"},
+
+	// Network
+	"vpnProxyDetection": {}, // Future
+	"localNetworkScan":  {}, // Future
+
+	// Advanced Security
+	"typingDynamics":          {}, // Future
+	"handCursorSync":          {}, // Future
+	"processScanning":         {"FORBIDDEN_PROCESS_DETECTED"},
+	"hardwareDeviceDetection": {}, // Future
+	"advancedRemoteBlock":     {}, // Future (shares REMOTE_ACCESS_DETECTED)
+	"hardwareIdBinding":       {"HARDWARE_ID_MISMATCH"},
+	"deepMultiMonitorCheck":   {}, // Future
+	"forceLowSpecMode":        {}, // Mode toggle, no penalty
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +388,7 @@ func (s *Scorer) ComputeScore(ctx context.Context, sessionID string) (*Integrity
 	score := 100.0
 	var penalties []PenaltyEntry
 
-	for _, rule := range penaltyRules {
+	for _, rule := range defaultPenaltyRules {
 		count := eventCounts[rule.eventType]
 		if count == 0 {
 			continue
@@ -370,6 +451,282 @@ func (s *Scorer) ComputeScore(ctx context.Context, sessionID string) (*Integrity
 		zap.String("verdict", verdict),
 		zap.Int("total_events", totalEvents),
 		zap.Int("penalty_types", len(penalties)),
+	)
+
+	return result, nil
+}
+
+// QuerySessionMeta extracts session identity metadata (orgID, examID) from ClickHouse.
+// Used by the forensic handler to load per-exam settings before scoring.
+func (s *Scorer) QuerySessionMeta(ctx context.Context, sessionID string) (orgID, examID, studentID string, err error) {
+	qctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	row := s.chConn.QueryRow(qctx, `
+		SELECT any(org_id), any(exam_id), any(student_id)
+		FROM proctoring_events
+		WHERE session_id = ?`,
+		sessionID,
+	)
+	if err = row.Scan(&orgID, &examID, &studentID); err != nil {
+		return "", "", "", fmt.Errorf("forensic scorer: session meta query: %w", err)
+	}
+	return orgID, examID, studentID, nil
+}
+
+// ComputeScoreWithConfig computes the integrity score using per-exam settings.
+// Disabled toggles cause their mapped penalty rules to be skipped. Slider values
+// adjust penalty weights proportionally. Custom verdict thresholds are respected.
+func (s *Scorer) ComputeScoreWithConfig(ctx context.Context, sessionID string, cfg *entity.ExamProctoringSettings) (*IntegrityScore, error) {
+	// Build effective rules: filter out disabled toggles + apply slider adjustments.
+	effectiveRules := buildEffectiveRules(cfg)
+
+	// Resolve verdict thresholds.
+	cleanThr := cfg.CleanThreshold
+	warnThr := cfg.WarningThreshold
+	if cleanThr <= 0 {
+		cleanThr = 80
+	}
+	if warnThr <= 0 {
+		warnThr = 50
+	}
+
+	return s.computeScoreInternal(ctx, sessionID, effectiveRules, cleanThr, warnThr)
+}
+
+// buildDisabledSet returns the set of event type strings that should be skipped
+// because their controlling toggle is disabled.
+func buildDisabledSet(cfg *entity.ExamProctoringSettings) map[string]bool {
+	disabled := make(map[string]bool)
+
+	toggleStates := map[string]bool{
+		"requireSideCamera":       cfg.RequireSideCamera,
+		"faceVerification":        cfg.FaceVerification,
+		"dynamicFaceRecheck":      cfg.DynamicFaceRecheck,
+		"antiSpoofing":            cfg.AntiSpoofing,
+		"roomScan360":             cfg.RoomScan360,
+		"objectDetectionPhone":    cfg.ObjectDetectionPhone,
+		"objectDetectionPerson":   cfg.ObjectDetectionPerson,
+		"gazeTracking":            cfg.GazeTracking,
+		"voiceActivityDetection":  cfg.VoiceActivityDetection,
+		"audioPeripheryDetection": cfg.AudioPeripheryDetection,
+		"smartNoiseFilter":        cfg.SmartNoiseFilter,
+		"emotionStressAnalysis":   cfg.EmotionStressAnalysis,
+		"focusLossScore":          cfg.FocusLossScore,
+		"blinkPatternAnalysis":    cfg.BlinkPatternAnalysis,
+		"fullscreenExitDetection": cfg.FullscreenExitDetection,
+		"webDisplayMonitoring":    cfg.WebDisplayMonitoring,
+		"blockCopyPaste":          cfg.BlockCopyPaste,
+		"blockPrintScreen":        cfg.BlockPrintScreen,
+		"blockVirtualMachine":     cfg.BlockVirtualMachine,
+		"blockMultiDesktop":       cfg.BlockMultiDesktop,
+		"blockRemoteAccess":       cfg.BlockRemoteAccess,
+		"blockContextMenu":        cfg.BlockContextMenu,
+		"processScanning":         cfg.ProcessScanning,
+		"hardwareIdBinding":       cfg.HardwareIdBinding,
+	}
+
+	for toggle, enabled := range toggleStates {
+		if !enabled {
+			for _, et := range ToggleToRuleMap[toggle] {
+				disabled[et] = true
+			}
+		}
+	}
+
+	return disabled
+}
+
+// buildEffectiveRules filters defaultPenaltyRules by disabled set and applies
+// slider-based weight adjustments.
+func buildEffectiveRules(cfg *entity.ExamProctoringSettings) []penaltyRule {
+	disabled := buildDisabledSet(cfg)
+	var rules []penaltyRule
+
+	for _, rule := range defaultPenaltyRules {
+		if disabled[rule.eventType] {
+			continue
+		}
+
+		r := rule // copy
+
+		// Slider adjustments
+		switch rule.eventType {
+		case "GAZE_DEVIATION":
+			// gazeSensitivity: 10-95 (%). Scale penaltyPer proportionally.
+			// Default sensitivity = 60 → default penaltyPer = 2.
+			// Formula: penaltyPer = default * (sensitivity / 60).
+			if cfg.GazeSensitivity > 0 {
+				r.penaltyPer = rule.penaltyPer * (cfg.GazeSensitivity / 60.0)
+			}
+			// gazeDeviationLimitSec adjusts maxPenalty: shorter limit = higher max.
+			// Default limit = 10s → default maxPenalty = 20.
+			// Formula: maxPenalty = default * (10 / limitSec).
+			if cfg.GazeDeviationLimitSec > 0 {
+				r.maxPenalty = rule.maxPenalty * (10.0 / cfg.GazeDeviationLimitSec)
+			}
+
+		case "TAB_SWITCH":
+			// tabSwitchingLimit: 0 = prohibited, 1-10 = limit.
+			// maxPenalty = limit * penaltyPer (higher limit = higher max before capping)
+			if cfg.TabSwitchingLimit > 0 {
+				r.maxPenalty = float64(cfg.TabSwitchingLimit) * rule.penaltyPer
+			}
+			// If 0 (prohibited), keep default maxPenalty = 25.
+
+		case "AUDIO_ANOMALY", "SECOND_SPEAKER_DETECTED":
+			// voiceDetectionThreshold: 0-100 (%). Scale penaltyPer.
+			// Default threshold = 50 → default weights.
+			if cfg.VoiceDetectionThreshold > 0 {
+				r.penaltyPer = rule.penaltyPer * (cfg.VoiceDetectionThreshold / 50.0)
+			}
+		}
+
+		rules = append(rules, r)
+	}
+
+	return rules
+}
+
+// computeScoreInternal is the core scoring algorithm shared by ComputeScore and
+// ComputeScoreWithConfig. It queries event counts from ClickHouse and applies
+// the given penalty rules with configurable verdict thresholds.
+func (s *Scorer) computeScoreInternal(
+	ctx context.Context,
+	sessionID string,
+	rules []penaltyRule,
+	cleanThreshold, warningThreshold float64,
+) (*IntegrityScore, error) {
+	qctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	// Query event type counts for this session
+	rows, err := s.chConn.Query(qctx, `
+		SELECT
+			event_type,
+			severity,
+			count() AS cnt
+		FROM proctoring_events
+		WHERE session_id = ?
+		GROUP BY event_type, severity
+		ORDER BY cnt DESC`,
+		sessionID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("forensic scorer: query failed: %w", err)
+	}
+	defer rows.Close()
+
+	// Aggregate counts
+	eventCounts := make(map[string]int)
+	totalEvents := 0
+	criticalCount := 0
+	warningCount := 0
+
+	for rows.Next() {
+		var eventType, severity string
+		var cnt uint64
+		if err := rows.Scan(&eventType, &severity, &cnt); err != nil {
+			return nil, fmt.Errorf("forensic scorer: scan failed: %w", err)
+		}
+		eventCounts[eventType] += int(cnt)
+		totalEvents += int(cnt)
+		switch severity {
+		case "critical":
+			criticalCount += int(cnt)
+		case "warning":
+			warningCount += int(cnt)
+		}
+	}
+
+	// Query session metadata
+	var studentID, examID, orgID string
+	var firstTime, lastTime time.Time
+	metaRow := s.chConn.QueryRow(qctx, `
+		SELECT
+			any(student_id), any(exam_id), any(org_id),
+			min(server_timestamp), max(server_timestamp)
+		FROM proctoring_events
+		WHERE session_id = ?`,
+		sessionID,
+	)
+	if err := metaRow.Scan(&studentID, &examID, &orgID, &firstTime, &lastTime); err != nil {
+		s.logger.Warn("forensic scorer: metadata query failed", zap.Error(err))
+	}
+
+	durationSec := int64(0)
+	if !firstTime.IsZero() && !lastTime.IsZero() {
+		durationSec = int64(lastTime.Sub(firstTime).Seconds())
+	}
+
+	// Apply penalty rules
+	score := 100.0
+	var penalties []PenaltyEntry
+
+	for _, rule := range rules {
+		count := eventCounts[rule.eventType]
+		if count == 0 {
+			continue
+		}
+
+		rawPenalty := float64(count) * rule.penaltyPer
+		if rule.maxPenalty > 0 && rawPenalty > rule.maxPenalty {
+			rawPenalty = rule.maxPenalty
+		}
+
+		score -= rawPenalty
+
+		penalties = append(penalties, PenaltyEntry{
+			EventType:   rule.eventType,
+			Count:       count,
+			PenaltyPer:  rule.penaltyPer,
+			MaxPenalty:   rule.maxPenalty,
+			Applied:      rawPenalty,
+			Description: rule.description,
+		})
+	}
+
+	// Clamp score
+	score = math.Max(0, math.Min(100, score))
+
+	// Sort penalties by applied amount (descending)
+	sort.Slice(penalties, func(i, j int) bool {
+		return penalties[i].Applied > penalties[j].Applied
+	})
+
+	// Determine verdict with configurable thresholds
+	verdict, verdictLabel := computeVerdictWithThresholds(score, cleanThreshold, warningThreshold)
+
+	// Build justification
+	topFactors := buildTopFactors(penalties)
+	justification := buildJustification(verdict, score, topFactors, totalEvents, criticalCount)
+
+	result := &IntegrityScore{
+		SessionID:     sessionID,
+		StudentID:     studentID,
+		ExamID:        examID,
+		OrgID:         orgID,
+		Score:         math.Round(score*10) / 10,
+		Verdict:       verdict,
+		VerdictLabel:  verdictLabel,
+		Justification: justification,
+		Penalties:     penalties,
+		EventSummary:  eventCounts,
+		TopFactors:    topFactors,
+		DurationSec:   durationSec,
+		TotalEvents:   totalEvents,
+		CriticalCount: criticalCount,
+		WarningCount:  warningCount,
+		ComputedAt:    time.Now().UTC().Format(time.RFC3339),
+	}
+
+	s.logger.Info("forensic score computed",
+		zap.String("session_id", sessionID),
+		zap.Float64("score", result.Score),
+		zap.String("verdict", verdict),
+		zap.Int("total_events", totalEvents),
+		zap.Int("penalty_types", len(penalties)),
+		zap.Bool("dynamic_config", true),
 	)
 
 	return result, nil
@@ -623,10 +980,14 @@ func (s *Scorer) QuerySidecamSummary(ctx context.Context, sessionID string) (*Si
 // ---------------------------------------------------------------------------
 
 func computeVerdict(score float64) (string, string) {
-	if score >= 80 {
+	return computeVerdictWithThresholds(score, 80, 50)
+}
+
+func computeVerdictWithThresholds(score, cleanThreshold, warningThreshold float64) (string, string) {
+	if score >= cleanThreshold {
 		return "clean", "Чистая сессия"
 	}
-	if score >= 50 {
+	if score >= warningThreshold {
 		return "warning", "Требует проверки"
 	}
 	return "fraud", "Подозрение на нарушение"

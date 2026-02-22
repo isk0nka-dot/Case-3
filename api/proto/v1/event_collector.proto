@@ -163,6 +163,22 @@ enum EventType {
   VIRTUAL_MONITOR_DETECTED     = 66;
   VIRTUAL_MACHINE_DETECTED     = 67;
 
+  // Secondary Camera events
+  SIDECAM_DEVICE_DISPLACED     = 70;
+  SIDECAM_HANDS_OFF_DESK       = 71;
+  SIDECAM_BATTERY_CRITICAL     = 72;
+  SIDECAM_STREAM_DISCONNECTED  = 73;
+  SIDECAM_CALIBRATION_FAILED   = 74;
+  SIDECAM_THERMAL_THROTTLE     = 75;
+
+  // Backend AI deep scan events (post-session GPU re-analysis)
+  BACKEND_AI_FACE_MISMATCH     = 80;  // Backend confirmed face doesn't match enrolled
+  BACKEND_AI_SCREEN_REFLECTION = 81;  // Another person's reflection detected on screen
+  BACKEND_AI_MICRO_EXPRESSION  = 82;  // Micro-expression indicating deception
+  BACKEND_AI_HIDDEN_OBJECT     = 83;  // Object detected that frontend missed
+  BACKEND_AI_DEEPFAKE_DETECTED = 84;  // Advanced deepfake analysis (backend-only model)
+  BACKEND_AI_VOICE_SYNTH       = 85;  // Voice synthesis / TTS detected
+
   // Telemetry (high frequency, low severity)
   GAZE_TELEMETRY               = 100;
   MOUSE_TELEMETRY              = 101;
@@ -190,6 +206,7 @@ enum EventSource {
   BROWSER            = 4;
   KERNEL_AGENT       = 5;
   NETWORK_PROBE      = 6;
+  BACKEND_AI         = 7;  // Backend GPU-accelerated AI inference service
 }
 
 // ============================================================================

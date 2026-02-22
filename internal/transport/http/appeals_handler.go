@@ -19,14 +19,14 @@ package http
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/argus-ai/event-collector/pkg/randutil"
 
 	"github.com/argus-ai/event-collector/internal/domain/entity"
 )
@@ -408,7 +408,5 @@ func (h *AppealsHandler) appealsJSONError(w http.ResponseWriter, msg string, sta
 }
 
 func generateAppealID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return "apl-" + hex.EncodeToString(b)
+	return randutil.PrefixedID("apl-", 16)
 }

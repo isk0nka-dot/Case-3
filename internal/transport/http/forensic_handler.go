@@ -7,12 +7,13 @@
 // PDF engine.
 //
 // Endpoints:
-//   GET  /api/v1/forensic/session/{sessionId}/report   — Full JSON forensic report
-//   GET  /api/v1/forensic/session/{sessionId}/score    — Integrity score only
-//   GET  /api/v1/forensic/session/{sessionId}/pdf      — PDF forensic report download
-//   GET  /api/v1/forensic/session/{sessionId}/heatmap  — SVG gaze heatmap
-//   GET  /api/v1/forensic/session/{sessionId}/voice    — Voice biometric analysis
-//   POST /api/v1/forensic/verify                       — Verify a PDF report hash
+//   GET  /api/v1/forensic/session/{sessionId}/report      — Full JSON forensic report
+//   GET  /api/v1/forensic/session/{sessionId}/score       — Integrity score only
+//   GET  /api/v1/forensic/session/{sessionId}/pdf         — PDF forensic report download (sync)
+//   POST /api/v1/forensic/session/{sessionId}/pdf/async   — Enqueue async PDF generation via asynq
+//   GET  /api/v1/forensic/session/{sessionId}/heatmap     — SVG gaze heatmap
+//   GET  /api/v1/forensic/session/{sessionId}/voice       — Voice biometric analysis
+//   POST /api/v1/forensic/verify                          — Verify a PDF report hash
 // =============================================================================
 package http
 
@@ -25,36 +26,50 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/hibiken/asynq"
+	"go.uber.org/zap"
+
 	"github.com/argus-ai/event-collector/internal/application/port"
 	"github.com/argus-ai/event-collector/internal/domain/entity"
 	"github.com/argus-ai/event-collector/internal/infrastructure/forensic"
-	"go.uber.org/zap"
+	"github.com/argus-ai/event-collector/internal/infrastructure/postgres"
+	"github.com/argus-ai/event-collector/internal/infrastructure/worker"
+	"github.com/argus-ai/event-collector/pkg/randutil"
 )
 
 // ForensicHandler serves the forensic reporting REST API.
 type ForensicHandler struct {
 	scorer   *forensic.Scorer
 	verifier port.IntegrityVerifier
+	pgRepo   *postgres.Repository
 	logger   *zap.Logger
 
 	jwtSigningKey []byte
 	repo          adminRepo
+
+	// asynqClient dispatches forensic PDF jobs to the background worker service.
+	// When nil, the synchronous GET .../pdf endpoint is the only option.
+	asynqClient *asynq.Client
 }
 
 // NewForensicHandler creates a new forensic reporting API handler.
+// If asynqClient is non-nil, the async PDF endpoint dispatches jobs via Redis/asynq.
 func NewForensicHandler(
 	chConn driver.Conn,
 	verifier port.IntegrityVerifier,
-	pgRepo adminRepo,
+	pgRepo *postgres.Repository,
 	logger *zap.Logger,
 	jwtSigningKey []byte,
+	asynqClient *asynq.Client,
 ) *ForensicHandler {
 	return &ForensicHandler{
 		scorer:        forensic.NewScorer(chConn, logger),
 		verifier:      verifier,
+		pgRepo:        pgRepo,
 		logger:        logger.Named("forensic_api"),
 		jwtSigningKey: jwtSigningKey,
 		repo:          pgRepo,
+		asynqClient:   asynqClient,
 	}
 }
 
@@ -63,6 +78,7 @@ func (h *ForensicHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/forensic/session/{sessionId}/report", h.requireAuth(h.handleReport))
 	mux.HandleFunc("GET /api/v1/forensic/session/{sessionId}/score", h.requireAuth(h.handleScore))
 	mux.HandleFunc("GET /api/v1/forensic/session/{sessionId}/pdf", h.requireAuth(h.handlePDF))
+	mux.HandleFunc("POST /api/v1/forensic/session/{sessionId}/pdf/async", h.requireAuth(h.handleAsyncPDF))
 	mux.HandleFunc("GET /api/v1/forensic/session/{sessionId}/heatmap", h.requireAuth(h.handleHeatmap))
 	mux.HandleFunc("GET /api/v1/forensic/session/{sessionId}/voice", h.requireAuth(h.handleVoice))
 	mux.HandleFunc("POST /api/v1/forensic/verify", h.requireAuth(h.handleVerify))
@@ -102,7 +118,24 @@ func (h *ForensicHandler) handleScore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	score, err := h.scorer.ComputeScore(r.Context(), sessionID)
+	// Attempt config-aware scoring.
+	var score *forensic.IntegrityScore
+	var err error
+
+	if h.pgRepo != nil {
+		orgID, examID, _, metaErr := h.scorer.QuerySessionMeta(r.Context(), sessionID)
+		if metaErr == nil && orgID != "" && examID != "" {
+			settings, settingsErr := h.pgRepo.GetExamProctoringSettings(r.Context(), orgID, examID)
+			if settingsErr == nil && settings != nil {
+				score, err = h.scorer.ComputeScoreWithConfig(r.Context(), sessionID, settings)
+			}
+		}
+	}
+
+	if score == nil && err == nil {
+		score, err = h.scorer.ComputeScore(r.Context(), sessionID)
+	}
+
 	if err != nil {
 		h.logger.Error("forensic: score computation failed",
 			zap.String("session_id", sessionID),
@@ -156,6 +189,74 @@ func (h *ForensicHandler) handlePDF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
 	w.Header().Set("X-Report-Hash", pdfHash)
 	w.Write(pdfBytes)
+}
+
+// handleAsyncPDF enqueues a forensic PDF generation job via asynq and returns
+// 202 Accepted with a job ID. The worker service generates the PDF, uploads it
+// to MinIO, and sends a Telegram notification when ready.
+func (h *ForensicHandler) handleAsyncPDF(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("sessionId")
+	if sessionID == "" {
+		h.forensicJSONError(w, "sessionId is required", http.StatusBadRequest)
+		return
+	}
+
+	if h.asynqClient == nil {
+		h.forensicJSONError(w, "Async PDF generation is not available — Redis not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Extract requesting user from auth context.
+	user, _ := r.Context().Value(userContextKey).(*entity.User)
+	requestedBy := ""
+	if user != nil {
+		requestedBy = user.ID
+	}
+
+	// Resolve orgID from session metadata via the scorer.
+	orgID, _, _, _ := h.scorer.QuerySessionMeta(r.Context(), sessionID)
+
+	jobID := "FR-" + randutil.HexToken(12)
+
+	task, err := worker.NewForensicReportTask(worker.ForensicReportPayload{
+		SessionID:   sessionID,
+		RequestedBy: requestedBy,
+		OrgID:       orgID,
+	})
+	if err != nil {
+		h.logger.Error("forensic: failed to create asynq task",
+			zap.String("session_id", sessionID),
+			zap.Error(err),
+		)
+		h.forensicJSONError(w, "Failed to enqueue PDF job", http.StatusInternalServerError)
+		return
+	}
+
+	info, err := h.asynqClient.Enqueue(task)
+	if err != nil {
+		h.logger.Error("forensic: failed to enqueue PDF job",
+			zap.String("session_id", sessionID),
+			zap.Error(err),
+		)
+		h.forensicJSONError(w, "Failed to enqueue PDF job", http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info("forensic: PDF job enqueued",
+		zap.String("session_id", sessionID),
+		zap.String("job_id", jobID),
+		zap.String("asynq_id", info.ID),
+		zap.String("queue", info.Queue),
+	)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]string{
+		"jobId":     jobID,
+		"asynqId":   info.ID,
+		"sessionId": sessionID,
+		"status":    "queued",
+	})
 }
 
 // handleHeatmap generates an SVG gaze heatmap for a session.
@@ -248,10 +349,30 @@ func (h *ForensicHandler) handleVerify(w http.ResponseWriter, r *http.Request) {
 // ==========================================================================
 
 func (h *ForensicHandler) buildForensicReport(ctx context.Context, sessionID string) (*forensic.ForensicReport, error) {
-	// Compute all report components in sequence (they share the same ClickHouse connection)
-	score, err := h.scorer.ComputeScore(ctx, sessionID)
-	if err != nil {
-		return nil, fmt.Errorf("score computation: %w", err)
+	// Attempt config-aware scoring: look up per-exam settings from PostgreSQL.
+	// If custom settings exist, use dynamic scoring. Otherwise, fall back to defaults.
+	var score *forensic.IntegrityScore
+	var err error
+
+	if h.pgRepo != nil {
+		orgID, examID, _, metaErr := h.scorer.QuerySessionMeta(ctx, sessionID)
+		if metaErr == nil && orgID != "" && examID != "" {
+			settings, settingsErr := h.pgRepo.GetExamProctoringSettings(ctx, orgID, examID)
+			if settingsErr == nil && settings != nil {
+				score, err = h.scorer.ComputeScoreWithConfig(ctx, sessionID, settings)
+				if err != nil {
+					return nil, fmt.Errorf("dynamic score computation: %w", err)
+				}
+			}
+		}
+	}
+
+	// Fallback to hardcoded defaults if no custom settings or metadata unavailable.
+	if score == nil {
+		score, err = h.scorer.ComputeScore(ctx, sessionID)
+		if err != nil {
+			return nil, fmt.Errorf("score computation: %w", err)
+		}
 	}
 
 	timeline, err := h.scorer.QueryTimeline(ctx, sessionID)

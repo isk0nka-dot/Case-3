@@ -66,7 +66,7 @@ build: ## Build the binary into bin/event-collector
 
 run: build ## Build and run the service with default config
 	@echo "==> Running $(APP_NAME)..."
-	./$(BIN_DIR)/$(APP_NAME)
+	set -a && source .env && set +a && ./$(BIN_DIR)/$(APP_NAME)
 
 # ---------------------------------------------------------------------------
 #  Testing
@@ -109,7 +109,20 @@ proto: ## Generate Go code from proto files (requires protoc, protoc-gen-go, pro
 	$(PROTOC) --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
 		$(PROTO_DIR)/event_collector.proto
+	$(PROTOC) --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		$(PROTO_DIR)/inferencepb/inference.proto
 	@echo "==> Proto generation complete"
+
+sync-types: ## Verify TypeScript types are in sync with proto (CI-safe)
+	@echo "==> Checking proto ↔ TypeScript contract alignment..."
+	@bash ../argus-infra/scripts/proto-sync.sh --check
+	@echo "==> Contract sync verified"
+
+sync-types-generate: ## Generate TypeScript types from proto (after proto changes)
+	@echo "==> Syncing proto → TypeScript types..."
+	@bash ../argus-infra/scripts/proto-sync.sh
+	@echo "==> Sync complete"
 
 # ---------------------------------------------------------------------------
 #  Docker

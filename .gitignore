@@ -6,6 +6,10 @@
 bin/
 event-collector
 loadtest
+/server
+/worker
+/inference
+/setup
 *.exe
 *.dll
 *.so

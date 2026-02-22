@@ -159,6 +159,24 @@ func (w *Worker) claimPendingJob(ctx context.Context) (*entity.ExportJob, error)
 
 // processJob downloads evidence and creates the archive.
 func (w *Worker) processJob(ctx context.Context, job *entity.ExportJob) error {
+	return ProcessExportJob(ctx, w.db, w.chConn, w.minioClient, w.cfg, w.evidenceBkt, w.logger, job)
+}
+
+// ProcessExportJob is the shared export logic used by both the legacy polling
+// worker and the asynq-based worker service. It downloads evidence fragments
+// from MinIO, queries violation events from ClickHouse, builds a TAR.GZ
+// archive with a forensic manifest, uploads it, generates a presigned URL,
+// and updates the PostgreSQL job record.
+func ProcessExportJob(
+	ctx context.Context,
+	db *sql.DB,
+	chConn driver.Conn,
+	minioClient *minio.Client,
+	cfg config.ExportConfig,
+	evidenceBkt string,
+	logger *zap.Logger,
+	job *entity.ExportJob,
+) error {
 	// ── Step 1: Query evidence fragments for all sessions ────────────────
 	type fragmentInfo struct {
 		FragmentID  string
@@ -173,7 +191,7 @@ func (w *Worker) processJob(ctx context.Context, job *entity.ExportJob) error {
 	var fragments []fragmentInfo
 
 	for _, sessionID := range job.SessionIDs {
-		rows, err := w.chConn.Query(ctx, `
+		rows, err := chConn.Query(ctx, `
 			SELECT fragment_id, session_id, sha256_hash, uri, size_bytes, content_type, duration_sec
 			FROM evidence_fragments
 			WHERE session_id = ? AND org_id = ?
@@ -214,7 +232,7 @@ func (w *Worker) processJob(ctx context.Context, job *entity.ExportJob) error {
 	sessionViolations := make(map[string][]violationInfo)
 
 	for _, sessionID := range job.SessionIDs {
-		rows, err := w.chConn.Query(ctx, `
+		rows, err := chConn.Query(ctx, `
 			SELECT event_type, video_timestamp_sec, confidence, label, severity
 			FROM proctoring_events
 			WHERE session_id = ? AND org_id = ? AND severity IN ('warning', 'critical')
@@ -222,7 +240,7 @@ func (w *Worker) processJob(ctx context.Context, job *entity.ExportJob) error {
 			sessionID, job.OrgID,
 		)
 		if err != nil {
-			w.logger.Warn("export: failed to query violations, continuing",
+			logger.Warn("export: failed to query violations, continuing",
 				zap.String("session_id", sessionID), zap.Error(err))
 			continue
 		}
@@ -288,7 +306,7 @@ func (w *Worker) processJob(ctx context.Context, job *entity.ExportJob) error {
 	// Upload concurrently while writing.
 	uploadDone := make(chan error, 1)
 	go func() {
-		_, err := w.minioClient.PutObject(ctx, w.cfg.ExportBucket, archiveKey, pr, -1,
+		_, err := minioClient.PutObject(ctx, cfg.ExportBucket, archiveKey, pr, -1,
 			minio.PutObjectOptions{ContentType: "application/gzip"})
 		uploadDone <- err
 	}()
@@ -305,9 +323,9 @@ func (w *Worker) processJob(ctx context.Context, job *entity.ExportJob) error {
 			objectKey = fmt.Sprintf("%s/%s/%s.webm", job.OrgID, frag.SessionID, frag.FragmentID)
 		}
 
-		obj, err := w.minioClient.GetObject(ctx, w.evidenceBkt, objectKey, minio.GetObjectOptions{})
+		obj, err := minioClient.GetObject(ctx, evidenceBkt, objectKey, minio.GetObjectOptions{})
 		if err != nil {
-			w.logger.Warn("export: failed to download fragment, skipping",
+			logger.Warn("export: failed to download fragment, skipping",
 				zap.String("fragment_id", frag.FragmentID), zap.Error(err))
 			continue
 		}
@@ -316,7 +334,7 @@ func (w *Worker) processJob(ctx context.Context, job *entity.ExportJob) error {
 		data, err := io.ReadAll(obj)
 		obj.Close()
 		if err != nil {
-			w.logger.Warn("export: failed to read fragment, skipping",
+			logger.Warn("export: failed to read fragment, skipping",
 				zap.String("fragment_id", frag.FragmentID), zap.Error(err))
 			continue
 		}
@@ -408,15 +426,15 @@ func (w *Worker) processJob(ctx context.Context, job *entity.ExportJob) error {
 	}
 
 	archiveHashHex := hex.EncodeToString(archiveHash.Sum(nil))
-	archiveURI := fmt.Sprintf("s3://%s/%s", w.cfg.ExportBucket, archiveKey)
+	archiveURI := fmt.Sprintf("s3://%s/%s", cfg.ExportBucket, archiveKey)
 
 	// ── Step 4: Generate presigned download URL ─────────────────────────
 	ttl := time.Duration(job.PresignTTLSec) * time.Second
 	if ttl == 0 {
-		ttl = w.cfg.PresignTTL
+		ttl = cfg.PresignTTL
 	}
 
-	presignedURL, err := w.minioClient.PresignedGetObject(ctx, w.cfg.ExportBucket, archiveKey, ttl, nil)
+	presignedURL, err := minioClient.PresignedGetObject(ctx, cfg.ExportBucket, archiveKey, ttl, nil)
 	if err != nil {
 		return fmt.Errorf("generate presigned URL: %w", err)
 	}
@@ -425,7 +443,7 @@ func (w *Worker) processJob(ctx context.Context, job *entity.ExportJob) error {
 	completedAt := time.Now()
 
 	// ── Step 5: Update job as completed ─────────────────────────────────
-	_, err = w.db.ExecContext(ctx, `
+	_, err = db.ExecContext(ctx, `
 		UPDATE export_jobs SET
 			status = 'completed',
 			archive_uri = $1,
@@ -443,7 +461,7 @@ func (w *Worker) processJob(ctx context.Context, job *entity.ExportJob) error {
 		return fmt.Errorf("update job status: %w", err)
 	}
 
-	w.logger.Info("export worker: job completed",
+	logger.Info("export worker: job completed",
 		zap.String("export_id", job.ID),
 		zap.Int("fragments", len(fragments)),
 		zap.Int64("total_size_bytes", totalSize),
@@ -455,12 +473,18 @@ func (w *Worker) processJob(ctx context.Context, job *entity.ExportJob) error {
 
 // markFailed updates a job status to 'failed' with an error message.
 func (w *Worker) markFailed(ctx context.Context, jobID, errMsg string) {
-	_, err := w.db.ExecContext(ctx, `
+	MarkExportFailed(ctx, w.db, w.logger, jobID, errMsg)
+}
+
+// MarkExportFailed updates a job status to 'failed' with an error message.
+// Exported for use by the asynq worker handler.
+func MarkExportFailed(ctx context.Context, db *sql.DB, logger *zap.Logger, jobID, errMsg string) {
+	_, err := db.ExecContext(ctx, `
 		UPDATE export_jobs SET status = 'failed', error_message = $1 WHERE id = $2`,
 		errMsg, jobID,
 	)
 	if err != nil {
-		w.logger.Error("export worker: failed to mark job as failed",
+		logger.Error("export worker: failed to mark job as failed",
 			zap.String("export_id", jobID), zap.Error(err))
 	}
 }
