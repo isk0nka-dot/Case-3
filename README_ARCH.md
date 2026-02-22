@@ -376,6 +376,6 @@ Frontend runs at `localhost:3000`. Backend gRPC at `:50051`, REST at `:8080`.
 
 | Repository | URL | Stack |
 |---|---|---|
-| Backend | https://gitlab.com/Askadmass/argus-backend | Go 1.24 · gRPC · Kafka · ClickHouse · MinIO · PostgreSQL |
-| Frontend | https://gitlab.com/Askadmass/argus-frontend | Nuxt 4 · Vue 3 · TypeScript · Pinia · gRPC-Web · IndexedDB |
-| Infrastructure | https://gitlab.com/Askadmass/argus-infra | Docker · Nginx · PostgreSQL · ClickHouse · Kafka · MinIO · Redis · LiveKit |
+| Backend | https://gitlab.com/argus_ai_group/argus-backend | Go 1.24 · gRPC · Kafka · ClickHouse · MinIO · PostgreSQL |
+| Frontend | https://gitlab.com/argus_ai_group/argus-frontend | Nuxt 4 · Vue 3 · TypeScript · Pinia · gRPC-Web · IndexedDB |
+| Infrastructure | https://gitlab.com/argus_ai_group/argus-infra | Docker · Nginx · PostgreSQL · ClickHouse · Kafka · MinIO · Redis · LiveKit |
