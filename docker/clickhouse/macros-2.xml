@@ -1,0 +1,7 @@
+<clickhouse>
+    <macros>
+        <cluster>argus_cluster</cluster>
+        <shard>1</shard>
+        <replica>clickhouse-2</replica>
+    </macros>
+</clickhouse>

@@ -1,0 +1,36 @@
+<clickhouse>
+    <remote_servers>
+        <argus_cluster>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>argus-clickhouse-1</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>argus-clickhouse-2</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>argus-clickhouse-3</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </argus_cluster>
+    </remote_servers>
+
+    <zookeeper>
+        <node>
+            <host>argus-clickhouse-keeper-1</host>
+            <port>9181</port>
+        </node>
+        <node>
+            <host>argus-clickhouse-keeper-2</host>
+            <port>9181</port>
+        </node>
+        <node>
+            <host>argus-clickhouse-keeper-3</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+</clickhouse>
