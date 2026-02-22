@@ -17,9 +17,9 @@ Real-time fraud detection, forensic evidence chain, and enterprise-grade exam mo
 ### 1. Clone All Repositories
 
 ```bash
-git clone https://gitlab.com/Askadmass/argus-infra.git
-git clone https://gitlab.com/Askadmass/argus-backend.git
-git clone https://gitlab.com/Askadmass/argus-frontend.git
+git clone https://gitlab.com/argus_ai_group/argus-infra.git
+git clone https://gitlab.com/argus_ai_group/argus-backend.git
+git clone https://gitlab.com/argus_ai_group/argus-frontend.git
 ```
 
 ### 2. Configure Environment
@@ -76,9 +76,9 @@ open http://localhost:3000            # Frontend dashboard
 
 | Repository | Stack | Purpose |
 |------------|-------|---------|
-| [argus-backend](https://gitlab.com/Askadmass/argus-backend) | Go 1.24, gRPC, Kafka, ClickHouse, PostgreSQL, MinIO | Event ingestion, admin API, DLQ resilience, Telegram alerting |
-| [argus-frontend](https://gitlab.com/Askadmass/argus-frontend) | Nuxt 4, Vue 3, TypeScript, Pinia, gRPC-Web | Admin dashboard SPA with tier-adaptive resilience |
-| [argus-infra](https://gitlab.com/Askadmass/argus-infra) | Docker, Nginx, migrations, CI/CD | Orchestration, deployment, database schemas |
+| [argus-backend](https://gitlab.com/argus_ai_group/argus-backend) | Go 1.24, gRPC, Kafka, ClickHouse, PostgreSQL, MinIO | Event ingestion, admin API, DLQ resilience, Telegram alerting |
+| [argus-frontend](https://gitlab.com/argus_ai_group/argus-frontend) | Nuxt 4, Vue 3, TypeScript, Pinia, gRPC-Web | Admin dashboard SPA with tier-adaptive resilience |
+| [argus-infra](https://gitlab.com/argus_ai_group/argus-infra) | Docker, Nginx, migrations, CI/CD | Orchestration, deployment, database schemas |
 
 ## Architecture Documentation
 
