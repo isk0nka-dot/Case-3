@@ -46,6 +46,45 @@ type Config struct {
 	Redis       RedisConfig       `yaml:"redis"`
 	Inference   InferenceConfig   `yaml:"inference"`
 	CryptoErase CryptoEraseConfig `yaml:"crypto_erasure"`
+	Backfiller  BackfillerConfig  `yaml:"backfiller"`
+	Cleanup     CleanupConfig     `yaml:"cleanup"`
+}
+
+// CleanupConfig holds org lifecycle cleanup settings.
+// When enabled, a background job periodically purges data for
+// organizations that have been in the "purged" lifecycle state
+// beyond the configured grace period. GDPR right-to-erasure.
+type CleanupConfig struct {
+	// Enabled controls whether the background cleanup job runs. Default: false.
+	Enabled bool `yaml:"enabled"`
+
+	// RunInterval is how often the cleanup job runs. Default: 24h.
+	RunInterval time.Duration `yaml:"run_interval"`
+
+	// GracePeriodDays is the number of days after "purged" state before data is deleted.
+	// Default: 30 days.
+	GracePeriodDays int `yaml:"grace_period_days"`
+
+	// ClickHousePurge controls whether ClickHouse data is also purged.
+	// ALTER TABLE DELETE is resource-intensive. Default: false.
+	ClickHousePurge bool `yaml:"clickhouse_purge"`
+}
+
+// BackfillerConfig holds Kafka-to-ClickHouse backfiller settings (ADR-007).
+// When enabled, a Kafka consumer group replays events into ClickHouse,
+// ensuring zero data loss even if the primary ClickHouse writer drops events.
+type BackfillerConfig struct {
+	// Enabled controls whether the backfiller consumer starts. Default: false.
+	Enabled bool `yaml:"enabled"`
+
+	// BatchSize is events per ClickHouse batch insert. Default: 500.
+	BatchSize int `yaml:"batch_size"`
+
+	// FlushInterval is the maximum time between batch flushes. Default: 5s.
+	FlushInterval time.Duration `yaml:"flush_interval"`
+
+	// PauseOnError is the sleep after a ClickHouse insert failure. Default: 10s.
+	PauseOnError time.Duration `yaml:"pause_on_error"`
 }
 
 // CryptoEraseConfig holds GDPR cryptographic erasure settings.
@@ -174,6 +213,10 @@ type ServerConfig struct {
 	// Set to true only when this server terminates TLS directly (not via Nginx).
 	// In production, TLS is typically terminated at Nginx, so this defaults to false.
 	TLS bool `yaml:"tls"`
+
+	// EnablePprof exposes Go runtime profiling endpoints at /debug/pprof/*.
+	// MUST be false in production — only enable for debugging under supervision.
+	EnablePprof bool `yaml:"enable_pprof"`
 }
 
 // KafkaConfig maps 1:1 to kafka.ProducerConfig so the infrastructure layer
@@ -206,6 +249,21 @@ type KafkaConfig struct {
 	// IdempotentEnabled activates the Kafka idempotent producer for exactly-once
 	// semantics within a single producer session.
 	IdempotentEnabled bool `yaml:"idempotent_enabled"`
+
+	// AutoCreateTopics enables automatic topic creation at startup.
+	// When true, the service ensures all required topics exist with the
+	// configured partition count and replication factor.
+	AutoCreateTopics bool `yaml:"auto_create_topics"`
+
+	// TopicPartitions is the base partition count for auto-created topics.
+	// Higher values enable more consumer parallelism.
+	// Default: 6. Standard and telemetry topics get 2× this value.
+	TopicPartitions int `yaml:"topic_partitions"`
+
+	// TopicReplication is the replication factor for auto-created topics.
+	// Must not exceed the number of brokers in the cluster.
+	// Default: 1 (dev). Set to 3 for production HA.
+	TopicReplication int `yaml:"topic_replication"`
 }
 
 // ClickHouseConfig maps 1:1 to clickhouse.WriterConfig.
@@ -850,6 +908,17 @@ func applyDefaults(cfg *Config) {
 		cfg.Redis.InferenceConcurrency = 2
 	}
 
+	// --- Backfiller (Kafka-to-ClickHouse replay, ADR-007) ---
+	if cfg.Backfiller.BatchSize == 0 {
+		cfg.Backfiller.BatchSize = 500
+	}
+	if cfg.Backfiller.FlushInterval == 0 {
+		cfg.Backfiller.FlushInterval = 5 * time.Second
+	}
+	if cfg.Backfiller.PauseOnError == 0 {
+		cfg.Backfiller.PauseOnError = 10 * time.Second
+	}
+
 	// --- Inference (backend AI gateway) ---
 	if cfg.Inference.GRPCPort == 0 {
 		cfg.Inference.GRPCPort = 50061
@@ -896,6 +965,19 @@ func applyEnvOverrides(cfg *Config) {
 		brokers := splitAndTrim(v)
 		if len(brokers) > 0 {
 			cfg.Kafka.Brokers = brokers
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_KAFKA_AUTO_CREATE_TOPICS"); v != "" {
+		cfg.Kafka.AutoCreateTopics = v == "true" || v == "1"
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_KAFKA_TOPIC_PARTITIONS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Kafka.TopicPartitions = n
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_KAFKA_TOPIC_REPLICATION"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Kafka.TopicReplication = n
 		}
 	}
 
@@ -1060,6 +1142,11 @@ func applyEnvOverrides(cfg *Config) {
 		if c, err := strconv.Atoi(v); err == nil {
 			cfg.Inference.Concurrency = c
 		}
+	}
+
+	// Backfiller (Kafka-to-ClickHouse replay, ADR-007).
+	if v := os.Getenv("EVENT_COLLECTOR_BACKFILLER_ENABLED"); v != "" {
+		cfg.Backfiller.Enabled = v == "true" || v == "1"
 	}
 
 	// Crypto-erasure (GDPR envelope encryption).

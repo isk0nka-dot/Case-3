@@ -86,8 +86,9 @@ const minRequestsForRatio = 5
 // Breaker wraps a sony/gobreaker CircuitBreaker with structured logging
 // and a simplified API for the event-collector service.
 type Breaker struct {
-	cb     *gobreaker.CircuitBreaker
-	logger *zap.Logger
+	cb       *gobreaker.CircuitBreaker
+	settings gobreaker.Settings // retained for Reset()
+	logger   *zap.Logger
 }
 
 // New creates a new circuit breaker with the given configuration. The breaker
@@ -133,8 +134,9 @@ func New(cfg Config, logger *zap.Logger) *Breaker {
 	}
 
 	return &Breaker{
-		cb:     gobreaker.NewCircuitBreaker(settings),
-		logger: namedLogger,
+		cb:       gobreaker.NewCircuitBreaker(settings),
+		settings: settings,
+		logger:   namedLogger,
 	}
 }
 
@@ -218,4 +220,24 @@ func (b *Breaker) Name() string {
 // fields for Requests, TotalSuccesses, TotalFailures, and ConsecutiveFailures.
 func (b *Breaker) Counts() gobreaker.Counts {
 	return b.cb.Counts()
+}
+
+// Reset manually forces the circuit breaker back to the Closed state,
+// clearing all failure counters. This is intended for admin panic-button
+// recovery when a breaker is stuck in the Open state after the downstream
+// service has actually recovered but the probe window has not elapsed yet.
+//
+// Implementation: gobreaker v1 does not expose a Reset() method, so we
+// create a fresh CircuitBreaker instance with the same settings.
+// The old instance is garbage-collected.
+//
+// This method should only be called via the admin system-reset API.
+func (b *Breaker) Reset() {
+	previousState := b.cb.State().String()
+	b.cb = gobreaker.NewCircuitBreaker(b.settings)
+	b.logger.Info("circuit breaker manually reset by admin",
+		zap.String("breaker", b.settings.Name),
+		zap.String("previous_state", previousState),
+		zap.String("new_state", "closed"),
+	)
 }

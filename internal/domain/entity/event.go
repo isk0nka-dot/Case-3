@@ -154,8 +154,14 @@ func (e *ProctoringEvent) KafkaTopic() string {
 }
 
 // PartitionKey returns the Kafka partition key.
-// We partition by session_id to ensure all events from a single
-// session land on the same partition, preserving per-session ordering.
+// We partition by org_id:session_id to ensure:
+//   1. All events from a single session land on the same partition (per-session ordering).
+//   2. Events from different orgs are co-located by org for efficient consumer filtering.
+// The composite key preserves backward compatibility — sessions without an org_id
+// fall back to session_id only.
 func (e *ProctoringEvent) PartitionKey() string {
+	if e.OrgID != "" {
+		return e.OrgID + ":" + e.SessionID
+	}
 	return e.SessionID
 }

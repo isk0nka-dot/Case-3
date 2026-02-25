@@ -28,6 +28,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -85,6 +86,11 @@ func (h *AnalyticsHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/analytics/hourly-stats", h.requireAuth(h.handleHourlyStats))
 	mux.HandleFunc("GET /api/v1/analytics/overview", h.requireAuth(h.handleOverview))
 	mux.HandleFunc("GET /api/v1/analytics/infrastructure-stats", h.requireAuth(h.handleInfrastructureStats))
+
+	// Enterprise analytics endpoints (Migration 006 MVs)
+	mux.HandleFunc("GET /api/v1/analytics/exam-performance", h.requireAuth(h.handleExamPerformance))
+	mux.HandleFunc("GET /api/v1/analytics/realtime-health", h.requireAuth(h.handleRealtimeHealth))
+	mux.HandleFunc("GET /api/v1/analytics/daily-trends", h.requireAuth(h.handleDailyTrends))
 }
 
 // ==========================================================================
@@ -694,6 +700,210 @@ func splitToken(s string) []string {
 	parts[2] = s[start:]
 	result := parts[:]
 	return result
+}
+
+// ==========================================================================
+// Enterprise Analytics — Exam Performance (Migration 006)
+// ==========================================================================
+
+// ExamPerformanceEntry holds per-exam aggregated metrics.
+type ExamPerformanceEntry struct {
+	OrgID          string  `json:"orgId"`
+	ExamID         string  `json:"examId"`
+	TotalEvents    uint64  `json:"totalEvents"`
+	CriticalCount  uint64  `json:"criticalCount"`
+	WarningCount   uint64  `json:"warningCount"`
+	UniqueStudents uint64  `json:"uniqueStudents"`
+	UniqueSessions uint64  `json:"uniqueSessions"`
+	AvgConfidence  float64 `json:"avgConfidence"`
+}
+
+// handleExamPerformance returns exam-level performance metrics.
+//
+//	GET /api/v1/analytics/exam-performance?limit=50
+func (h *AnalyticsHandler) handleExamPerformance(w http.ResponseWriter, r *http.Request) {
+	orgID := h.resolveOrgID(r)
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := parseInt(l); err == nil && n > 0 && n <= 200 {
+			limit = n
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT org_id, exam_id,
+			sum(total_events), sum(critical_count), sum(warning_count),
+			sum(unique_students), sum(unique_sessions),
+			if(sum(confidence_count) > 0, sum(avg_confidence * confidence_count) / sum(confidence_count), 0)
+		FROM exam_performance_summary`
+
+	var args []interface{}
+	if orgID != "*" && orgID != "" {
+		query += ` WHERE org_id = ?`
+		args = append(args, orgID)
+	}
+	query += ` GROUP BY org_id, exam_id ORDER BY sum(critical_count) DESC LIMIT ?`
+	args = append(args, limit)
+
+	rows, err := h.chConn.Query(ctx, query, args...)
+	if err != nil {
+		h.jsonError(w, "Failed to query exam performance", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var results []ExamPerformanceEntry
+	for rows.Next() {
+		var e ExamPerformanceEntry
+		if err := rows.Scan(&e.OrgID, &e.ExamID, &e.TotalEvents, &e.CriticalCount,
+			&e.WarningCount, &e.UniqueStudents, &e.UniqueSessions, &e.AvgConfidence); err != nil {
+			continue
+		}
+		results = append(results, e)
+	}
+
+	h.jsonResponse(w, results, http.StatusOK)
+}
+
+// ==========================================================================
+// Enterprise Analytics — Realtime Org Health (Migration 006)
+// ==========================================================================
+
+// RealtimeHealthEntry holds a 5-minute health window for an org.
+type RealtimeHealthEntry struct {
+	OrgID          string  `json:"orgId"`
+	WindowStart    string  `json:"windowStart"`
+	EventCount     uint64  `json:"eventCount"`
+	CriticalCount  uint64  `json:"criticalCount"`
+	ActiveSessions uint64  `json:"activeSessions"`
+	AvgConfidence  float64 `json:"avgConfidence"`
+}
+
+// handleRealtimeHealth returns 5-minute windowed org health metrics.
+//
+//	GET /api/v1/analytics/realtime-health?windows=24
+func (h *AnalyticsHandler) handleRealtimeHealth(w http.ResponseWriter, r *http.Request) {
+	orgID := h.resolveOrgID(r)
+	windows := 24 // last 2 hours by default (24 × 5min)
+	if n := r.URL.Query().Get("windows"); n != "" {
+		if val, err := parseInt(n); err == nil && val > 0 && val <= 288 {
+			windows = val
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT org_id, window_start,
+			sum(event_count), sum(critical_count), sum(active_sessions),
+			if(sum(confidence_count) > 0, sum(avg_confidence * confidence_count) / sum(confidence_count), 0)
+		FROM realtime_org_health
+		WHERE window_start > now() - INTERVAL ? MINUTE`
+
+	args := []interface{}{windows * 5}
+	if orgID != "*" && orgID != "" {
+		query += ` AND org_id = ?`
+		args = append(args, orgID)
+	}
+	query += ` GROUP BY org_id, window_start ORDER BY window_start DESC`
+
+	rows, err := h.chConn.Query(ctx, query, args...)
+	if err != nil {
+		h.jsonError(w, "Failed to query realtime health", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var results []RealtimeHealthEntry
+	for rows.Next() {
+		var e RealtimeHealthEntry
+		var windowTime time.Time
+		if err := rows.Scan(&e.OrgID, &windowTime, &e.EventCount, &e.CriticalCount,
+			&e.ActiveSessions, &e.AvgConfidence); err != nil {
+			continue
+		}
+		e.WindowStart = windowTime.Format(time.RFC3339)
+		results = append(results, e)
+	}
+
+	h.jsonResponse(w, results, http.StatusOK)
+}
+
+// ==========================================================================
+// Enterprise Analytics — Daily Violation Trends (Migration 006)
+// ==========================================================================
+
+// DailyTrendEntry holds daily violation counts by type and severity.
+type DailyTrendEntry struct {
+	OrgID     string `json:"orgId"`
+	Day       string `json:"day"`
+	EventType string `json:"eventType"`
+	Severity  string `json:"severity"`
+	Count     uint64 `json:"count"`
+}
+
+// handleDailyTrends returns daily violation trend data for charting.
+//
+//	GET /api/v1/analytics/daily-trends?days=30
+func (h *AnalyticsHandler) handleDailyTrends(w http.ResponseWriter, r *http.Request) {
+	orgID := h.resolveOrgID(r)
+	days := 30
+	if d := r.URL.Query().Get("days"); d != "" {
+		if val, err := parseInt(d); err == nil && val > 0 && val <= 365 {
+			days = val
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT org_id, day, event_type, severity, sum(count)
+		FROM daily_violation_trends
+		WHERE day >= today() - ?`
+
+	args := []interface{}{days}
+	if orgID != "*" && orgID != "" {
+		query += ` AND org_id = ?`
+		args = append(args, orgID)
+	}
+	query += ` GROUP BY org_id, day, event_type, severity ORDER BY day DESC, sum(count) DESC`
+
+	rows, err := h.chConn.Query(ctx, query, args...)
+	if err != nil {
+		h.jsonError(w, "Failed to query daily trends", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var results []DailyTrendEntry
+	for rows.Next() {
+		var e DailyTrendEntry
+		var dayTime time.Time
+		if err := rows.Scan(&e.OrgID, &dayTime, &e.EventType, &e.Severity, &e.Count); err != nil {
+			continue
+		}
+		e.Day = dayTime.Format("2006-01-02")
+		results = append(results, e)
+	}
+
+	h.jsonResponse(w, results, http.StatusOK)
+}
+
+// parseInt parses a string to int (helper for query params).
+func parseInt(s string) (int, error) {
+	n := 0
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0, fmt.Errorf("not a number: %s", s)
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, nil
 }
 
 // Sentinel errors for auth.

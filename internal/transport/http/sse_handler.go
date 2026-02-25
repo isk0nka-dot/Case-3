@@ -240,15 +240,15 @@ func (h *SSEHandler) handleSSE(w http.ResponseWriter, r *http.Request) {
 			// 4. Auto-terminate if enabled and score crossed threshold.
 			if settings != nil && settings.AutoTerminate && score.Score <= settings.AutoTerminateAt {
 				// Check if already terminated.
-				terminated, _ := h.pgRepo.IsSessionTerminated(ctx, sessionID)
+				terminated, _ := h.pgRepo.IsSessionTerminated(ctx, orgID, sessionID)
 				if !terminated {
 					reason := fmt.Sprintf(
 						"Auto-terminated: integrity score %.1f%% below threshold %.1f%%",
 						score.Score, settings.AutoTerminateAt,
 					)
 
-					// Insert termination record.
-					_ = h.pgRepo.TerminateSession(ctx, sessionID, "system", reason)
+					// Insert termination record (scoped to org).
+					_ = h.pgRepo.TerminateSession(ctx, orgID, sessionID, "system", reason)
 
 					// Push terminate event.
 					termData, _ := json.Marshal(sseTerminate{

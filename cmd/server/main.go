@@ -48,6 +48,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	pprofHTTP "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -91,6 +92,7 @@ import (
 	"github.com/argus-ai/event-collector/pkg/cors"
 	"github.com/argus-ai/event-collector/pkg/randutil"
 	"github.com/argus-ai/event-collector/pkg/ratelimiter"
+	httpMiddleware "github.com/argus-ai/event-collector/pkg/middleware"
 	"github.com/argus-ai/event-collector/pkg/securityheaders"
 )
 
@@ -178,6 +180,26 @@ func run() error {
 	)
 
 	// =================================================================
+	// STEP 4a: Ensure Kafka topics exist (idempotent).
+	//
+	// Explicitly creates topics with configured partition count and
+	// replication factor. This replaces implicit auto-creation and
+	// gives operators control over consumer parallelism and durability.
+	// =================================================================
+	if cfg.Kafka.AutoCreateTopics {
+		defaultTopics := kafka.DefaultTopics(
+			int32(cfg.Kafka.TopicPartitions),
+			int16(cfg.Kafka.TopicReplication),
+		)
+		if topicErr := kafka.EnsureTopics(cfg.Kafka.Brokers, defaultTopics, logger); topicErr != nil {
+			logger.Warn("kafka topic provisioning failed — topics may be managed externally",
+				zap.Error(topicErr),
+			)
+			// Non-fatal: topics may already exist or be managed by Terraform/Strimzi
+		}
+	}
+
+	// =================================================================
 	// STEP 5: Initialise infrastructure: ClickHouse writer.
 	// =================================================================
 	chWriter, err := clickhouse.NewWriter(clickhouse.WriterConfig{
@@ -199,6 +221,36 @@ func run() error {
 	)
 
 	// =================================================================
+	// STEP 5a: Initialise ClickHouse Backfiller (ADR-007).
+	//
+	// Kafka consumer group that replays events from all three proctoring
+	// topics into ClickHouse. ClickHouse ReplacingMergeTree deduplicates
+	// replayed events — at-least-once delivery is safe.
+	// =================================================================
+	var chBackfiller *clickhouse.Backfiller
+	if cfg.Backfiller.Enabled {
+		chBackfiller, err = clickhouse.NewBackfiller(chWriter, clickhouse.BackfillerConfig{
+			Brokers:       cfg.Kafka.Brokers,
+			BatchSize:     cfg.Backfiller.BatchSize,
+			FlushInterval: cfg.Backfiller.FlushInterval,
+			PauseOnError:  cfg.Backfiller.PauseOnError,
+		}, nil, logger) // alerter wired after Step 5c below
+		if err != nil {
+			logger.Warn("backfiller init failed — continuing without backfill",
+				zap.Error(err),
+			)
+			chBackfiller = nil
+		} else {
+			logger.Info("clickhouse backfiller initialised (ADR-007)",
+				zap.Int("batch_size", cfg.Backfiller.BatchSize),
+				zap.Duration("flush_interval", cfg.Backfiller.FlushInterval),
+			)
+		}
+	} else {
+		logger.Info("clickhouse backfiller disabled (set EVENT_COLLECTOR_BACKFILLER_ENABLED=true to enable)")
+	}
+
+	// =================================================================
 	// STEP 5c: Initialise Telegram emergency alerter (optional).
 	// =================================================================
 	telegramAlerter := alerting.NewTelegramProvider(alerting.TelegramConfig{
@@ -212,6 +264,11 @@ func run() error {
 		kafkaProducer.SetAlerter(telegramAlerter)
 	}
 
+	// Start backfiller if initialised (must happen after alerter setup).
+	if chBackfiller != nil {
+		chBackfiller.Start()
+	}
+
 	// =================================================================
 	// STEP 5d: Initialise DLQ (BadgerDB dead-letter queue).
 	//
@@ -221,6 +278,7 @@ func run() error {
 	// =================================================================
 	var kafkaEventWriter port.EventWriter = kafkaProducer
 	var dlqStatusProvider health.DLQStatusProvider
+	var dlqResilientWriter *dlq.ResilientWriter
 
 	if cfg.DLQ.Enabled {
 		dlqStore, dlqErr := dlq.NewStore(dlq.StoreConfig{
@@ -270,6 +328,7 @@ func run() error {
 		resilientWriter.Start()
 		kafkaEventWriter = resilientWriter
 		dlqStatusProvider = resilientWriter
+		dlqResilientWriter = resilientWriter
 
 		logger.Info("dlq enabled (BadgerDB dead-letter queue)",
 			zap.String("data_dir", cfg.DLQ.DataDir),
@@ -483,7 +542,7 @@ func run() error {
 	// =================================================================
 	// STEP 10: Initialise gRPC interceptor chain.
 	//
-	// Chain order: Recovery → RateLimit → Auth (JWT + Session) → Logging
+	// Chain order: Recovery → RequestID → Metrics → Dedup → RateLimit → Auth → Logging
 	//
 	// When auth is disabled, the Auth interceptor is still in the chain
 	// but passes through all requests (jwtVerifier is nil → skip auth).
@@ -491,8 +550,12 @@ func run() error {
 	unaryLimiter := rate.NewLimiter(rate.Limit(cfg.RateLimit.GlobalRPS), cfg.RateLimit.GlobalBurst)
 	streamLimiter := rate.NewLimiter(rate.Limit(cfg.RateLimit.GlobalRPS), cfg.RateLimit.GlobalBurst)
 
+	// Idempotency cache — prevents duplicate event ingestion during
+	// frontend transport retries. Keys expire after 5 minutes.
+	idempCache := grpcTransport.NewIdempotencyCache(5*time.Minute, logger)
+
 	unaryInterceptors, streamInterceptors := grpcTransport.NewInterceptorChain(
-		logger, unaryLimiter, streamLimiter, jwtVerifier, sessionValidator,
+		logger, unaryLimiter, streamLimiter, jwtVerifier, sessionValidator, idempCache,
 	)
 
 	logger.Info("interceptor chain configured",
@@ -571,10 +634,14 @@ func run() error {
 	// Health handler with tagged dependency checks:
 	//   - Kafka is critical: failure → 503 (events cannot be ingested)
 	//   - ClickHouse is non-critical: failure → degraded (analytics delayed, Kafka retains data)
-	healthHandler := health.NewHandler(logger,
+	healthCheckers := []health.TaggedChecker{
 		health.Critical(kafkaProducer),
 		health.NonCritical(chWriter),
-	)
+	}
+	if chBackfiller != nil {
+		healthCheckers = append(healthCheckers, health.NonCritical(chBackfiller))
+	}
+	healthHandler := health.NewHandler(logger, healthCheckers...)
 	if dlqStatusProvider != nil {
 		healthHandler.SetDLQProvider(dlqStatusProvider)
 	}
@@ -922,6 +989,24 @@ func run() error {
 		)
 
 		// =============================================================
+		// pprof debug endpoints (guarded by config flag)
+		//
+		// MUST be disabled in production. Only enable for debugging.
+		// Exposes Go runtime profiling at /debug/pprof/*.
+		// =============================================================
+		if cfg.Server.EnablePprof {
+			httpMux.HandleFunc("GET /debug/pprof/", pprofHTTP.Index)
+			httpMux.HandleFunc("GET /debug/pprof/cmdline", pprofHTTP.Cmdline)
+			httpMux.HandleFunc("GET /debug/pprof/profile", pprofHTTP.Profile)
+			httpMux.HandleFunc("GET /debug/pprof/symbol", pprofHTTP.Symbol)
+			httpMux.HandleFunc("GET /debug/pprof/trace", pprofHTTP.Trace)
+
+			logger.Warn("pprof debug endpoints enabled — DISABLE IN PRODUCTION",
+				zap.String("endpoint", "/debug/pprof/"),
+			)
+		}
+
+		// =============================================================
 		// Temporary diagnostic: test-alert endpoint
 		// =============================================================
 		httpMux.HandleFunc("POST /api/v1/internal/test-alert", func(w http.ResponseWriter, r *http.Request) {
@@ -942,9 +1027,22 @@ func run() error {
 			fmt.Fprint(w, `{"status":"sent","message":"Test alert fired to Telegram"}`)
 		})
 
+		// =============================================================
+		// System Health & Panic Button (Gap 5 — Indestructible)
+		// Admin-only endpoints for system health audit and emergency
+		// recovery: breaker reset, DLQ clear, overflow flush.
+		// =============================================================
+		systemHandler := adminHTTP.NewSystemHandler(dlqResilientWriter, chWriter, logger, adminJWTKey, adminHandler)
+		systemHandler.RegisterRoutes(httpMux)
+
+		logger.Info("system health api registered",
+			zap.String("base_path", "/api/v1/admin/system-health"),
+			zap.Int("endpoints", 2),
+		)
+
 		logger.Info("admin api registered",
 			zap.String("base_path", "/api/v1"),
-			zap.Int("endpoints", 32),
+			zap.Int("endpoints", 34),
 		)
 	}
 
@@ -990,6 +1088,7 @@ func run() error {
 			"X-Requested-With",
 			"Grpc-Timeout",
 			"X-Argus-Session-Id",
+			"X-Idempotency-Key",
 		},
 		ExposedHeaders: []string{
 			"Grpc-Status",
@@ -1011,9 +1110,14 @@ func run() error {
 		TLS: cfg.Server.TLS,
 	})(corsHandler)
 
+	// Observability middleware chain (outermost → innermost):
+	//   RequestID → Metrics → SecurityHeaders → CORS → gRPC-Web → Mux
+	metricsHandler := httpMiddleware.MetricsHTTPMiddleware(secHeadersHandler)
+	requestIDHandler := httpMiddleware.RequestIDHTTPMiddleware(metricsHandler)
+
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Server.HTTPPort),
-		Handler:           secHeadersHandler,
+		Handler:           requestIDHandler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       0,               // Disabled for streaming (gRPC-Web streams can be long-lived).
 		WriteTimeout:      0,               // Disabled for streaming.
@@ -1026,6 +1130,40 @@ func run() error {
 		zap.Strings("cors_origins", cfg.CORS.AllowedOrigins),
 		zap.Bool("cors_credentials", cfg.CORS.AllowCredentials),
 	)
+
+	// =================================================================
+	// STEP 13b: Org Lifecycle Cleanup (background job).
+	//
+	// The cleanup use case periodically scans for orgs in "purged" state
+	// and permanently removes their data from PostgreSQL and optionally
+	// ClickHouse. Disabled by default — opt-in via config.
+	// =================================================================
+	var cleanupUC *usecase.CleanupUseCase
+	if cfg.Cleanup.Enabled && pgRepo != nil {
+		cleanupCfg := usecase.CleanupConfig{
+			Enabled:         cfg.Cleanup.Enabled,
+			RunInterval:     cfg.Cleanup.RunInterval,
+			GracePeriodDays: cfg.Cleanup.GracePeriodDays,
+			ClickHousePurge: cfg.Cleanup.ClickHousePurge,
+		}
+
+		// ClickHouse purger is optional — only set if writer is available.
+		var chPurger usecase.ClickHousePurger
+		if chWriter != nil && cfg.Cleanup.ClickHousePurge {
+			chPurger = chWriter
+		}
+
+		cleanupUC = usecase.NewCleanupUseCase(pgRepo, chPurger, logger, cleanupCfg)
+		go cleanupUC.Start(context.Background())
+
+		logger.Info("org lifecycle cleanup job started",
+			zap.Duration("interval", cfg.Cleanup.RunInterval),
+			zap.Int("grace_period_days", cfg.Cleanup.GracePeriodDays),
+			zap.Bool("clickhouse_purge", cfg.Cleanup.ClickHousePurge),
+		)
+	} else {
+		logger.Info("org lifecycle cleanup job DISABLED (opt-in via cleanup.enabled)")
+	}
 
 	// =================================================================
 	// STEP 14: Set up signal handler for graceful shutdown.
@@ -1206,6 +1344,30 @@ func run() error {
 	if sidecamOrchestrator != nil {
 		logger.Info("phase 3f: closing sidecam orchestrator...")
 		sidecamOrchestrator.Close()
+	}
+
+	// Phase 3g: Stop cleanup use case (stop before data stores close).
+	if cleanupUC != nil {
+		logger.Info("phase 3g: stopping cleanup use case...")
+		cleanupUC.Stop()
+		logger.Info("cleanup use case stopped")
+	}
+
+	// Phase 3h: Stop idempotency cache eviction goroutine.
+	if idempCache != nil {
+		logger.Info("phase 3h: stopping idempotency cache...")
+		idempCache.Close()
+		logger.Info("idempotency cache stopped")
+	}
+
+	// Phase 3i: Stop backfiller (must stop BEFORE ClickHouse writer closes).
+	if chBackfiller != nil {
+		logger.Info("phase 3g: stopping clickhouse backfiller...")
+		if err := chBackfiller.Close(); err != nil {
+			logger.Warn("backfiller close error", zap.Error(err))
+		} else {
+			logger.Info("clickhouse backfiller stopped")
+		}
 	}
 
 	// Phase 4: Flush data stores (Kafka + ClickHouse).

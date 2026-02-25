@@ -14,6 +14,7 @@ import (
 	pb "github.com/argus-ai/event-collector/api/proto/v1"
 	"github.com/argus-ai/event-collector/internal/application/usecase"
 	"github.com/argus-ai/event-collector/internal/domain/entity"
+	"github.com/argus-ai/event-collector/pkg/auth"
 )
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,13 @@ func (s *Server) IngestEvent(
 	// Map from proto to domain entity.
 	domainEvent := ProtoEventToDomain(req.GetEvent(), peerAddr)
 
+	// Multi-tenancy guard: verify the event's org_id matches the JWT claim.
+	// This prevents a client authenticated for org-A from injecting events
+	// into org-B's data stream.
+	if err := validateOrgID(ctx, domainEvent); err != nil {
+		return nil, err
+	}
+
 	// Execute the domain use case.
 	result := s.ingest.Ingest(ctx, domainEvent)
 
@@ -123,10 +131,18 @@ func (s *Server) IngestBatch(
 
 	peerAddr := extractPeerAddress(ctx)
 
-	// Map all proto events to domain entities.
+	// Map all proto events to domain entities and validate org_id.
 	domainEvents := make([]*entity.ProctoringEvent, 0, len(events))
 	for _, pbEvent := range events {
-		domainEvents = append(domainEvents, ProtoEventToDomain(pbEvent, peerAddr))
+		domainEvent := ProtoEventToDomain(pbEvent, peerAddr)
+
+		// Multi-tenancy guard: every event in the batch must belong to the
+		// authenticated org. Fail-fast on first mismatch.
+		if err := validateOrgID(ctx, domainEvent); err != nil {
+			return nil, err
+		}
+
+		domainEvents = append(domainEvents, domainEvent)
 	}
 
 	// Execute the batch use case.
@@ -210,6 +226,11 @@ func (s *Server) StreamEvents(
 		// Map proto to domain.
 		domainEvent := ProtoEventToDomain(pbEvent, peerAddr)
 
+		// Multi-tenancy guard: validate every streamed event against the JWT claim.
+		if err := validateOrgID(ctx, domainEvent); err != nil {
+			return err
+		}
+
 		// Create a buffered result channel so the worker never blocks on send.
 		resultCh := make(chan *usecase.IngestResult, 1)
 
@@ -291,6 +312,30 @@ func (s *Server) Heartbeat(
 // ---------------------------------------------------------------------------
 //  Helpers
 // ---------------------------------------------------------------------------
+
+// validateOrgID enforces multi-tenant data isolation at the transport layer.
+// It compares the org_id in the domain event against the org_id from the
+// verified JWT claims in the context. If they don't match, the request is
+// rejected with PermissionDenied — preventing cross-tenant data injection.
+//
+// If auth is disabled (no claims in context) or the event has no org_id,
+// validation is skipped for backward compatibility.
+func validateOrgID(ctx context.Context, event *entity.ProctoringEvent) error {
+	claims := auth.ClaimsFromContext(ctx)
+	if claims == nil || claims.OrgID == "" {
+		// Auth disabled or claims not available — skip validation.
+		return nil
+	}
+	if event.OrgID == "" {
+		// Event has no org_id — allow (will be enriched later or is a legacy client).
+		return nil
+	}
+	if event.OrgID != claims.OrgID {
+		return status.Errorf(codes.PermissionDenied,
+			"org_id mismatch: token=%s event=%s", claims.OrgID, event.OrgID)
+	}
+	return nil
+}
 
 // extractPeerAddress retrieves the client IP address from the gRPC peer
 // context. This is set by the gRPC transport layer and represents the

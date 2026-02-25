@@ -28,6 +28,7 @@
     - ADR-004: Single binary → API/Worker split (superseded by ADR-006)
     - ADR-005: HMAC-SHA256 → RSA-256 JWT (superseded by ADR-006)
     - ADR-006: Microservice Split & Distributed Inference
+    - ADR-007: Edge Persistence & Replay Policy
 
 ---
 
@@ -842,3 +843,68 @@ from starving lightweight administrative tasks:
 3. Set `algorithm: RS256` and provide key paths
 4. Rotate: deploy API server with private key, workers with public key only
 5. Remove `HS256` fallback after all tokens have expired (24h)
+
+---
+
+### ADR-007: Edge Persistence & Replay Policy
+
+**Status:** Accepted
+**Date:** 2026-02-23
+**Supersedes:** None
+
+#### Context
+
+Argus captures legally significant proctoring evidence across the full path from the student's browser to the analytical database (ClickHouse). Two data integrity gaps existed:
+
+1. **Browser edge**: The offline queue (`useOfflineQueue.ts`) evicted low-priority events when IndexedDB usage exceeded 80% of quota via `evictToSizeLimit()`. This intentionally destroyed evidence. Additionally, no call to `navigator.storage.persist()` was made, leaving all evidence vulnerable to silent browser eviction under storage pressure.
+
+2. **Backend overflow**: The ClickHouse writer (`writer.go`) dropped the oldest batch when its in-memory overflow queue exceeded 50 batches (FIFO eviction in `pushOverflow()`). No mechanism existed to replay dropped events from Kafka back into ClickHouse after recovery.
+
+Both violated the zero-data-loss architectural principle. In proctoring, every event is evidence — losing even a single violation event could invalidate an entire exam session in an audit or legal proceeding.
+
+#### Decision
+
+##### Browser: Evidence Vault
+
+1. **Persistent storage**: Call `navigator.storage.persist()` during `initialize()` to request the browser never silently evict IndexedDB data. Logged but non-blocking if the browser denies the request.
+
+2. **OPFS offloading**: Binary snapshot blobs exceeding 256 KB are stored in the Origin Private File System (`argus-snapshots/` directory) instead of inline in IndexedDB. This avoids IDB blob size limits and improves write performance. The `opfsKey` field in `QueuedSnapshot` links IDB metadata to the OPFS file. Graceful degradation: if OPFS is unavailable, blobs remain inline in IDB.
+
+3. **Evidence eviction prohibited**: The `evictToSizeLimit()` function is deleted entirely. No code path may delete queued events or snapshots to free space. Evidence is only removed after successful upload confirmation from the backend.
+
+4. **Hard blocker at 90% quota**: When `navigator.storage.estimate()` reports usage ≥ 90% of quota, the system:
+   - Sets `isStorageBlocked = true`
+   - Stops the drain loop (pauses upload attempts)
+   - Renders `HardBlockerModal.vue` — an unclosable full-screen modal (no X button, no backdrop dismiss, no Escape key) that pauses the exam and instructs the student to free disk space
+   - Recovery at < 80% quota: clears the block, resumes drain, modal auto-dismisses
+   - Storage quota is checked every 30 seconds
+
+##### Backend: Backpressure & Replay
+
+1. **Overflow never drops**: The `pushOverflow()` method in `writer.go` no longer evicts batches. It always appends. Two thresholds exist:
+   - **Soft threshold** (`OverflowQueueSize = 50`): Logs a warning and fires a Telegram alert. No data action taken.
+   - **Hard threshold** (`HardOverflowLimit = 200`): Activates the `backpressureActive` atomic flag and fires a CRITICAL Telegram alert. Upstream components can query `BackpressureActive()` to throttle ingestion.
+   - The backpressure flag clears automatically when `drainOverflow()` empties the queue.
+
+2. **ClickHouse backfiller**: A new Kafka consumer group (`argus-clickhouse-backfiller`) in `backfiller.go` consumes from all three event topics (`argus.events.critical`, `argus.events.standard`, `argus.events.telemetry`) and inserts events into ClickHouse via `insertBatch()`.
+   - Batch size: 500 events or 5-second flush interval (whichever comes first)
+   - On ClickHouse failure: sleeps `PauseOnError` (10s), does NOT commit Kafka offsets — Kafka redelivers on next poll
+   - Circuit breaker (5 consecutive failures → open, 30s recovery timeout) prevents hammering a down ClickHouse
+   - Registered as a non-critical health check — does not fail liveness probes
+
+3. **Idempotent replay**: ClickHouse's `ReplacingMergeTree` engine deduplicates on `(org_id, exam_id, session_id, event_id)`. Events replayed by the backfiller that already exist in ClickHouse are silently merged away. This makes at-least-once delivery safe and correct.
+
+#### Consequences
+
+**Positive:**
+- Zero evidence loss from student browser to analytical database — the full audit chain is preserved
+- Browser storage persistence prevents silent OS-level eviction of evidence
+- OPFS offloading keeps IndexedDB lean, improving read/write performance for metadata queries
+- Kafka acts as a durable event log; the backfiller ensures ClickHouse eventually converges with Kafka state
+- Backpressure signaling provides observability into overflow conditions without destroying data
+
+**Negative:**
+- The hard blocker modal degrades student UX when storage is critically low — the exam is paused until they free disk space. This is an intentional trade-off: evidence integrity outweighs UX convenience.
+- Unbounded overflow queue in the writer can consume significant memory during prolonged ClickHouse outages. Mitigated by the CRITICAL alert at 200 batches, which triggers operational intervention.
+- OPFS is not available in all browsers (notably missing in Firefox as of 2026). The graceful degradation path (inline IDB blobs) preserves functionality but loses the performance benefit.
+- The backfiller adds a second Kafka consumer group, increasing Kafka broker load. At Argus scale (< 50K events/sec), this is negligible.

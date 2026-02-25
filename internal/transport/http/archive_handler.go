@@ -415,7 +415,7 @@ func (h *ArchiveHandler) queryArchivedSessionByID(ctx context.Context, sessionID
 	defer rows.Close()
 
 	terminatedSet := make(map[string]bool)
-	terminatedSessions, err := h.pgRepo.GetTerminatedSessions(ctx)
+	terminatedSessions, err := h.pgRepo.GetTerminatedSessions(ctx, "*")
 	if err == nil {
 		for _, sid := range terminatedSessions {
 			terminatedSet[sid] = true
@@ -530,9 +530,9 @@ func (h *ArchiveHandler) queryArchivedSessions(ctx context.Context, orgID, examI
 	}
 	defer rows.Close()
 
-	// Get terminated session IDs from PostgreSQL.
+	// Get terminated session IDs from PostgreSQL (scoped to org).
 	terminatedSet := make(map[string]bool)
-	terminatedSessions, err := h.pgRepo.GetTerminatedSessions(ctx)
+	terminatedSessions, err := h.pgRepo.GetTerminatedSessions(ctx, orgID)
 	if err == nil {
 		for _, sid := range terminatedSessions {
 			terminatedSet[sid] = true

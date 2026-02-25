@@ -20,12 +20,13 @@
 //     accumulating in the hot buffer concurrently. This minimizes lock contention
 //     to a single pointer swap per flush cycle.
 //
-//   - Bounded overflow queue for backpressure resilience. If ClickHouse is slow
-//     or down, failed batches are pushed onto a bounded overflow queue (default
-//     capacity: 50 batches = ~50,000 events). When ClickHouse recovers, the
-//     overflow is drained before new batches. If the overflow fills up, the
-//     oldest batch is dropped and logged — this is acceptable because Kafka
-//     retains the data for replay.
+//   - Unbounded overflow queue with backpressure signaling (ADR-007). If
+//     ClickHouse is slow or down, failed batches are pushed onto the overflow
+//     queue. When ClickHouse recovers, the overflow is drained before new
+//     batches. Batches are NEVER dropped — evidence is legally significant.
+//     At 50 batches (soft limit), a warning fires. At 200 batches (hard limit),
+//     backpressure is signaled via BackpressureActive(). Kafka retains all
+//     events for replay via the backfiller consumer.
 //
 //   - Exponential backoff with jitter on retries to prevent thundering-herd
 //     reconnections after a ClickHouse restart.
@@ -92,14 +93,18 @@ type WriterConfig struct {
 	// queue. Default: 3.
 	MaxRetries int `yaml:"max_retries"`
 
-	// OverflowQueueSize is the maximum number of failed batches held in
-	// memory for retry. When ClickHouse recovers, the overflow is drained
-	// before new batches are flushed.
+	// OverflowQueueSize is the soft threshold for the overflow queue.
+	// When this limit is reached, a WARNING-level alert fires but batches
+	// are still accepted. This serves as an early warning indicator.
 	// Default: 50 (= 50 * BatchSize = ~50,000 events in memory).
-	//
-	// If the overflow fills up, the OLDEST batch is dropped. This is
-	// acceptable because Kafka retains the original events for replay.
 	OverflowQueueSize int `yaml:"overflow_queue_size"`
+
+	// HardOverflowLimit is the absolute maximum number of failed batches
+	// held in memory before backpressure activates. When reached, the
+	// BackpressureActive() signal fires a CRITICAL Telegram alert.
+	// Batches are NEVER dropped — Kafka is the source of truth.
+	// Default: 200 (= 200 * BatchSize = ~200,000 events in memory).
+	HardOverflowLimit int `yaml:"hard_overflow_limit"`
 
 	// MaxOpenConns limits the number of simultaneous ClickHouse connections.
 	// Default: 10.
@@ -149,11 +154,17 @@ type Writer struct {
 	buffer []*entity.ProctoringEvent
 	mu     sync.Mutex
 
-	// Overflow queue: bounded ring buffer for failed batches.
+	// Overflow queue: unbounded buffer for failed batches (ADR-007).
 	// When ClickHouse is down, failed batches are queued here for retry.
+	// Batches are NEVER dropped — evidence is legally significant.
 	overflow     [][]*entity.ProctoringEvent
 	overflowMu   sync.Mutex
-	overflowFull atomic.Int64 // Counter: batches dropped due to full overflow.
+	overflowFull atomic.Int64 // Counter: times overflow exceeded soft limit.
+
+	// Backpressure signal: set when overflow exceeds HardOverflowLimit.
+	// External consumers (e.g., ingestion pipeline) can check this to
+	// slow down or pause event production.
+	backpressureActive atomic.Bool
 
 	// Circuit breaker: fast-fails inserts when ClickHouse is unreachable,
 	// preventing retry storms and backpressure propagation.
@@ -365,6 +376,19 @@ func (w *Writer) Name() string {
 // Exposed for the health handler to include in readiness probe responses.
 func (w *Writer) BreakerState() string {
 	return w.breaker.State()
+}
+
+// ResetBreaker manually resets the ClickHouse circuit breaker to the Closed state.
+// Intended for admin panic-button recovery when the breaker is stuck open.
+func (w *Writer) ResetBreaker() {
+	w.breaker.Reset()
+}
+
+// OverflowSize returns the current number of batches in the overflow queue.
+func (w *Writer) OverflowSize() int {
+	w.overflowMu.Lock()
+	defer w.overflowMu.Unlock()
+	return len(w.overflow)
 }
 
 // SetAlerter configures an optional emergency alerting provider.
@@ -643,51 +667,88 @@ func (w *Writer) insertBatch(events []*entity.ProctoringEvent) error {
 
 // pushOverflow adds a failed batch to the overflow queue for later retry.
 //
-// If the queue is full, the OLDEST batch is evicted (FIFO) and its events
-// are counted as permanently dropped. This is acceptable because:
-//   - Kafka retains all events for the configured retention period (7 days).
-//   - A separate Kafka-to-ClickHouse consumer can backfill missing data.
-//   - Dropping the oldest batch preserves the freshest data, which is more
-//     valuable for real-time dashboards.
+// ADR-007: Batches are NEVER dropped. Evidence is legally significant and
+// Kafka is the source of truth. Instead of evicting, the writer signals
+// backpressure when the overflow exceeds HardOverflowLimit.
+//
+// Backpressure signal flow:
+//  1. Overflow exceeds OverflowQueueSize → WARNING log + alert
+//  2. Overflow exceeds HardOverflowLimit → backpressureActive=true + CRITICAL alert
+//  3. Overflow drains to 0 → backpressureActive=false (cleared in drainOverflow)
 func (w *Writer) pushOverflow(events []*entity.ProctoringEvent) {
 	w.overflowMu.Lock()
 	defer w.overflowMu.Unlock()
 
-	if len(w.overflow) >= w.cfg.OverflowQueueSize {
-		// Evict the oldest batch (index 0).
-		dropped := w.overflow[0]
-		w.overflow = w.overflow[1:]
-		w.totalDropped.Add(int64(len(dropped)))
+	currentLen := len(w.overflow)
+
+	// Soft threshold: warning alert.
+	if currentLen >= w.cfg.OverflowQueueSize && currentLen%w.cfg.OverflowQueueSize == 0 {
 		w.overflowFull.Add(1)
-		w.logger.Error("clickhouse: overflow queue full, dropping oldest batch",
-			zap.Int("dropped_events", len(dropped)),
-			zap.Int("queue_size", w.cfg.OverflowQueueSize),
-			zap.Int64("total_dropped", w.totalDropped.Load()),
+		w.logger.Warn("clickhouse: overflow queue exceeded soft limit",
+			zap.Int("current_batches", currentLen),
+			zap.Int("soft_limit", w.cfg.OverflowQueueSize),
+			zap.Int("hard_limit", w.cfg.HardOverflowLimit),
+		)
+	}
+
+	// Hard threshold: activate backpressure signal.
+	if currentLen >= w.cfg.HardOverflowLimit && !w.backpressureActive.Load() {
+		w.backpressureActive.Store(true)
+		w.logger.Error("clickhouse: BACKPRESSURE ACTIVE — overflow exceeded hard limit",
+			zap.Int("current_batches", currentLen),
+			zap.Int("hard_limit", w.cfg.HardOverflowLimit),
 		)
 
-		// DATA LOSS: fire emergency alert.
 		if w.alerter != nil {
 			w.alerter.Send(alerting.Alert{
 				Component: "clickhouse-writer",
 				Severity:  "CRITICAL",
-				Error:     fmt.Sprintf("DATA LOSS: overflow queue full, dropped %d events. Total dropped: %d", len(dropped), w.totalDropped.Load()),
+				Error:     fmt.Sprintf("BACKPRESSURE: overflow queue at %d batches (hard limit: %d). ClickHouse is unreachable. No data is being dropped — Kafka retains all events.", currentLen, w.cfg.HardOverflowLimit),
 			})
 		}
 	}
 
+	// Always append — NEVER drop evidence.
 	w.overflow = append(w.overflow, events)
+}
+
+// BackpressureActive returns true when the overflow queue has exceeded its
+// hard limit. External consumers should slow down or pause when this is true.
+func (w *Writer) BackpressureActive() bool {
+	return w.backpressureActive.Load()
 }
 
 // drainOverflow attempts to flush all batches in the overflow queue.
 // It stops at the first failure — remaining batches stay in the queue
 // for the next drain cycle. This prevents hammering a sick ClickHouse
 // with many concurrent retries.
+//
+// When the overflow queue is fully drained, the backpressure signal is cleared.
+// DrainOverflow triggers an immediate drain of the ClickHouse overflow queue.
+// This is intended for admin panic-button recovery to force-flush overflow
+// batches when ClickHouse has recovered but the automatic drain cycle hasn't
+// triggered yet.
+//
+// The overflow queue holds batches that failed initial insertion. When
+// ClickHouse recovers, this method processes them oldest-first. If ClickHouse
+// is still unhealthy, the drain stops after the first failure and batches
+// remain queued for the next automatic cycle.
+func (w *Writer) DrainOverflow() {
+	w.drainOverflow()
+}
+
 func (w *Writer) drainOverflow() {
 	for {
 		// Pop the oldest batch from the queue.
 		w.overflowMu.Lock()
 		if len(w.overflow) == 0 {
 			w.overflowMu.Unlock()
+
+			// ADR-007: Clear backpressure signal when overflow is fully drained.
+			if w.backpressureActive.Load() {
+				w.backpressureActive.Store(false)
+				w.logger.Info("clickhouse: backpressure cleared — overflow queue fully drained")
+			}
 			return
 		}
 		batch := w.overflow[0]
@@ -743,6 +804,9 @@ func applyWriterDefaults(cfg *WriterConfig) {
 	if cfg.OverflowQueueSize <= 0 {
 		cfg.OverflowQueueSize = 50
 	}
+	if cfg.HardOverflowLimit <= 0 {
+		cfg.HardOverflowLimit = 200
+	}
 	if cfg.MaxOpenConns <= 0 {
 		cfg.MaxOpenConns = 10
 	}
@@ -758,4 +822,65 @@ func applyWriterDefaults(cfg *WriterConfig) {
 	if cfg.InsertTimeout <= 0 {
 		cfg.InsertTimeout = 30 * time.Second
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Org Lifecycle — ClickHouse Data Purge (GDPR Right to Erasure)
+// ---------------------------------------------------------------------------
+
+// PurgeOrgEvents permanently deletes all events for the given org from ClickHouse.
+// This uses ALTER TABLE DELETE which is an asynchronous mutation — it marks the
+// data for deletion and the actual cleanup happens during the next background merge.
+//
+// WARNING: ALTER TABLE DELETE is resource-intensive on large datasets.
+// Schedule during off-peak hours. The operation is idempotent.
+//
+// Tables purged:
+//   - proctoring_events (main fact table)
+//   - session_event_counts (MV target)
+//   - hourly_event_stats (MV target)
+//   - critical_events_recent (MV target)
+//   - student_session_summary (MV target)
+//   - global_org_stats (MV target)
+//   - session_ai_summary (MV target)
+//   - exam_performance_summary (MV target, migration 006)
+//   - realtime_org_health (MV target, migration 006)
+//   - daily_violation_trends (MV target, migration 006)
+func (w *Writer) PurgeOrgEvents(ctx context.Context, orgID string) error {
+	if orgID == "" {
+		return fmt.Errorf("clickhouse: purge org events: org_id is required")
+	}
+
+	// List of all tables containing org-scoped data.
+	tables := []string{
+		"proctoring_events",
+		"session_event_counts",
+		"hourly_event_stats",
+		"critical_events_recent",
+		"student_session_summary",
+		"global_org_stats",
+		"session_ai_summary",
+		"exam_performance_summary",
+		"realtime_org_health",
+		"daily_violation_trends",
+	}
+
+	for _, table := range tables {
+		query := fmt.Sprintf("ALTER TABLE %s DELETE WHERE org_id = ?", table)
+		if err := w.conn.Exec(ctx, query, orgID); err != nil {
+			w.logger.Warn("clickhouse: purge org events: table delete failed (may not exist)",
+				zap.String("table", table),
+				zap.String("org_id", orgID),
+				zap.Error(err),
+			)
+			// Continue with other tables — some may not exist in older deployments
+		}
+	}
+
+	w.logger.Info("clickhouse: org purge mutations submitted",
+		zap.String("org_id", orgID),
+		zap.Int("tables", len(tables)),
+	)
+
+	return nil
 }

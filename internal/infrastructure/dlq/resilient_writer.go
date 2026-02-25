@@ -263,6 +263,18 @@ func (rw *ResilientWriter) BreakerState() string {
 	return rw.breaker.State()
 }
 
+// ResetBreaker manually resets the Kafka circuit breaker to the Closed state.
+// Intended for admin panic-button recovery.
+func (rw *ResilientWriter) ResetBreaker() {
+	rw.breaker.Reset()
+}
+
+// ClearDLQ removes all entries from the dead-letter queue.
+// Intended for admin panic-button recovery.
+func (rw *ResilientWriter) ClearDLQ() error {
+	return rw.dlqStore.Clear()
+}
+
 // IsDegraded returns true if the system is operating in buffered/degraded mode.
 func (rw *ResilientWriter) IsDegraded() bool {
 	return rw.degradedSince.Load() > 0

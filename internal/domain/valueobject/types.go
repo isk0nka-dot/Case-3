@@ -179,6 +179,17 @@ func (et EventType) String() string {
 	return "unspecified"
 }
 
+// ParseEventType converts a string event type name back to its EventType constant.
+// Returns EventTypeUnspecified if the name is not recognized.
+func ParseEventType(name string) EventType {
+	for et := EventType(0); et <= 106; et++ {
+		if et.String() == name {
+			return et
+		}
+	}
+	return EventTypeUnspecified
+}
+
 // Severity classifies event urgency.
 type Severity int32
 
@@ -200,6 +211,20 @@ func (s Severity) String() string {
 		return "critical"
 	default:
 		return "unspecified"
+	}
+}
+
+// ParseSeverity converts a string severity name back to its Severity constant.
+func ParseSeverity(name string) Severity {
+	switch name {
+	case "info":
+		return SeverityInfo
+	case "warning":
+		return SeverityWarning
+	case "critical":
+		return SeverityCritical
+	default:
+		return SeverityUnspecified
 	}
 }
 
@@ -236,5 +261,27 @@ func (es EventSource) String() string {
 		return "backend_ai"
 	default:
 		return "unspecified"
+	}
+}
+
+// ParseEventSource converts a string source name back to its EventSource constant.
+func ParseEventSource(name string) EventSource {
+	switch name {
+	case "webcam":
+		return SourceWebcam
+	case "side_camera":
+		return SourceSideCamera
+	case "system":
+		return SourceSystem
+	case "browser":
+		return SourceBrowser
+	case "kernel_agent":
+		return SourceKernelAgent
+	case "network_probe":
+		return SourceNetworkProbe
+	case "backend_ai":
+		return SourceBackendAI
+	default:
+		return SourceUnspecified
 	}
 }

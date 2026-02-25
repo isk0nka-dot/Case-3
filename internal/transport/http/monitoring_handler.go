@@ -272,8 +272,8 @@ func (h *MonitoringHandler) handleTerminateSession(w http.ResponseWriter, r *htt
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	// Insert termination record into PostgreSQL.
-	if err := h.pgRepo.TerminateSession(ctx, sessionID, caller.ID, body.Reason); err != nil {
+	// Insert termination record into PostgreSQL (scoped to caller's org).
+	if err := h.pgRepo.TerminateSession(ctx, caller.OrgID, sessionID, caller.ID, body.Reason); err != nil {
 		h.logger.Error("failed to terminate session",
 			zap.String("session_id", sessionID),
 			zap.Error(err))
@@ -389,9 +389,9 @@ func (h *MonitoringHandler) queryActiveSessions(ctx context.Context, orgID, exam
 	}
 	defer rows.Close()
 
-	// Also get terminated session IDs from PostgreSQL.
+	// Also get terminated session IDs from PostgreSQL (scoped to org).
 	terminatedSet := make(map[string]bool)
-	terminatedSessions, err := h.pgRepo.GetTerminatedSessions(ctx)
+	terminatedSessions, err := h.pgRepo.GetTerminatedSessions(ctx, orgID)
 	if err == nil {
 		for _, sid := range terminatedSessions {
 			terminatedSet[sid] = true

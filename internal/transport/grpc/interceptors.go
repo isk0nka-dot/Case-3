@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
@@ -16,6 +19,7 @@ import (
 
 	"github.com/argus-ai/event-collector/internal/application/port"
 	"github.com/argus-ai/event-collector/pkg/auth"
+	"github.com/argus-ai/event-collector/pkg/middleware"
 )
 
 // ---------------------------------------------------------------------------
@@ -460,22 +464,160 @@ func isClientError(code codes.Code) bool {
 	}
 }
 
+// ============================= IDEMPOTENCY / DEDUPLICATION =================
+
+// idempotencyEntry holds the expiration time for a cached idempotency key.
+type idempotencyEntry struct {
+	expiresAt time.Time
+}
+
+// IdempotencyCache provides a TTL-based cache of idempotency keys using
+// sync.Map for lock-free reads. A background goroutine evicts expired
+// entries every 60 seconds. This prevents duplicate event ingestion when
+// the frontend transport retries a failed request with the same
+// X-Idempotency-Key header.
+type IdempotencyCache struct {
+	entries sync.Map
+	ttl     time.Duration
+	logger  *zap.Logger
+	done    chan struct{}
+}
+
+// NewIdempotencyCache creates an idempotency cache with the given TTL.
+// The cache starts a background eviction goroutine that runs every 60 seconds.
+// Call Close() to stop the eviction goroutine.
+func NewIdempotencyCache(ttl time.Duration, logger *zap.Logger) *IdempotencyCache {
+	c := &IdempotencyCache{
+		ttl:    ttl,
+		logger: logger.Named("idemp_cache"),
+		done:   make(chan struct{}),
+	}
+	go c.evictionLoop()
+	return c
+}
+
+// Check returns true if the key has already been seen (duplicate).
+// If the key is new, it is stored with the configured TTL and false is returned.
+func (c *IdempotencyCache) Check(key string) bool {
+	entry := idempotencyEntry{expiresAt: time.Now().Add(c.ttl)}
+	_, loaded := c.entries.LoadOrStore(key, entry)
+	return loaded
+}
+
+// evictionLoop periodically removes expired entries from the cache.
+func (c *IdempotencyCache) evictionLoop() {
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			now := time.Now()
+			evicted := 0
+			c.entries.Range(func(key, value any) bool {
+				entry := value.(idempotencyEntry)
+				if now.After(entry.expiresAt) {
+					c.entries.Delete(key)
+					evicted++
+				}
+				return true
+			})
+			if evicted > 0 {
+				c.logger.Debug("evicted expired idempotency keys",
+					zap.Int("count", evicted),
+				)
+			}
+		case <-c.done:
+			return
+		}
+	}
+}
+
+// Close stops the background eviction goroutine.
+func (c *IdempotencyCache) Close() {
+	close(c.done)
+}
+
+// DeduplicationUnaryInterceptor returns a unary server interceptor that
+// rejects duplicate requests based on the X-Idempotency-Key gRPC metadata
+// header. When a duplicate is detected, the interceptor returns an empty
+// successful response (codes.OK) without invoking the handler.
+//
+// This prevents duplicate event ingestion during frontend transport retries
+// (exponential backoff). The frontend generates a unique key per logical
+// request and preserves it across retries.
+//
+// If cache is nil or the request has no idempotency key, the interceptor
+// passes through to the handler.
+func DeduplicationUnaryInterceptor(cache *IdempotencyCache) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req interface{},
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (interface{}, error) {
+		// Skip if cache is nil (dedup disabled).
+		if cache == nil {
+			return handler(ctx, req)
+		}
+
+		// Skip for health checks and reflection.
+		if shouldSkipAuth(info.FullMethod) {
+			return handler(ctx, req)
+		}
+
+		// Extract idempotency key from gRPC metadata.
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return handler(ctx, req)
+		}
+
+		keys := md.Get("x-idempotency-key")
+		if len(keys) == 0 || keys[0] == "" {
+			return handler(ctx, req)
+		}
+
+		idempKey := keys[0]
+
+		// Check if this key has been seen before.
+		if cache.Check(idempKey) {
+			// Duplicate request — return success without processing.
+			// The client already has the data; it just needs confirmation.
+			cache.logger.Debug("duplicate request deduplicated",
+				zap.String("key", idempKey),
+				zap.String("method", info.FullMethod),
+			)
+			// Return nil response with OK status. gRPC serializes this as
+			// an empty protobuf message, which is a valid "success" response.
+			return nil, nil
+		}
+
+		// First time seeing this key — proceed with handler.
+		return handler(ctx, req)
+	}
+}
+
 // NewInterceptorChain is a convenience function that constructs the recommended
 // interceptor chain for the Event Collector gRPC server.
 //
 // Chain order (applied outermost-first):
-//  1. Recovery  — ensures panics never crash the server.
-//  2. Rate Limit — sheds excess load before reaching business logic.
-//  3. Auth (JWT) — verifies identity and injects claims into context.
-//  4. Logging   — records every call for observability.
+//  1. Recovery     — ensures panics never crash the server.
+//  2. RequestID    — assigns a unique ID to every request for tracing.
+//  3. Metrics      — records request duration and count.
+//  4. Dedup        — rejects duplicate requests via X-Idempotency-Key.
+//  5. Rate Limit   — sheds excess load before reaching business logic.
+//  6. Auth (JWT)   — verifies identity and injects claims into context.
+//  7. Logging      — records every call for observability.
 //
 // Session validation is embedded within the Auth interceptor. The Auth
 // interceptor calls sessionValidator.ValidateSession() after JWT verification.
 //
+// The idempCache parameter may be nil to disable deduplication.
+//
 // Usage:
 //
 //	unaryInterceptors, streamInterceptors := grpc.NewInterceptorChain(
-//	    logger, unaryLimiter, streamLimiter, jwtVerifier, sessionValidator,
+//	    logger, unaryLimiter, streamLimiter, jwtVerifier, sessionValidator, idempCache,
 //	)
 //	srv := grpc.NewServer(
 //	    grpc.ChainUnaryInterceptor(unaryInterceptors...),
@@ -487,9 +629,13 @@ func NewInterceptorChain(
 	streamLimiter *rate.Limiter,
 	jwtVerifier *auth.Verifier,
 	sessionValidator port.SessionValidator,
+	idempCache *IdempotencyCache,
 ) ([]grpc.UnaryServerInterceptor, []grpc.StreamServerInterceptor) {
 	unary := []grpc.UnaryServerInterceptor{
 		RecoveryUnaryInterceptor(logger),
+		middleware.RequestIDUnaryInterceptor(),
+		MetricsUnaryInterceptor(),
+		DeduplicationUnaryInterceptor(idempCache),
 		RateLimitUnaryInterceptor(unaryLimiter),
 		AuthUnaryInterceptor(jwtVerifier, sessionValidator, logger),
 		LoggingUnaryInterceptor(logger),
@@ -497,12 +643,76 @@ func NewInterceptorChain(
 
 	stream := []grpc.StreamServerInterceptor{
 		RecoveryStreamInterceptor(logger),
+		middleware.RequestIDStreamInterceptor(),
+		MetricsStreamInterceptor(),
 		RateLimitStreamInterceptor(streamLimiter),
 		AuthStreamInterceptor(jwtVerifier, sessionValidator, logger),
 		LoggingStreamInterceptor(logger),
 	}
 
 	return unary, stream
+}
+
+// ============================= METRICS =====================================
+
+// Prometheus metrics for gRPC request observability.
+var (
+	grpcRequestDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "argus_grpc_request_duration_seconds",
+			Help:    "Duration of gRPC requests in seconds.",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		},
+		[]string{"method", "code"},
+	)
+
+	grpcRequestsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "argus_grpc_requests_total",
+			Help: "Total number of gRPC requests.",
+		},
+		[]string{"method", "code"},
+	)
+)
+
+// MetricsUnaryInterceptor records request duration and count for unary RPCs.
+func MetricsUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req interface{},
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (interface{}, error) {
+		start := time.Now()
+		resp, err := handler(ctx, req)
+		duration := time.Since(start).Seconds()
+
+		code := status.Code(err).String()
+		grpcRequestDuration.WithLabelValues(info.FullMethod, code).Observe(duration)
+		grpcRequestsTotal.WithLabelValues(info.FullMethod, code).Inc()
+
+		return resp, err
+	}
+}
+
+// MetricsStreamInterceptor records request duration and count for streaming RPCs.
+func MetricsStreamInterceptor() grpc.StreamServerInterceptor {
+	return func(
+		srv interface{},
+		ss grpc.ServerStream,
+		info *grpc.StreamServerInfo,
+		handler grpc.StreamHandler,
+	) error {
+		start := time.Now()
+		err := handler(srv, ss)
+		duration := time.Since(start).Seconds()
+
+		code := status.Code(err).String()
+		grpcRequestDuration.WithLabelValues(info.FullMethod, code).Observe(duration)
+		grpcRequestsTotal.WithLabelValues(info.FullMethod, code).Inc()
+
+		return err
+	}
 }
 
 // FormatRateLimit returns a human-readable string for a rate limiter configuration.

@@ -336,6 +336,27 @@ func (s *Store) Metrics() StoreMetrics {
 	}
 }
 
+// Clear removes ALL entries from the DLQ. This is a destructive operation
+// intended for admin panic-button recovery when the DLQ contains stuck or
+// corrupt entries that prevent normal reclamation.
+//
+// This is idempotent — calling Clear() on an empty DLQ is a no-op.
+func (s *Store) Clear() error {
+	entriesCleared := s.currentSize.Load()
+
+	s.logger.Warn("DLQ cleared by admin",
+		zap.Int64("entries_cleared", entriesCleared),
+	)
+
+	err := s.db.DropAll()
+	if err != nil {
+		return fmt.Errorf("dlq: clear failed: %w", err)
+	}
+
+	s.currentSize.Store(0)
+	return nil
+}
+
 // Close stops the GC goroutine and closes BadgerDB.
 func (s *Store) Close() error {
 	close(s.done)
