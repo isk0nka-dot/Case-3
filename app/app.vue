@@ -58,6 +58,10 @@ const topNavigation = computed(() => {
     { label: 'Экспорт', icon: 'i-lucide-hard-drive-download', to: '/dashboard/exports' },
     { label: 'Аналитика', icon: 'i-lucide-bar-chart-3', to: '/analytics' },
   ]
+  // Integrations page — visible to org_admin + super_admin
+  if (authStore.isSuperAdmin || authStore.isOrgAdmin) {
+    items.push({ label: 'Интеграции', icon: 'i-lucide-blocks', to: '/integrations' })
+  }
   // API & Integrations is a system page — Super Admin only
   if (authStore.isSuperAdmin) {
     items.push({ label: 'API и Интеграции', icon: 'i-lucide-plug', to: '/api' })
@@ -83,7 +87,7 @@ const isDashboardRoute = computed(() => {
 
 // Landing page should render without sidebar chrome
 // Landing pages render without sidebar chrome
-const isLandingPage = computed(() => route.path === '/' || route.path === '/landing')
+const isLandingPage = computed(() => route.path === '/' || route.path === '/landing' || route.path.startsWith('/docs'))
 
 // Restore auth session eagerly during setup (not onMounted) so that
 // child pages' onMounted hooks already have the JWT token available.
@@ -101,10 +105,22 @@ function handleLogout() {
 
 // Simulate real-time data
 let interval: ReturnType<typeof setInterval> | null = null
+
+// Performance Debugger (Ctrl+Shift+D)
+const showDebugger = ref(false)
+
 onMounted(() => {
   interval = setInterval(() => {
     store.simulateNewViolation()
   }, 8000)
+
+  // Ctrl+Shift+D toggles PerformanceDebugger overlay
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+      e.preventDefault()
+      showDebugger.value = !showDebugger.value
+    }
+  })
 })
 onUnmounted(() => {
   if (interval) clearInterval(interval)
@@ -341,11 +357,8 @@ onUnmounted(() => {
           </NuxtLink>
         </nav>
 
-        <!-- Bottom: Org Switcher + Theme Toggle + User -->
+        <!-- Bottom: Theme Toggle + User -->
         <div class="px-2 py-3 border-t space-y-2" style="border-color: var(--argus-border);">
-          <!-- Global Organization Switcher (Super Admin only) -->
-          <OrgSwitcher v-if="store.leftSidebarOpen" />
-
           <!-- Theme Toggle -->
           <button
             class="flex items-center w-full rounded-lg transition-all duration-200"
@@ -447,5 +460,8 @@ onUnmounted(() => {
         </main>
       </div>
     </div>
+
+    <!-- Performance Debugger Overlay (Ctrl+Shift+D) -->
+    <PerformanceDebugger v-if="showDebugger" @close="showDebugger = false" />
   </UApp>
 </template>

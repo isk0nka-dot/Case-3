@@ -502,6 +502,10 @@ function activeRulesCount(exam: ExamProctoringConfig): number {
 function exceptionProfileIcon(_profile: string): string {
   return 'i-lucide-user-cog'
 }
+
+function blurExcDropdown() {
+  window.setTimeout(() => { excDropdownOpen.value = false }, 200)
+}
 </script>
 
 <template>
@@ -1415,7 +1419,7 @@ function exceptionProfileIcon(_profile: string): string {
                       class="flex-1 bg-transparent text-xs font-medium outline-none placeholder:text-[var(--argus-text-dimmed)]"
                       :style="{ color: 'var(--argus-text)' }"
                       @focus="excDropdownOpen = true"
-                      @blur="setTimeout(() => excDropdownOpen = false, 200)"
+                      @blur="blurExcDropdown"
                     >
                   </div>
 

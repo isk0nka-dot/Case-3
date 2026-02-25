@@ -204,6 +204,9 @@ export function useHealthGovernor(config?: Partial<HealthGovernorConfig>) {
   // RTT tracking
   let lastRttMs = 0
 
+  // Inference latency tracking (reported by VisionEngine)
+  const inferenceLatencyMs: Ref<number> = ref(0)
+
   // -------------------------------------------------------------------------
   // FPS Measurement via requestAnimationFrame
   // -------------------------------------------------------------------------
@@ -325,7 +328,28 @@ export function useHealthGovernor(config?: Partial<HealthGovernorConfig>) {
     const rttScore = normalizeRtt(m.rttMs) * WEIGHTS.rtt
     const lossScore = normalizePacketLoss(m.packetLoss) * WEIGHTS.packetLoss
 
-    return Math.round(fpsScore + rttScore + lossScore)
+    // CPU spike penalty: AI inference latency >50ms indicates CPU pressure
+    // from vision processing. This supplements the FPS-based detection
+    // which may lag behind actual CPU spikes.
+    //   50ms → 0 penalty   (normal)
+    //   75ms → 5 penalty   (moderate)
+    //  100ms → 10 penalty  (high)
+    //  150ms → 20 penalty  (severe — capped)
+    let cpuPenalty = 0
+    if (inferenceLatencyMs.value > 50) {
+      cpuPenalty = Math.min(20, (inferenceLatencyMs.value - 50) / 5)
+    }
+
+    return Math.max(0, Math.round(fpsScore + rttScore + lossScore - cpuPenalty))
+  }
+
+  /**
+   * Report the latest AI inference latency from the VisionEngine.
+   * This feeds the CPU spike penalty in the health score computation.
+   * Called by VisionEngine after each frame inference completes.
+   */
+  function reportInferenceLatency(ms: number): void {
+    inferenceLatencyMs.value = ms
   }
 
   // -------------------------------------------------------------------------
@@ -519,10 +543,14 @@ export function useHealthGovernor(config?: Partial<HealthGovernorConfig>) {
     tierLabel,
     consecutiveDowngradeSamples,
     consecutiveUpgradeSamples,
+    inferenceLatencyMs: computed(() => inferenceLatencyMs.value),
 
     // Lifecycle
     start,
     stop,
-    forceSample
+    forceSample,
+
+    // Vision Engine integration
+    reportInferenceLatency
   }
 }

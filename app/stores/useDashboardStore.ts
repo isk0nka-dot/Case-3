@@ -197,6 +197,16 @@ export interface WebhookDeliveryLog {
   duration: number
 }
 
+// --- IP Whitelist ---
+export interface IPWhitelistEntry {
+  id: string
+  orgId: string
+  ip: string
+  label: string
+  createdAt: string
+  createdBy: string
+}
+
 // --- Exam Proctoring Settings ---
 export interface StudentException {
   id: string
@@ -283,7 +293,7 @@ export interface AiDetectionStatus {
 export interface MonitoringEvent {
   id: string
   timestamp: string
-  type: 'gaze_deviation' | 'face_mismatch' | 'phone_detected' | 'book_detected' | 'tab_switch' | 'audio_anomaly' | 'earbuds_detected' | 'multiple_persons'
+  type: 'gaze_deviation' | 'face_mismatch' | 'phone_detected' | 'book_detected' | 'tab_switch' | 'audio_anomaly' | 'earbuds_detected' | 'multiple_persons' | 'background_voices' | 'whispering' | 'whisper_detected' | 'second_speaker_detected'
   label: string
   severity: 'critical' | 'warning' | 'info'
 }
@@ -851,6 +861,20 @@ export const useDashboardStore = defineStore('dashboard', () => {
     { id: 'dl-009', webhookId: 'wh-002', event: 'violation.detected', status: 'success', timestamp: '2026-02-11T10:15:30Z', responseCode: 200, duration: 134 },
     { id: 'dl-010', webhookId: 'wh-001', event: 'violation.detected', status: 'success', timestamp: '2026-02-11T10:10:00Z', responseCode: 200, duration: 112 }
   ])
+
+  const ipWhitelist = ref<IPWhitelistEntry[]>([
+    { id: 'ip-001', orgId: 'org-eduser', ip: '195.12.45.0/24', label: 'University Main Campus', createdAt: '2026-01-15', createdBy: 'admin' },
+    { id: 'ip-002', orgId: 'org-eduser', ip: '10.0.0.0/8', label: 'Internal VPN', createdAt: '2026-02-01', createdBy: 'admin' },
+    { id: 'ip-003', orgId: 'org-nis', ip: '82.200.165.0/24', label: 'NIS Network', createdAt: '2026-01-20', createdBy: 'admin' }
+  ])
+
+  function addIPEntry(entry: IPWhitelistEntry) {
+    ipWhitelist.value.push(entry)
+  }
+
+  function removeIPEntry(entryId: string) {
+    ipWhitelist.value = ipWhitelist.value.filter(e => e.id !== entryId)
+  }
 
   const apiSystemStatus = ref<'operational' | 'degraded' | 'down'>('operational')
 
@@ -1665,6 +1689,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
     webhooks,
     webhookDeliveryLogs,
     apiSystemStatus,
+    ipWhitelist,
+    addIPEntry,
+    removeIPEntry,
     // Global Analytics
     weeklyTrends,
     monthlyTrends,

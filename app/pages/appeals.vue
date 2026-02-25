@@ -30,6 +30,22 @@ function statusBgColor(status: string, opacity: number): string {
   return appealStatusBg(status, opacity, { accentBg, warningBg, successBg, errorBg, infoBg: (o: number) => isDark.value ? `rgba(100, 116, 139, ${o})` : `rgba(148, 163, 184, ${o})` })
 }
 
+// ---------------------------------------------------------------------------
+// Reactive state
+// ---------------------------------------------------------------------------
+const loading = ref(false)
+const error = ref('')
+const statusFilter = ref('all')
+const appeals = ref<AppealDetail[]>([])
+const selectedAppeal = ref<AppealDetail | null>(null)
+const reviewNotes = ref('')
+const reviewError = ref('')
+const reviewSuccess = ref('')
+const reviewSubmitting = ref(false)
+const detailLoading = ref(false)
+type ReviewStatus = 'under_review' | 'upheld' | 'overturned' | 'withdrawn'
+const reviewStatus = ref<ReviewStatus>('upheld')
+
 // Fetch all appeals
 async function fetchAppeals() {
   loading.value = true

@@ -1982,7 +1982,7 @@ onMounted(() => {
 
                   <div class="text-right shrink-0 ml-3">
                     <div class="text-[10px]" style="color: var(--argus-text-dimmed);">
-                      Вход: {{ formatDateTime(u.lastLoginAt) }}
+                      Вход: {{ u.lastLoginAt ? formatDateTime(u.lastLoginAt) : '—' }}
                     </div>
                     <div class="text-[10px]" style="color: var(--argus-text-dimmed);">
                       Создан: {{ formatDate(u.createdAt) }}
@@ -2194,7 +2194,7 @@ onMounted(() => {
                   <div class="flex items-center gap-3 shrink-0 ml-3">
                     <div class="text-right">
                       <div class="text-[10px]" style="color: var(--argus-text-dimmed);">
-                        Исп.: {{ formatDateTime(k.lastUsedAt) }}
+                        Исп.: {{ k.lastUsedAt ? formatDateTime(k.lastUsedAt) : '—' }}
                       </div>
                       <div v-if="k.expiresAt" class="text-[10px]" style="color: var(--argus-text-dimmed);">
                         Истекает: {{ formatDate(k.expiresAt) }}

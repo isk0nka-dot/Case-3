@@ -180,7 +180,7 @@ const waveformPath = computed(() => {
   let d = `M 0 ${mid}`
   for (let i = 0; i < w.length; i++) {
     const x = i * step
-    const y = mid + w[i] * mid * 3 // amplify for visibility
+    const y = mid + (w[i] ?? 0) * mid * 3 // amplify for visibility
     d += ` L ${x.toFixed(1)} ${Math.max(0, Math.min(height, y)).toFixed(1)}`
   }
   return d

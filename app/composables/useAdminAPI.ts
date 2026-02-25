@@ -1518,6 +1518,31 @@ export function useAdminAPI() {
     return `${base}/api/v1/monitoring/sessions/${sessionId}/stream?token=${token}`
   }
 
+  // ---------------------------------------------------------------------------
+  // IP Whitelisting (stub — backend not yet implemented)
+  // ---------------------------------------------------------------------------
+
+  interface IPWhitelistEntry {
+    id: string
+    orgId: string
+    ip: string
+    label: string
+    createdAt: string
+    createdBy: string
+  }
+
+  async function listIPWhitelist(orgId: string): Promise<IPWhitelistEntry[]> {
+    return request<IPWhitelistEntry[]>('GET', `/api/v1/admin/organizations/${orgId}/ip-whitelist`)
+  }
+
+  async function addIPWhitelist(orgId: string, data: { ip: string; label: string }): Promise<IPWhitelistEntry> {
+    return request<IPWhitelistEntry>('POST', `/api/v1/admin/organizations/${orgId}/ip-whitelist`, data)
+  }
+
+  async function removeIPWhitelist(orgId: string, entryId: string): Promise<{ status: string }> {
+    return request<{ status: string }>('DELETE', `/api/v1/admin/organizations/${orgId}/ip-whitelist/${entryId}`)
+  }
+
   return {
     // Auth
     login,
@@ -1626,6 +1651,11 @@ export function useAdminAPI() {
     deleteProctoringSettings,
     listProctoringSettingsByOrg,
     getRuleRegistry,
+
+    // IP Whitelisting (stub — backend not yet implemented)
+    listIPWhitelist,
+    addIPWhitelist,
+    removeIPWhitelist,
 
     // SSE Session Stream
     getSessionStreamUrl,

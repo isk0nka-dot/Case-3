@@ -16,8 +16,18 @@
 //   - Typed wrapper over IDBObjectStore
 //   - Auto-incrementing IDs for ordering
 //   - Indexed by sessionId, priority, status for efficient queries
+//   - Large blobs (>256KB) routed to OPFS via opfsKey field
+//   - EVIDENCE IS NEVER EVICTED — storage pressure triggers HardBlockerModal
 //
 // =============================================================================
+
+import {
+  isOPFSAvailable,
+  writeBlob as opfsWriteBlob,
+  readBlob as opfsReadBlob,
+  deleteBlob as opfsDeleteBlob,
+  OPFS_BLOB_THRESHOLD
+} from './opfs'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,7 +65,7 @@ export interface QueuedSnapshot {
   id?: number
   /** Session this snapshot belongs to. */
   sessionId: string
-  /** JPEG binary data. */
+  /** JPEG binary data (may be empty ArrayBuffer if stored in OPFS). */
   blob: ArrayBuffer
   /** SHA-256 hash of the blob (hex string). */
   sha256: string
@@ -77,6 +87,12 @@ export interface QueuedSnapshot {
   examId: string
   /** Student ID. */
   studentId: string
+  /**
+   * OPFS file key — when set, the actual blob is stored in the Origin Private
+   * File System instead of inline in IndexedDB. The `blob` field is an empty
+   * ArrayBuffer in this case. Use `readBlob(opfsKey)` to reconstitute.
+   */
+  opfsKey?: string
 }
 
 /** Metadata key-value record. */
@@ -397,23 +413,49 @@ export async function clearSessionEvents(sessionId: string): Promise<void> {
 
 /**
  * Add a snapshot to the queue. Returns the auto-generated ID.
+ *
+ * If the blob exceeds OPFS_BLOB_THRESHOLD (256KB) and OPFS is available,
+ * the blob is written to OPFS and only metadata + opfsKey are stored in IDB.
+ * This keeps IndexedDB transactions fast and avoids blob size limits.
  */
 export async function addSnapshot(snapshot: Omit<QueuedSnapshot, 'id'>): Promise<number> {
+  let record = { ...snapshot }
+
+  // Route large blobs to OPFS for better performance.
+  if (record.blob.byteLength > OPFS_BLOB_THRESHOLD && await isOPFSAvailable()) {
+    const opfsKey = `snap-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    try {
+      await opfsWriteBlob(opfsKey, record.blob)
+      // Store only metadata in IDB — blob is in OPFS.
+      record = {
+        ...record,
+        blob: new ArrayBuffer(0), // Empty placeholder.
+        opfsKey
+      }
+    } catch {
+      // OPFS write failed — fall back to inline IDB blob.
+      console.warn('[argus:idb] OPFS write failed, storing blob inline in IndexedDB')
+    }
+  }
+
   const id = await writeTx<IDBValidKey>(STORE_SNAPSHOTS, (store) =>
-    store.add(snapshot)
+    store.add(record)
   )
   return id as number
 }
 
 /**
  * Get snapshots by status, ordered by capturedAt (oldest first).
+ *
+ * For snapshots stored in OPFS (opfsKey is set), the blob is reconstituted
+ * from OPFS before returning. This is transparent to the caller.
  */
 export async function getSnapshotsByStatus(
   status: QueuedSnapshot['status'],
   limit: number = 5
 ): Promise<QueuedSnapshot[]> {
   const db = await openDB()
-  return new Promise<QueuedSnapshot[]>((resolve, reject) => {
+  const rawResults = await new Promise<QueuedSnapshot[]>((resolve, reject) => {
     const tx = db.transaction(STORE_SNAPSHOTS, 'readonly')
     const store = tx.objectStore(STORE_SNAPSHOTS)
     const index = store.index('status')
@@ -434,6 +476,18 @@ export async function getSnapshotsByStatus(
 
     request.onerror = () => reject(request.error)
   })
+
+  // Reconstitute OPFS blobs.
+  for (const snap of rawResults) {
+    if (snap.opfsKey) {
+      const blobData = await opfsReadBlob(snap.opfsKey)
+      if (blobData) {
+        snap.blob = blobData
+      }
+    }
+  }
+
+  return rawResults
 }
 
 /**
@@ -482,15 +536,46 @@ export async function updateSnapshotStatus(
 
 /**
  * Remove snapshots by their IDs.
+ * Also deletes associated OPFS blobs for snapshots with opfsKey.
  */
 export async function removeSnapshots(ids: number[]): Promise<void> {
   if (ids.length === 0) return
 
+  // First, read records to find OPFS keys before deletion.
+  const db = await openDB()
+  const opfsKeys: string[] = []
+
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_SNAPSHOTS, 'readonly')
+    const store = tx.objectStore(STORE_SNAPSHOTS)
+
+    for (const id of ids) {
+      const req = store.get(id)
+      req.onsuccess = () => {
+        const record = req.result as QueuedSnapshot | undefined
+        if (record?.opfsKey) {
+          opfsKeys.push(record.opfsKey)
+        }
+      }
+    }
+
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+
+  // Delete IDB records.
   await batchWriteTx(STORE_SNAPSHOTS, (store) => {
     for (const id of ids) {
       store.delete(id)
     }
   })
+
+  // Clean up OPFS blobs (best-effort, non-blocking).
+  for (const key of opfsKeys) {
+    opfsDeleteBlob(key).catch(() => {
+      // Silently ignore — blob cleanup is best-effort.
+    })
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -607,45 +692,10 @@ export async function getOldestPendingAge(): Promise<number> {
   })
 }
 
-/**
- * Evict oldest low-priority events to stay under the size limit.
- * Never evicts critical events.
- */
-export async function evictToSizeLimit(maxSizeBytes: number): Promise<number> {
-  const currentSize = await getTotalQueueSize()
-  if (currentSize <= maxSizeBytes) return 0
-
-  let evicted = 0
-  const excessBytes = currentSize - maxSizeBytes
-
-  // Evict low priority events first, then normal
-  for (const priority of ['low', 'normal'] as const) {
-    if (evicted >= excessBytes) break
-
-    const db = await openDB()
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_EVENTS, 'readwrite')
-      const store = tx.objectStore(STORE_EVENTS)
-      const index = store.index('priority')
-      const request = index.openCursor(IDBKeyRange.only(priority))
-
-      request.onsuccess = (event) => {
-        const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
-        if (cursor && evicted < excessBytes) {
-          const record = cursor.value as QueuedEvent
-          evicted += record.sizeBytes
-          cursor.delete()
-          cursor.continue()
-        }
-      }
-
-      tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
-    })
-  }
-
-  return evicted
-}
+// NOTE: evictToSizeLimit() has been REMOVED (ADR-007: Edge Persistence Policy).
+// Evidence is NEVER evicted — storage pressure triggers HardBlockerModal instead.
+// The browser evidence queue is a legal evidence chain; destroying evidence is
+// prohibited regardless of storage quota pressure.
 
 // ---------------------------------------------------------------------------
 // SHA-256 Utility

@@ -81,9 +81,11 @@ const heatmapData = computed(() => {
   const weeklyBase = store.weeklyTrends
   for (let d = 0; d < 7; d++) {
     const row: number[] = []
-    const dayMultiplier = weeklyBase[d] ? (weeklyBase[d].phone + weeklyBase[d].gaze) / 120 : 0.5
+    const wb = weeklyBase[d]
+    const dayMultiplier = wb ? (wb.phone + wb.gaze) / 120 : 0.5
     for (let h = 0; h < 12; h++) {
-      const hourVal = hourlyBase[h] ? (hourlyBase[h].phone + hourlyBase[h].gaze + hourlyBase[h].persons) : 0
+      const hb = hourlyBase[h]
+      const hourVal = hb ? (hb.phone + hb.gaze + hb.persons) : 0
       const value = Math.round(hourVal * dayMultiplier * (0.7 + Math.random() * 0.6))
       row.push(value)
     }

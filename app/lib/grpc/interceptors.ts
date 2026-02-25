@@ -292,6 +292,41 @@ export function createMetricsInterceptor(): {
 }
 
 // ---------------------------------------------------------------------------
+// Idempotency Interceptor — Prevents Duplicate Event Ingestion
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates an idempotency interceptor that attaches a unique
+ * `X-Idempotency-Key` header to every outgoing gRPC-Web request.
+ *
+ * When the transport retries a failed request (exponential backoff),
+ * the SAME key is sent. The backend's dedup interceptor recognizes
+ * the repeated key and returns a cached response instead of re-ingesting.
+ *
+ * Key generation:
+ *   - Prefers `crypto.randomUUID()` (available in secure contexts)
+ *   - Falls back to timestamp + entropy for HTTP contexts
+ *
+ * The key is generated ONCE per logical request. Retries within the
+ * transport layer reuse the same key because the header is set
+ * before the retry loop begins.
+ */
+export function createIdempotencyInterceptor(): TransportInterceptor {
+  return {
+    beforeRequest(request: TransportRequest): TransportRequest {
+      // Only set if not already present (retries preserve the original key)
+      if (!request.headers['X-Idempotency-Key']) {
+        const key = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+        request.headers['X-Idempotency-Key'] = key
+      }
+      return request
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Utility
 // ---------------------------------------------------------------------------
 

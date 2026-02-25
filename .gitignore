@@ -50,6 +50,12 @@ node_modules/
 playwright-report/
 test-results/
 
+# ── CI cache ──────────────────────────────────────────────────────────────
+.npm-cache/
+
+# ── Deployment platforms ──────────────────────────────────────────────────
+.vercel/
+
 # ── Temporary / Generated ───────────────────────────────────────────────────
 *.log
 *.tmp

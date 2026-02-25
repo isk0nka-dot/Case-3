@@ -78,6 +78,12 @@ export interface VisionEngineConfig {
   gazeThresholdDeg?: number  // default 15
   blinkEARThreshold?: number // default 0.21
   livenessWindow?: number    // frames for liveness check, default 30
+
+  // Callbacks for health governor integration
+  /** Called after each inference with the latency in ms. */
+  onInferenceLatency?: (ms: number) => void
+  /** Called when sustained high CPU load is detected (rolling avg >100ms for 3+ frames). */
+  onHighCpuLoad?: (avgInferenceMs: number) => void
 }
 
 export interface VisionEngineState {
@@ -134,19 +140,19 @@ const RIGHT_IRIS_CENTER = 473 as const
 function eyeAspectRatio(landmarks: Float32Array, eyeIds: readonly number[]): number {
   // EAR = (||p2-p6|| + ||p3-p5||) / (2 * ||p1-p4||)
   const p = (idx: number) => ({
-    x: landmarks[idx * 3],
-    y: landmarks[idx * 3 + 1]
+    x: landmarks[idx * 3]!,
+    y: landmarks[idx * 3 + 1]!
   })
 
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
     Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
 
-  const p1 = p(eyeIds[0])
-  const p2 = p(eyeIds[1])
-  const p3 = p(eyeIds[2])
-  const p4 = p(eyeIds[3])
-  const p5 = p(eyeIds[4])
-  const p6 = p(eyeIds[5])
+  const p1 = p(eyeIds[0]!)
+  const p2 = p(eyeIds[1]!)
+  const p3 = p(eyeIds[2]!)
+  const p4 = p(eyeIds[3]!)
+  const p5 = p(eyeIds[4]!)
+  const p6 = p(eyeIds[5]!)
 
   const vertical1 = dist(p2, p6)
   const vertical2 = dist(p3, p5)
@@ -167,18 +173,18 @@ function estimateHeadPose(
 ): HeadPose {
   // Extract 2D projected points from landmarks
   const pts2d: [number, number][] = PNP_LANDMARK_IDS.map(id => [
-    landmarks[id * 3] * frameWidth,
-    landmarks[id * 3 + 1] * frameHeight
+    landmarks[id * 3]! * frameWidth,
+    landmarks[id * 3 + 1]! * frameHeight
   ])
 
   // Simplified Euler angle estimation using geometric ratios
   // (avoids full PnP solve which requires OpenCV — not available in browser)
-  const noseTip = pts2d[0]
-  const chin = pts2d[1]
-  const leftEye = pts2d[2]
-  const rightEye = pts2d[3]
-  const leftMouth = pts2d[4]
-  const rightMouth = pts2d[5]
+  const noseTip = pts2d[0]!
+  const chin = pts2d[1]!
+  const leftEye = pts2d[2]!
+  const rightEye = pts2d[3]!
+  const leftMouth = pts2d[4]!
+  const rightMouth = pts2d[5]!
 
   // Yaw: ratio of nose-to-eye distances
   const noseToLeft = Math.sqrt((noseTip[0] - leftEye[0]) ** 2 + (noseTip[1] - leftEye[1]) ** 2)
@@ -216,18 +222,18 @@ function estimateGaze(
 ): GazeVector {
   // Compute iris center relative to eye corners
   const leftIris = {
-    x: landmarks[LEFT_IRIS_CENTER * 3],
-    y: landmarks[LEFT_IRIS_CENTER * 3 + 1]
+    x: landmarks[LEFT_IRIS_CENTER * 3]!,
+    y: landmarks[LEFT_IRIS_CENTER * 3 + 1]!
   }
   const rightIris = {
-    x: landmarks[RIGHT_IRIS_CENTER * 3],
-    y: landmarks[RIGHT_IRIS_CENTER * 3 + 1]
+    x: landmarks[RIGHT_IRIS_CENTER * 3]!,
+    y: landmarks[RIGHT_IRIS_CENTER * 3 + 1]!
   }
 
-  const leftEyeInner = { x: landmarks[263 * 3], y: landmarks[263 * 3 + 1] }
-  const leftEyeOuter = { x: landmarks[362 * 3], y: landmarks[362 * 3 + 1] }
-  const rightEyeInner = { x: landmarks[133 * 3], y: landmarks[133 * 3 + 1] }
-  const rightEyeOuter = { x: landmarks[33 * 3], y: landmarks[33 * 3 + 1] }
+  const leftEyeInner = { x: landmarks[263 * 3]!, y: landmarks[263 * 3 + 1]! }
+  const leftEyeOuter = { x: landmarks[362 * 3]!, y: landmarks[362 * 3 + 1]! }
+  const rightEyeInner = { x: landmarks[133 * 3]!, y: landmarks[133 * 3 + 1]! }
+  const rightEyeOuter = { x: landmarks[33 * 3]!, y: landmarks[33 * 3 + 1]! }
 
   // Normalize iris position within eye (0=outer corner, 1=inner corner)
   const leftEyeWidth = Math.abs(leftEyeInner.x - leftEyeOuter.x) + 1e-6
@@ -264,8 +270,8 @@ function estimateGaze(
 function computeFaceBBox(landmarks: Float32Array, count: number): FaceBBox {
   let minX = 1, minY = 1, maxX = 0, maxY = 0
   for (let i = 0; i < count; i++) {
-    const x = landmarks[i * 3]
-    const y = landmarks[i * 3 + 1]
+    const x = landmarks[i * 3]!
+    const y = landmarks[i * 3 + 1]!
     if (x < minX) minX = x
     if (y < minY) minY = y
     if (x > maxX) maxX = x
@@ -315,7 +321,9 @@ export function useVisionEngine(config: VisionEngineConfig) {
     headPoseThresholds = { yaw: 25, pitch: 20, roll: 15 },
     gazeThresholdDeg = 15,
     blinkEARThreshold = 0.21,
-    livenessWindow = 30
+    livenessWindow = 30,
+    onInferenceLatency,
+    onHighCpuLoad
   } = config
 
   // State
@@ -354,6 +362,13 @@ export function useVisionEngine(config: VisionEngineConfig) {
   let frameCountForFps = 0
   let fpsStartTime = Date.now()
 
+  // Inference latency rolling average (for CPU spike detection)
+  const INFERENCE_LATENCY_WINDOW = 5
+  const inferenceLatencyWindow: number[] = []
+  let consecutiveHighCpuFrames = 0
+  const HIGH_CPU_THRESHOLD_MS = 100
+  const HIGH_CPU_CONSECUTIVE = 3
+
   // MediaPipe FaceMesh instance (lazy loaded)
   let faceMesh: any = null
 
@@ -365,6 +380,7 @@ export function useVisionEngine(config: VisionEngineConfig) {
     if (modelLoaded.value) return true
     try {
       // Dynamic import to avoid bundling MediaPipe unless used
+      // @ts-expect-error — dynamic import, types not bundled
       const vision = await import('@mediapipe/tasks-vision')
       const { FaceLandmarker, FilesetResolver } = vision
 
@@ -418,6 +434,28 @@ export function useVisionEngine(config: VisionEngineConfig) {
 
       _stats.value.totalFrames++
       _stats.value.inferenceMsSum += inferenceMs
+
+      // Report inference latency to health governor for CPU spike penalty
+      if (onInferenceLatency) {
+        onInferenceLatency(inferenceMs)
+      }
+
+      // Track rolling average for HIGH_CPU_LOAD detection
+      inferenceLatencyWindow.push(inferenceMs)
+      if (inferenceLatencyWindow.length > INFERENCE_LATENCY_WINDOW) {
+        inferenceLatencyWindow.shift()
+      }
+      const avgInferenceMs = inferenceLatencyWindow.reduce((a, b) => a + b, 0) / inferenceLatencyWindow.length
+      if (avgInferenceMs > HIGH_CPU_THRESHOLD_MS) {
+        consecutiveHighCpuFrames++
+        if (consecutiveHighCpuFrames >= HIGH_CPU_CONSECUTIVE && onHighCpuLoad) {
+          onHighCpuLoad(avgInferenceMs)
+          // Reset to avoid flooding — only fire once per sustained spike
+          consecutiveHighCpuFrames = 0
+        }
+      } else {
+        consecutiveHighCpuFrames = 0
+      }
 
       // FPS tracking
       frameCountForFps++

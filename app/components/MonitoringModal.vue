@@ -441,7 +441,7 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                   >
                     <!-- LiveKit Video Player (replaces static placeholder) -->
                     <VideoPlayer
-                      :session-id="session.sessionId"
+                      :session-id="session.id"
                       :compact="false"
                     />
 

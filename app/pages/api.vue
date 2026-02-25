@@ -357,6 +357,10 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('click', onClickOutsideOrgDropdown)
 })
+
+function copyToClipboard(text: string) {
+  window.navigator.clipboard.writeText(text)
+}
 </script>
 
 <template>
@@ -751,7 +755,7 @@ onUnmounted(() => {
                 <button
                   class="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer shrink-0"
                   :style="{ background: 'var(--argus-accent)', color: '#fff' }"
-                  @click="window.navigator.clipboard.writeText(createdSecretKey!)"
+                  @click="copyToClipboard(createdSecretKey!)"
                 >
                   <UIcon name="i-lucide-copy" class="size-3" />
                   Копировать

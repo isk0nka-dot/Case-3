@@ -49,9 +49,9 @@ export default defineNuxtConfig({
   // Backwards-compat: NUXT_PUBLIC_GRPC_URL is also accepted.
   runtimeConfig: {
     public: {
-      apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL
-        || process.env.NUXT_PUBLIC_GRPC_URL
-        || 'http://localhost:8080'
+      // Nuxt auto-maps NUXT_PUBLIC_API_BASE_URL env var at runtime.
+      // Backwards-compat: NUXT_PUBLIC_GRPC_URL is read via fallback below.
+      apiBaseUrl: 'http://localhost:8080'
     }
   },
 

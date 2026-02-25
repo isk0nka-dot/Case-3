@@ -1,7 +1,7 @@
 export default defineNuxtRouteMiddleware((to) => {
   // Public pages that don't require auth.
   // The index page (/) is the landing page — always accessible.
-  const publicPaths = ['/', '/landing', '/student-guide']
+  const publicPaths = ['/', '/landing', '/student-guide', '/docs']
 
   if (publicPaths.includes(to.path)) {
     return // Allow access — no auth required
@@ -30,6 +30,22 @@ export default defineNuxtRouteMiddleware((to) => {
               }
             } else {
               // No user data stored — cannot verify role, block access
+              return navigateTo('/dashboard?denied=1')
+            }
+          }
+
+          // --- Org Admin Route Protection ---
+          // Restrict /integrations to org_admin or super_admin.
+          const orgAdminPaths = ['/integrations']
+          if (orgAdminPaths.includes(to.path)) {
+            const storedUser = localStorage.getItem('argus_user')
+            if (storedUser) {
+              const user = JSON.parse(storedUser)
+              const isAdmin = user.role === 'org_admin' || (user.role === 'super_admin' && user.orgId === '*')
+              if (!isAdmin) {
+                return navigateTo('/dashboard?denied=1')
+              }
+            } else {
               return navigateTo('/dashboard?denied=1')
             }
           }

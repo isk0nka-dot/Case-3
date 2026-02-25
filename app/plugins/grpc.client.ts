@@ -27,6 +27,7 @@ import { GrpcWebTransport } from '~/lib/grpc/transport'
 import { EventCollectorClient } from '~/lib/grpc/client'
 import {
   createAuthInterceptor,
+  createIdempotencyInterceptor,
   createLoggingInterceptor,
   createMetricsInterceptor
 } from '~/lib/grpc/interceptors'
@@ -115,6 +116,17 @@ export default defineNuxtPlugin((_nuxtApp) => {
     }
   )
   transport.addInterceptor(authInterceptor)
+
+  // -------------------------------------------------------------------------
+  // Step 2b: Add Idempotency Interceptor
+  // -------------------------------------------------------------------------
+  //
+  // Attaches a unique X-Idempotency-Key header to every request.
+  // The backend's dedup interceptor uses this to prevent duplicate
+  // event ingestion during transport retries.
+  //
+  const idempotencyInterceptor = createIdempotencyInterceptor()
+  transport.addInterceptor(idempotencyInterceptor)
 
   // -------------------------------------------------------------------------
   // Step 3: Add Logging Interceptor

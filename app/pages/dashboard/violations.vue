@@ -6,8 +6,8 @@ const { isDark, accentBg, errorBg, successBg, warningBg } = useColors()
 
 // --- Filter State ---
 const selectedExam = computed({
-  get: () => store.violationSelectedExamId,
-  set: (v) => { store.violationSelectedExamId = v }
+  get: () => store.violationSelectedExamId ?? undefined,
+  set: (v: string | undefined) => { store.violationSelectedExamId = v ?? null }
 })
 
 const dateRange = computed({

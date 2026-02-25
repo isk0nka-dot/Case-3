@@ -44,6 +44,7 @@ import { ref, computed, watch, onUnmounted, type Ref, type ComputedRef } from 'v
 import type { ProctoringEvent, ClientMeta, EventPayload, SessionDirective } from '~/lib/proto/types'
 import { EventType, Severity, EventSource, TelemetryMode, isTelemetryEvent } from '~/lib/proto/types'
 import { useResilience } from './useResilience'
+import { registerDebugSession, clearDebugSession } from './useDebugBridge'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -187,7 +188,11 @@ export function useProctoringSession(config: SessionConfig) {
   // -------------------------------------------------------------------------
 
   function generateEventId(): string {
-    const timestamp = Date.now().toString(36)
+    // Use server-adjusted time for time-ordered event IDs.
+    // This ensures correct chronological ordering even when the
+    // student's system clock is skewed.
+    const adjustedNow = resilience ? resilience.serverAdjustedNow() : Date.now()
+    const timestamp = adjustedNow.toString(36)
     const random = Math.random().toString(36).substring(2, 10)
     eventCounter++
     return `evt-${timestamp}-${random}-${eventCounter.toString(36)}`
@@ -231,6 +236,17 @@ export function useProctoringSession(config: SessionConfig) {
       startedAt.value = Date.now()
       status.value = 'active'
 
+      // Register with debug bridge for PerformanceDebugger overlay (Ctrl+Shift+D)
+      // This is a no-op in production — the debugger panel is hidden by default.
+      // We register here (instead of at construction) so the debugger only shows
+      // data for actively running sessions.
+      registerDebugSession(
+        // Defer registration — the return object is created below.
+        // For now, pass a partial proxy that the debugger can read from.
+        { status, isActive, metrics, resilience } as ReturnType<typeof useProctoringSession>,
+        resilience
+      )
+
       console.debug(`[argus:session] Started session ${sessionId}`, {
         resilience: enableResilience,
         tier: resilience?.tier.value ?? 'N/A'
@@ -271,10 +287,12 @@ export function useProctoringSession(config: SessionConfig) {
       await sendHeartbeat()
 
       status.value = 'stopped'
+      clearDebugSession()
       console.debug(`[argus:session] Stopped session ${sessionId}. Total events: ${totalEventsSent.value}`)
     } catch (err) {
       error.value = (err as Error).message
       status.value = 'stopped'
+      clearDebugSession()
     }
   }
 
@@ -321,7 +339,16 @@ export function useProctoringSession(config: SessionConfig) {
       violationCount.value++
     }
 
-    // Build the event.
+    // Build the event with server-adjusted timestamp for correct chronological ordering.
+    const adjustedNow = resilience ? resilience.serverAdjustedNow() : Date.now()
+    const clientMeta = getClientMeta()
+
+    // Include clock offset in client metadata for server-side audit trail.
+    // This lets the server know the client was aware of its clock skew.
+    if (resilience) {
+      (clientMeta as unknown as Record<string, unknown>).clockOffsetMs = resilience.clockOffsetMs.value
+    }
+
     const event: ProctoringEvent = {
       eventId: generateEventId(),
       sessionId,
@@ -331,11 +358,11 @@ export function useProctoringSession(config: SessionConfig) {
       eventType,
       severity,
       source,
-      clientTimestamp: new Date().toISOString(),
+      clientTimestamp: new Date(adjustedNow).toISOString(),
       label: label ?? '',
       confidence,
       payload,
-      clientMeta: getClientMeta()
+      clientMeta
     }
 
     // Queue for batched delivery.

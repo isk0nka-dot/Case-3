@@ -165,7 +165,7 @@ export function useAudioEngine(config: AudioEngineConfig = {}) {
     // A-weighted RMS from frequency domain
     let sum = 0
     for (let i = 0; i < freqData.length; i++) {
-      const dbVal = freqData[i] + aWeightLut[i] // apply A-weighting
+      const dbVal = (freqData[i] ?? 0) + (aWeightLut[i] ?? 0) // apply A-weighting
       const linear = Math.pow(10, dbVal / 20)
       sum += linear * linear
     }
@@ -176,7 +176,7 @@ export function useAudioEngine(config: AudioEngineConfig = {}) {
   function computePeakDb(timeDomain: Float32Array): number {
     let peak = 0
     for (let i = 0; i < timeDomain.length; i++) {
-      const abs = Math.abs(timeDomain[i])
+      const abs = Math.abs(timeDomain[i] ?? 0)
       if (abs > peak) peak = abs
     }
     return 20 * Math.log10(peak + 1e-20)
@@ -185,7 +185,7 @@ export function useAudioEngine(config: AudioEngineConfig = {}) {
   function computeZCR(timeDomain: Float32Array): number {
     let crossings = 0
     for (let i = 1; i < timeDomain.length; i++) {
-      if ((timeDomain[i] >= 0) !== (timeDomain[i - 1] >= 0)) crossings++
+      if (((timeDomain[i] ?? 0) >= 0) !== ((timeDomain[i - 1] ?? 0) >= 0)) crossings++
     }
     return crossings / (timeDomain.length - 1)
   }
@@ -195,7 +195,7 @@ export function useAudioEngine(config: AudioEngineConfig = {}) {
     let weightedSum = 0
     let totalEnergy = 0
     for (let i = 1; i < freqData.length; i++) {
-      const linear = Math.pow(10, freqData[i] / 20)
+      const linear = Math.pow(10, (freqData[i] ?? -100) / 20)
       const energy = linear * linear
       weightedSum += i * binHz * energy
       totalEnergy += energy
@@ -210,7 +210,7 @@ export function useAudioEngine(config: AudioEngineConfig = {}) {
 
     for (let i = 0; i < freqData.length; i++) {
       const freq = i * binHz
-      const val = freqData[i]
+      const val = freqData[i] ?? -100
       if (freq < 200) { bands.sub += val; counts.sub++ }
       else if (freq < 500) { bands.low += val; counts.low++ }
       else if (freq < 2000) { bands.mid += val; counts.mid++ }
@@ -334,8 +334,8 @@ export function useAudioEngine(config: AudioEngineConfig = {}) {
   function analyze() {
     if (!analyser || !frequencyData || !timeDomainData) return
 
-    analyser.getFloatFrequencyData(frequencyData)
-    analyser.getFloatTimeDomainData(timeDomainData)
+    analyser.getFloatFrequencyData(frequencyData as Float32Array<ArrayBuffer>)
+    analyser.getFloatTimeDomainData(timeDomainData as Float32Array<ArrayBuffer>)
 
     const rmsDb = computeRmsDb(frequencyData)
     const peakDb = computePeakDb(timeDomainData)
@@ -349,7 +349,7 @@ export function useAudioEngine(config: AudioEngineConfig = {}) {
       if (noiseFloorSamples.length === NOISE_CALIBRATION_FRAMES) {
         noiseFloorSamples.sort((a, b) => a - b)
         // Use 10th percentile as noise floor
-        calibratedNoiseFloor = noiseFloorSamples[Math.floor(NOISE_CALIBRATION_FRAMES * 0.1)]
+        calibratedNoiseFloor = noiseFloorSamples[Math.floor(NOISE_CALIBRATION_FRAMES * 0.1)] ?? -60
       }
     }
 

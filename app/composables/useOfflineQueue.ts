@@ -39,12 +39,12 @@ import {
   updateSnapshotStatus,
   getTotalQueueSize,
   getOldestPendingAge,
-  evictToSizeLimit,
   sha256,
   hmacSha256,
   type QueuedEvent,
   type QueuedSnapshot
 } from '~/lib/storage/idb'
+import { probeOPFSHealth, getStorageStats, type OPFSStorageStats } from '~/lib/storage/opfs'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -255,8 +255,8 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
     try {
       const ids = await addEvents(records)
 
-      // Enforce size limit
-      await evictToSizeLimit(cfg.maxSizeBytes)
+      // ADR-007: Evidence is NEVER evicted. Storage pressure triggers
+      // HardBlockerModal via checkStorageQuota() instead.
 
       // Update stats (debounced to avoid thrashing)
       void refreshStats()
@@ -305,8 +305,8 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
         studentId: meta.studentId
       })
 
-      // Enforce size limit
-      await evictToSizeLimit(cfg.maxSizeBytes)
+      // ADR-007: Evidence is NEVER evicted. Storage pressure triggers
+      // HardBlockerModal via checkStorageQuota() instead.
 
       void refreshStats()
       return id
@@ -534,8 +534,29 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
     if (isInitialized.value) return
 
     try {
+      // ADR-007: Request persistent storage BEFORE any writes.
+      // Prevents the browser from silently evicting our IndexedDB evidence
+      // during storage pressure. Without this, Chrome can delete our data
+      // at any time when running low on disk space.
+      if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+        try {
+          const granted = await navigator.storage.persist()
+          if (granted) {
+            console.debug('[argus:queue] Persistent storage GRANTED — evidence is protected from browser eviction')
+          } else {
+            console.warn('[argus:queue] Persistent storage DENIED — evidence may be evicted by the browser under storage pressure')
+          }
+        } catch (err) {
+          console.warn('[argus:queue] navigator.storage.persist() failed:', err)
+        }
+      }
+
       await refreshStats()
       isInitialized.value = true
+
+      // Start OPFS health probe for fallback recovery
+      startOPFSProbe()
+
       console.debug('[argus:queue] Offline queue initialized', stats.value)
     } catch (err) {
       console.error('[argus:queue] Failed to initialize:', err)
@@ -546,7 +567,7 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
   void initialize()
 
   // -------------------------------------------------------------------------
-  // IndexedDB Quota Monitoring (v2.1)
+  // IndexedDB Quota Monitoring (v3.0 — ADR-007: Edge Persistence)
   // -------------------------------------------------------------------------
 
   /** Browser storage quota info. */
@@ -556,14 +577,83 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
     percent: 0
   })
 
-  /** High quota threshold (80%). When exceeded, low-priority items are evicted. */
-  const QUOTA_HIGH_THRESHOLD = 0.8
+  /**
+   * CRITICAL threshold (90%): when exceeded, the exam is hard-blocked.
+   * The HardBlockerModal is displayed and all evidence capture stops until
+   * the student frees disk space. Evidence is NEVER evicted.
+   */
+  const QUOTA_CRITICAL_THRESHOLD = 0.9
+
+  /**
+   * Recovery threshold (80%): when storage drops below this after being
+   * blocked, the hard blocker is cleared and draining resumes.
+   */
+  const QUOTA_RECOVERY_THRESHOLD = 0.8
+
+  /**
+   * Hard blocker state. When true, the HardBlockerModal is shown to the
+   * student and the drain loop is paused. The exam cannot continue until
+   * storage drops below QUOTA_RECOVERY_THRESHOLD.
+   */
+  const isStorageBlocked: Ref<boolean> = ref(false)
 
   let quotaCheckTimer: ReturnType<typeof setInterval> | null = null
 
+  // -------------------------------------------------------------------------
+  // OPFS Health Probe & Fallback Tracking (Gap 4)
+  // -------------------------------------------------------------------------
+
+  let opfsProbeTimer: ReturnType<typeof setInterval> | null = null
+  const opfsFallbackCount: Ref<number> = ref(0)
+
+  /** Start periodic OPFS health probing (every 60 seconds). */
+  function startOPFSProbe(): void {
+    if (opfsProbeTimer) return
+    opfsProbeTimer = setInterval(async () => {
+      const healthy = await probeOPFSHealth()
+      if (healthy) {
+        // If it was previously failed (fallback count > 0), log recovery
+        if (opfsFallbackCount.value > 0) {
+          console.info('[argus:queue] OPFS recovered after', opfsFallbackCount.value, 'fallback writes')
+        }
+      }
+    }, 60_000)
+    // Initial probe
+    void probeOPFSHealth()
+    console.debug('[argus:queue] OPFS health probe started (60s interval)')
+  }
+
+  /** Stop OPFS health probing. */
+  function stopOPFSProbe(): void {
+    if (opfsProbeTimer) {
+      clearInterval(opfsProbeTimer)
+      opfsProbeTimer = null
+    }
+  }
+
+  /** Handle OPFS → IDB fallback events from the storage layer. */
+  function handleStorageFallback(event: Event): void {
+    const detail = (event as CustomEvent).detail
+    opfsFallbackCount.value++
+    console.warn('[argus:queue] OPFS fallback event received', {
+      key: detail?.key,
+      error: detail?.error,
+      totalFallbacks: opfsFallbackCount.value
+    })
+  }
+
+  // Listen for storage fallback events
+  if (typeof window !== 'undefined') {
+    window.addEventListener('argus:storage-fallback', handleStorageFallback)
+  }
+
   /**
    * Check IndexedDB/storage quota via navigator.storage.estimate().
-   * If usage exceeds 80% of quota, proactively evict low-priority items.
+   *
+   * ADR-007 policy:
+   *   - At 90% quota → set isStorageBlocked=true, stop drain loop
+   *   - At < 80% quota (when blocked) → clear block, resume drain
+   *   - Evidence is NEVER evicted regardless of quota pressure
    */
   async function checkStorageQuota(): Promise<void> {
     if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return
@@ -576,17 +666,24 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
 
       storageQuota.value = { usage, quota, percent }
 
-      if (percent > QUOTA_HIGH_THRESHOLD) {
-        console.warn('[argus:queue] Storage quota high, evicting low-priority items', {
+      if (percent >= QUOTA_CRITICAL_THRESHOLD && !isStorageBlocked.value) {
+        // CRITICAL: Storage nearly full. Hard-block the exam.
+        isStorageBlocked.value = true
+        stopDrain()
+        console.error('[argus:queue] STORAGE CRITICAL — exam hard-blocked', {
           usageMB: Math.round(usage / (1024 * 1024)),
           quotaMB: Math.round(quota / (1024 * 1024)),
           percent: Math.round(percent * 100) + '%'
         })
-
-        // Evict to 70% of quota to create headroom.
-        const targetSize = Math.floor(quota * 0.7)
-        await evictToSizeLimit(targetSize)
-        await refreshStats()
+      } else if (percent < QUOTA_RECOVERY_THRESHOLD && isStorageBlocked.value) {
+        // Recovery: storage dropped below 80%, resume normal operation.
+        isStorageBlocked.value = false
+        startDrain()
+        console.info('[argus:queue] Storage recovered — exam unblocked, drain resumed', {
+          usageMB: Math.round(usage / (1024 * 1024)),
+          quotaMB: Math.round(quota / (1024 * 1024)),
+          percent: Math.round(percent * 100) + '%'
+        })
       }
     } catch (err) {
       // navigator.storage.estimate() may not be available in all contexts.
@@ -624,8 +721,10 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
     totalPending,
     formattedSize,
 
-    // Storage quota (v2.1)
+    // Storage quota (v3.0 — ADR-007)
     storageQuota,
+    /** Hard blocker: true when storage ≥90%. Exam must pause until recovery. */
+    isStorageBlocked,
 
     // Operations
     enqueueEvents,
@@ -642,10 +741,16 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
     setEventUploader,
     setSnapshotUploader,
 
-    // Quota monitoring (v2.1)
+    // Quota monitoring (v3.0 — ADR-007)
     startQuotaMonitoring,
     stopQuotaMonitoring,
     checkStorageQuota,
+
+    // OPFS health probe (Gap 4 — dual-write fallback)
+    startOPFSProbe,
+    stopOPFSProbe,
+    opfsFallbackCount,
+    getOPFSStats: getStorageStats,
 
     // Utilities
     refreshStats

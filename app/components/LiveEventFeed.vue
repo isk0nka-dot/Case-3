@@ -72,6 +72,10 @@ const { formatTimeAgoMs } = useFormatters()
 
 // Selected event for detail view.
 const selectedEvent = ref<FeedEvent | null>(null)
+const isEventModalOpen = computed({
+  get: () => !!selectedEvent.value,
+  set: (val: boolean) => { if (!val) selectedEvent.value = null }
+})
 </script>
 
 <template>
@@ -196,7 +200,7 @@ const selectedEvent = ref<FeedEvent | null>(null)
     </div>
 
     <!-- Event Detail Modal -->
-    <UModal v-model:open="selectedEvent">
+    <UModal v-model:open="isEventModalOpen">
       <template #default>
         <div v-if="selectedEvent" class="p-6">
           <div class="flex items-center gap-3 mb-4">

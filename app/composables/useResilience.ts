@@ -93,6 +93,69 @@ export function useResilience(config: ResilienceConfig) {
   const heartbeatIntervalMs = 15_000 // Send heartbeat every 15s
 
   // -------------------------------------------------------------------------
+  // Clock Synchronization (NTP-style offset estimation)
+  // -------------------------------------------------------------------------
+  //
+  // Prevents JWT expiration failures when the student's system clock is skewed.
+  // Uses the heartbeat round-trip to estimate server-client clock offset:
+  //   offset = serverTime - clientSendTime - rtt/2
+  //
+  // A running median of the last 5 samples rejects RTT outliers.
+  // -------------------------------------------------------------------------
+
+  const clockOffsetMs: Ref<number> = ref(0)
+  const clockOffsetSamples: number[] = []
+  const CLOCK_OFFSET_SAMPLE_COUNT = 5
+
+  /**
+   * Returns `Date.now()` adjusted by the server clock offset.
+   * If the student's clock is 5 minutes ahead, this returns a time
+   * 5 minutes behind `Date.now()`, matching the server's wall clock.
+   */
+  function serverAdjustedNow(): number {
+    return Date.now() + clockOffsetMs.value
+  }
+
+  /**
+   * Update clock offset from heartbeat round-trip timing.
+   *
+   * @param sendTimeMs - `Date.now()` captured immediately before heartbeat RPC
+   * @param serverTimestamp - ISO 8601 timestamp from `HeartbeatResponse.serverTimestamp`
+   * @param recvTimeMs - `Date.now()` captured immediately after heartbeat response
+   */
+  function updateClockOffset(sendTimeMs: number, serverTimestamp: string, recvTimeMs: number): void {
+    const serverTimeMs = new Date(serverTimestamp).getTime()
+    if (isNaN(serverTimeMs) || serverTimeMs <= 0) return // Invalid timestamp
+
+    const rtt = recvTimeMs - sendTimeMs
+    if (rtt < 0 || rtt > 30_000) return // Reject absurd RTT (>30s)
+
+    // NTP-style offset: offset = serverTime - clientTime - rtt/2
+    const offset = serverTimeMs - sendTimeMs - Math.floor(rtt / 2)
+
+    // Maintain a rolling window of samples
+    clockOffsetSamples.push(offset)
+    if (clockOffsetSamples.length > CLOCK_OFFSET_SAMPLE_COUNT) {
+      clockOffsetSamples.shift()
+    }
+
+    // Use the median to reject outliers (e.g., one slow heartbeat)
+    const sorted = [...clockOffsetSamples].sort((a, b) => a - b)
+    const medianOffset = sorted[Math.floor(sorted.length / 2)]
+
+    clockOffsetMs.value = medianOffset ?? 0
+
+    // Log significant skew (>2s) for debugging
+    if (Math.abs(medianOffset ?? 0) > 2000) {
+      console.warn('[argus:resilience] Significant clock skew detected', {
+        offsetMs: medianOffset,
+        rttMs: rtt,
+        samples: clockOffsetSamples.length
+      })
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Transport Integration
   // -------------------------------------------------------------------------
 
@@ -147,12 +210,48 @@ export function useResilience(config: ResilienceConfig) {
           }
         })
 
-        // Listen for online/offline transitions
+        // Listen for online/offline transitions with enhanced reconnection protocol
         if ($grpc.transport) {
           $grpc.transport.onConnectionChange((online: boolean) => {
             if (online) {
-              connectionMessage.value = ''
+              // Mid-exam reconnection protocol:
+              // 1. Show queue depth to student
+              const pendingEvents = offlineQueue.stats.value.pendingEvents ?? 0
+              const pendingSnapshots = offlineQueue.stats.value.pendingSnapshots ?? 0
+              const total = pendingEvents + pendingSnapshots
+
+              if (total > 0) {
+                connectionMessage.value = `Переподключение... (${total} событий в очереди)`
+              } else {
+                connectionMessage.value = 'Подключение восстановлено.'
+              }
+
+              // 2. Send immediate heartbeat (don't wait for 15s interval)
+              void sendHeartbeat()
+
+              // 3. Start drain loop (with existing 5s jitter)
               offlineQueue.startDrain()
+
+              // 4. Clear message after successful drain or 5s
+              setTimeout(() => {
+                if (connectionMessage.value.includes('Переподключение') || connectionMessage.value === 'Подключение восстановлено.') {
+                  connectionMessage.value = total > 0 ? 'Данные синхронизированы ✓' : ''
+                  // Clear the success message after 5s
+                  if (connectionMessage.value) {
+                    setTimeout(() => {
+                      if (connectionMessage.value === 'Данные синхронизированы ✓') {
+                        connectionMessage.value = ''
+                      }
+                    }, 5000)
+                  }
+                }
+              }, 3000)
+
+              console.info('[argus:resilience] Reconnected', {
+                pendingEvents,
+                pendingSnapshots,
+                clockOffsetMs: clockOffsetMs.value
+              })
             } else {
               connectionMessage.value = 'Подключение потеряно. События сохраняются локально.'
               offlineQueue.stopDrain()
@@ -183,39 +282,55 @@ export function useResilience(config: ResilienceConfig) {
 
     heartbeatTimer = setInterval(async () => {
       if (!isStarted.value || serverTerminated.value) return
-
-      try {
-        const { $grpc } = useNuxtApp()
-        if (!$grpc?.client) return
-
-        const response: HeartbeatResponse = await $grpc.client.heartbeat({
-          sessionId: config.sessionId,
-          studentId: config.studentId,
-          examId: config.examId,
-          clientTimestamp: new Date().toISOString(),
-          currentFocusScore: healthGovernor.healthScore.value,
-          violationCount: 0 // Will be populated by session state
-        })
-
-        // Process server directives
-        if (response.directive) {
-          serverDirective.value = response.directive
-          applyServerDirective(response.directive)
-        }
-
-        // Check session termination
-        if (!response.sessionActive || response.directive?.terminate) {
-          serverTerminated.value = true
-          serverTerminateReason.value = response.directive?.terminateReason || 'Session terminated by server'
-          connectionMessage.value = `Сессия завершена сервером: ${serverTerminateReason.value}`
-          stop()
-        }
-      } catch {
-        // Heartbeat failed — not fatal, next iteration will retry.
-        // The transport layer handles offline detection separately.
-        console.debug('[argus:resilience] Heartbeat failed, will retry')
-      }
+      await sendHeartbeat()
     }, heartbeatIntervalMs)
+  }
+
+  /**
+   * Send a single heartbeat with clock offset measurement.
+   * Extracted from the interval loop so it can be called immediately on reconnect.
+   */
+  async function sendHeartbeat(): Promise<void> {
+    try {
+      const { $grpc } = useNuxtApp()
+      if (!$grpc?.client) return
+
+      // Capture send time for clock offset calculation
+      const sendTimeMs = Date.now()
+
+      const response: HeartbeatResponse = await $grpc.client.heartbeat({
+        sessionId: config.sessionId,
+        studentId: config.studentId,
+        examId: config.examId,
+        clientTimestamp: new Date(serverAdjustedNow()).toISOString(),
+        currentFocusScore: healthGovernor.healthScore.value,
+        violationCount: 0 // Will be populated by session state
+      })
+
+      // Clock offset calculation from heartbeat round-trip
+      const recvTimeMs = Date.now()
+      if (response.serverTimestamp) {
+        updateClockOffset(sendTimeMs, response.serverTimestamp, recvTimeMs)
+      }
+
+      // Process server directives
+      if (response.directive) {
+        serverDirective.value = response.directive
+        applyServerDirective(response.directive)
+      }
+
+      // Check session termination
+      if (!response.sessionActive || response.directive?.terminate) {
+        serverTerminated.value = true
+        serverTerminateReason.value = response.directive?.terminateReason || 'Session terminated by server'
+        connectionMessage.value = `Сессия завершена сервером: ${serverTerminateReason.value}`
+        stop()
+      }
+    } catch {
+      // Heartbeat failed — not fatal, next iteration will retry.
+      // The transport layer handles offline detection separately.
+      console.debug('[argus:resilience] Heartbeat failed, will retry')
+    }
   }
 
   function stopHeartbeatLoop(): void {
@@ -500,6 +615,10 @@ export function useResilience(config: ResilienceConfig) {
     serverDirective,
     serverTerminated,
     serverTerminateReason,
+
+    // Clock synchronization
+    clockOffsetMs: computed(() => clockOffsetMs.value),
+    serverAdjustedNow,
 
     // Sub-systems (for advanced usage)
     healthGovernor,
