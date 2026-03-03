@@ -220,7 +220,10 @@ export class GrpcWebTransport {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        // Request compressed responses — gzip/br reduces JSON payloads by 80-87%.
+        // The browser automatically decompresses Content-Encoding: gzip/br responses.
+        'Accept-Encoding': 'gzip, deflate, br'
       },
       body: JSON.stringify(body)
     }

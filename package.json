@@ -28,6 +28,8 @@
     "@nuxt/eslint": "^1.14.0",
     "@playwright/test": "^1.58.2",
     "eslint": "^10.0.0",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5",
     "typescript": "^5.9.3",
     "vue-tsc": "^3.2.4"
   }

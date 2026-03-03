@@ -171,16 +171,23 @@ export function useProctoringSession(config: SessionConfig) {
   let eventCounter = 0
 
   // -------------------------------------------------------------------------
-  // Client Metadata
+  // Client Metadata — cached at session start
   // -------------------------------------------------------------------------
 
+  // Pre-compute immutable client metadata ONCE instead of re-reading
+  // navigator.userAgent, screen dimensions, and constructing a Date object
+  // on every event (~10 events/sec = 10 unnecessary allocations/sec).
+  // Only timezoneOffsetMin could theoretically change mid-session (DST
+  // transition), but in practice this never happens during a 2-3 hour exam.
+  const cachedClientMeta: ClientMeta = {
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    sdkVersion,
+    resolution: typeof screen !== 'undefined' ? `${screen.width}x${screen.height}` : '0x0',
+    timezoneOffsetMin: new Date().getTimezoneOffset()
+  }
+
   function getClientMeta(): ClientMeta {
-    return {
-      userAgent: navigator.userAgent,
-      sdkVersion,
-      resolution: `${screen.width}x${screen.height}`,
-      timezoneOffsetMin: new Date().getTimezoneOffset()
-    }
+    return cachedClientMeta
   }
 
   // -------------------------------------------------------------------------

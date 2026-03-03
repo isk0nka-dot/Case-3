@@ -358,6 +358,12 @@ export function useVisionEngine(config: VisionEngineConfig) {
   let lastInferenceTime = 0
   const inferenceInterval = 1000 / inferenceHz
 
+  // Pre-allocated Float32Array buffer for landmark extraction.
+  // Reused across frames to eliminate 5.8KB allocation per frame (478×3×4 bytes).
+  // At 10Hz this saves 58KB/sec of GC pressure — significant on mobile GPUs.
+  const LANDMARK_BUFFER_SIZE = 478 * 3 // max landmarks × 3 (x, y, z)
+  let landmarkBuffer: Float32Array | null = null
+
   // FPS measurement
   let frameCountForFps = 0
   let fpsStartTime = Date.now()
@@ -487,10 +493,15 @@ export function useVisionEngine(config: VisionEngineConfig) {
 
       consecutiveNoFace.value = 0
 
-      // Extract first face landmarks as flat Float32Array
+      // Extract first face landmarks into a reusable Float32Array buffer.
+      // Allocates once, reuses across all frames — eliminates 5.8KB/frame GC churn.
       const faceLandmarks = results.faceLandmarks[0]
       const landmarkCount = faceLandmarks.length
-      const landmarks = new Float32Array(landmarkCount * 3)
+      const requiredSize = landmarkCount * 3
+      if (!landmarkBuffer || landmarkBuffer.length < requiredSize) {
+        landmarkBuffer = new Float32Array(Math.max(requiredSize, LANDMARK_BUFFER_SIZE))
+      }
+      const landmarks = landmarkBuffer
       for (let i = 0; i < landmarkCount; i++) {
         landmarks[i * 3] = faceLandmarks[i].x
         landmarks[i * 3 + 1] = faceLandmarks[i].y
