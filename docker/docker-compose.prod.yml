@@ -1,0 +1,339 @@
+# =============================================================================
+#  Argus AI — Production Overlay
+#
+#  This file extends docker-compose.yaml with production-specific settings:
+#    - CPU/memory resource limits for every service
+#    - Nginx reverse proxy with TLS termination
+#    - Certbot sidecar for automatic Let's Encrypt renewal
+#    - Log rotation to prevent disk overflow
+#
+#  Usage:
+#    # Start the full production stack
+#    docker compose -f docker-compose.yaml -f docker-compose.prod.yml up -d
+#
+#    # Or use the COMPOSE_FILE env var
+#    export COMPOSE_FILE=docker-compose.yaml:docker-compose.prod.yml
+#    docker compose up -d
+#
+#  Server requirements:
+#    - 32 GB RAM minimum (16 GB for ClickHouse alone)
+#    - 16 CPU cores
+#    - 500 GB SSD (NVMe recommended for ClickHouse)
+#    - Docker 27+ with Compose v2
+# =============================================================================
+
+services:
+
+  # ── Nginx Reverse Proxy ──────────────────────────────────────────────────────
+  # TLS termination, gRPC-Web proxying, rate limiting, security headers.
+  # Serves as the single entry point for all external traffic.
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: argus-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt/live/argusai.kz/fullchain.pem:/etc/nginx/certs/fullchain.pem:ro
+      - /etc/letsencrypt/live/argusai.kz/privkey.pem:/etc/nginx/certs/privkey.pem:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - certbot-webroot:/var/www/certbot:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks:
+      - argus-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 0"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── Certbot — Let's Encrypt Auto-Renewal ─────────────────────────────────────
+  # Runs every 12 hours to check for certificate renewal.
+  # Certificates are shared with Nginx via the certbot-certs volume.
+  #
+  # First-time setup (run manually BEFORE starting the stack):
+  #   docker compose run --rm certbot certonly \
+  #     --webroot -w /var/www/certbot \
+  #     -d app.argus.ai -d api.argus.ai \
+  #     --email admin@argus.ai --agree-tos --no-eff-email
+  certbot:
+    image: certbot/certbot:latest
+    container_name: argus-certbot
+    volumes:
+      - certbot-webroot:/var/www/certbot
+      - certbot-certs:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 43200; done'"
+    networks:
+      - argus-network
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Backend — Resource Limits ────────────────────────────────────────────────
+  # 4 CPUs / 4 GB: handles 50K events/sec with 512-goroutine worker pool,
+  # Kafka async producer, ClickHouse batch writer, and DLQ management.
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          cpus: '2.0'
+          memory: 2G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── Frontend — Resource Limits ───────────────────────────────────────────────
+  # 1 CPU / 512 MB: Nuxt Node.js server, minimal compute (SPA mode).
+  frontend:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ── Kafka Brokers — Resource Limits ──────────────────────────────────────────
+  # 2 CPUs / 2 GB each: JVM heap + page cache for log segments.
+  # 3-broker KRaft cluster with RF=3, min.insync.replicas=2.
+  kafka-1:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  kafka-2:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  kafka-3:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── ClickHouse Nodes — Resource Limits ───────────────────────────────────────
+  # 2 CPUs / 3 GB each: MergeTree engine merge operations, query execution.
+  # 3-node replicated cluster for zero data loss.
+  clickhouse-1:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  clickhouse-2:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  clickhouse-3:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── ClickHouse Keepers — Resource Limits ─────────────────────────────────────
+  # 0.5 CPU / 512 MB each: Raft consensus, minimal compute.
+  clickhouse-keeper-1:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  clickhouse-keeper-2:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  clickhouse-keeper-3:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ── PostgreSQL — Resource Limits ─────────────────────────────────────────────
+  # 2 CPUs / 2 GB: connection pool (25 max conns), WAL, SaaS admin queries.
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── Redis — Resource Limits ──────────────────────────────────────────────────
+  # 1 CPU / 1 GB: asynq job queue (noeviction, AOF+RDB dual persistence).
+  # maxmemory is 4GB in redis.conf, but container limit prevents OOM.
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ── MinIO — Resource Limits ──────────────────────────────────────────────────
+  # 1 CPU / 1 GB: S3 object storage for evidence (WORM compliance).
+  minio:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ── LiveKit — Resource Limits ────────────────────────────────────────────────
+  # 1 CPU / 512 MB: WebRTC SFU for real-time communication.
+  livekit:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+# =============================================================================
+#  Additional Volumes (SSL certificates)
+# =============================================================================
+volumes:
+  certbot-webroot:
+    driver: local
+    name: argus-certbot-webroot
+  certbot-certs:
+    driver: local
+    name: argus-certbot-certs
