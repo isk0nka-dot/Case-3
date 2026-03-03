@@ -122,8 +122,6 @@ sync-infra:
       echo "═══════════════════════════════════════════════════════════"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
-      allow_failure: false
 
 # ── Stage: migrate ───────────────────────────────────────────────────────────
 # Runs all idempotent SQL migrations via docker exec.
@@ -179,4 +177,3 @@ run-migrations:
       '
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: manual
