@@ -10,8 +10,8 @@
 #  Zero Data Loss guarantee: any single node can fail without data loss.
 #
 #  Image sources:
-#    argus-backend  → registry.argus.ai/argus/backend:latest
-#    argus-frontend → registry.argus.ai/argus/frontend:latest
+#    argus-backend  → built locally from ../backend/Dockerfile
+#    argus-frontend → built locally from ../frontend/Dockerfile
 #    Infrastructure → public images (kafka, clickhouse, postgres, etc.)
 #
 #  Usage:
@@ -28,18 +28,19 @@
 #    Copy .env.example to .env and fill in all required values.
 # =============================================================================
 
-# ── Image version control ─────────────────────────────────────────────────────
-x-image-versions:
-  backend-image: &backend-image registry.argus.ai/argus/backend:${BACKEND_TAG:-latest}
-  frontend-image: &frontend-image registry.argus.ai/argus/frontend:${FRONTEND_TAG:-latest}
-
 services:
 
   # ── argus-backend ────────────────────────────────────────────────────────────
   # Go event-collection service. Handles gRPC ingestion, REST admin API,
   # analytics, monitoring, evidence storage, and organization management.
   backend:
-    image: *backend-image
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${BACKEND_TAG:-dev}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: argus/backend:${BACKEND_TAG:-latest}
     container_name: argus-backend
     entrypoint: ["/app/event-collector", "-config", "/app/config/config.yaml"]
     ports:
@@ -111,7 +112,12 @@ services:
   # ── argus-frontend ────────────────────────────────────────────────────────────
   # Nuxt 4 (Vue 3) admin dashboard SPA.
   frontend:
-    image: *frontend-image
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        NUXT_PUBLIC_API_BASE_URL: ${BACKEND_PUBLIC_URL:-http://localhost:8080}
+    image: argus/frontend:${FRONTEND_TAG:-latest}
     container_name: argus-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
