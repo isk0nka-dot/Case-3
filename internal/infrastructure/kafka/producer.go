@@ -566,6 +566,18 @@ func (p *Producer) handleErrors() {
 // Message Construction
 // ---------------------------------------------------------------------------
 
+// Pre-computed header key byte slices — allocated ONCE at package init.
+// At 50K events/sec, this eliminates 300K+ byte slice allocations per second
+// (6 headers × 50K events = 300K []byte("string") conversions avoided).
+var (
+	headerKeyEventType = []byte("event_type")
+	headerKeySeverity  = []byte("severity")
+	headerKeySource    = []byte("source")
+	headerKeyExamID    = []byte("exam_id")
+	headerKeyOrgID     = []byte("org_id")
+	headerKeySessionID = []byte("session_id")
+)
+
 // buildMessage converts a domain ProctoringEvent into a sarama.ProducerMessage
 // ready for async production.
 //
@@ -600,16 +612,15 @@ func (p *Producer) buildMessage(event *entity.ProctoringEvent) (*sarama.Producer
 		Value: sarama.ByteEncoder(value),
 
 		// Metadata headers for consumer-side filtering without deserialization.
-		// These enable efficient topic-level consumers that process only
-		// specific event types (e.g., a "face mismatch alert" microservice
-		// filters by event_type=face_mismatch in the header).
+		// Header keys use pre-computed package-level byte slices to avoid
+		// per-message allocation of []byte("event_type") etc.
 		Headers: []sarama.RecordHeader{
-			{Key: []byte("event_type"), Value: []byte(event.EventType.String())},
-			{Key: []byte("severity"), Value: []byte(event.Severity.String())},
-			{Key: []byte("source"), Value: []byte(event.Source.String())},
-			{Key: []byte("exam_id"), Value: []byte(event.ExamID)},
-			{Key: []byte("org_id"), Value: []byte(event.OrgID)},
-			{Key: []byte("session_id"), Value: []byte(event.SessionID)},
+			{Key: headerKeyEventType, Value: []byte(event.EventType.String())},
+			{Key: headerKeySeverity, Value: []byte(event.Severity.String())},
+			{Key: headerKeySource, Value: []byte(event.Source.String())},
+			{Key: headerKeyExamID, Value: []byte(event.ExamID)},
+			{Key: headerKeyOrgID, Value: []byte(event.OrgID)},
+			{Key: headerKeySessionID, Value: []byte(event.SessionID)},
 		},
 
 		// Timestamp: server-side timestamp for Kafka log-append-time correlation.

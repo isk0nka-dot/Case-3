@@ -147,7 +147,12 @@ func NewStore(cfg StoreConfig, logger *zap.Logger) (*Store, error) {
 	}
 
 	// Count existing entries (recovery after crash).
-	s.recount()
+	// If recount fails, the DLQ would appear empty and silently drop
+	// previously queued events. Fail startup loudly instead.
+	if err := s.recount(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("dlq: startup recount failed (possible corruption): %w", err)
+	}
 
 	// Start background value log GC.
 	go s.gcLoop()
@@ -381,9 +386,11 @@ func (s *Store) Close() error {
 // ---------------------------------------------------------------------------
 
 // recount scans BadgerDB to count existing entries on startup (crash recovery).
-func (s *Store) recount() {
+// Returns an error if the scan fails — callers must decide whether to fail
+// startup or proceed with a potentially stale count.
+func (s *Store) recount() error {
 	var count int64
-	_ = s.db.View(func(txn *badger.Txn) error {
+	err := s.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = false // Keys only — fast.
 		opts.Prefix = []byte(dlqKeyPrefix)
@@ -396,7 +403,14 @@ func (s *Store) recount() {
 		}
 		return nil
 	})
+	if err != nil {
+		s.logger.Error("dlq: recount scan failed — DLQ size may be inaccurate",
+			zap.Error(err),
+		)
+		return fmt.Errorf("dlq: recount failed: %w", err)
+	}
 	s.currentSize.Store(count)
+	return nil
 }
 
 // gcLoop periodically runs BadgerDB value log garbage collection.

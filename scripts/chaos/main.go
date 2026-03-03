@@ -520,8 +520,11 @@ func runPhase6CombinedFailure(jwt string) PhaseResult {
 
 	// Reset all breakers
 	time.Sleep(3 * time.Second)
-	_ = postReset(jwt, []string{"reset_kafka_breaker", "reset_ch_breaker", "flush_overflow"})
-	fmt.Printf("  %s✓%s All breakers reset\n", colorGreen, colorReset)
+	if err := postReset(jwt, []string{"reset_kafka_breaker", "reset_ch_breaker", "flush_overflow"}); err != nil {
+		fmt.Printf("  %s⚠ breaker reset failed: %v%s\n", colorYellow, err, colorReset)
+	} else {
+		fmt.Printf("  %s✓%s All breakers reset\n", colorGreen, colorReset)
+	}
 
 	// Assert: both breakers open, goroutine count stable (no leak)
 	passed := false

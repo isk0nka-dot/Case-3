@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
@@ -145,11 +146,13 @@ func run() error {
 	// STEP 8: Send startup notification.
 	// =================================================================
 	if telegramAlerter != nil {
-		_ = telegramAlerter.SendDirect(alerting.MsgInferenceStartup(
+		if err := telegramAlerter.SendDirect(alerting.MsgInferenceStartup(
 			version, engine.Name(),
 			cfg.Inference.GRPCPort, cfg.Inference.Concurrency,
 			time.Now().Format("2006-01-02 15:04:05 MST"),
-		))
+		)); err != nil {
+			logger.Warn("failed to send startup alert", zap.Error(err))
+		}
 	}
 
 	// =================================================================
@@ -160,6 +163,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", addr, err)
 	}
+	defer lis.Close()
 
 	// Signal handler for graceful shutdown.
 	sigCh := make(chan os.Signal, 1)
@@ -176,28 +180,47 @@ func run() error {
 	// =================================================================
 	// STEP 10: Block until signal or fatal error.
 	// =================================================================
+	var serveErr error
 	select {
 	case sig := <-sigCh:
 		logger.Info("received shutdown signal", zap.String("signal", sig.String()))
-	case err := <-errCh:
-		return err
+	case serveErr = <-errCh:
+		logger.Error("gRPC serve failed, initiating shutdown", zap.Error(serveErr))
 	}
 
 	// =================================================================
-	// STEP 11: Graceful shutdown.
+	// STEP 11: Graceful shutdown with timeout.
 	// =================================================================
 	logger.Info("argus-inference shutting down...")
-	grpcServer.GracefulStop()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	grpcDone := make(chan struct{})
+	go func() {
+		grpcServer.GracefulStop()
+		close(grpcDone)
+	}()
+
+	select {
+	case <-grpcDone:
+		logger.Info("grpc server stopped gracefully")
+	case <-shutdownCtx.Done():
+		logger.Warn("grpc server graceful stop timed out, forcing stop")
+		grpcServer.Stop()
+	}
 
 	if telegramAlerter != nil {
-		_ = telegramAlerter.SendDirect(alerting.MsgInferenceShutdown(
+		if err := telegramAlerter.SendDirect(alerting.MsgInferenceShutdown(
 			time.Now().Format("2006-01-02 15:04:05 MST"),
-		))
+		)); err != nil {
+			logger.Warn("failed to send shutdown alert", zap.Error(err))
+		}
 		telegramAlerter.Close()
 	}
 
 	logger.Info("argus-inference stopped gracefully")
-	return nil
+	return serveErr
 }
 
 // ---------------------------------------------------------------------------

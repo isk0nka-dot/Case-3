@@ -109,83 +109,98 @@ func (et EventType) IsViolation() bool {
 	return et > 0 && et < 100
 }
 
+// eventTypeNames is a package-level map initialized ONCE at startup.
+// This eliminates the per-call map allocation that previously created
+// 300K+ garbage objects/sec at 50K events/sec (each event calls String()
+// 3+ times: Kafka headers, toKafkaEvent, logging).
+var eventTypeNames = map[EventType]string{
+	GazeDeviation:            "gaze_deviation",
+	FaceMismatch:             "face_mismatch",
+	FaceNotDetected:          "face_not_detected",
+	FaceSpoofDetected:        "face_spoof_detected",
+	MultiplePersons:          "multiple_persons",
+	DynamicFaceRecheckFail:   "dynamic_face_recheck_fail",
+	PhoneDetected:            "phone_detected",
+	BookDetected:             "book_detected",
+	EarbudsDetected:          "earbuds_detected",
+	UnknownObjectDetected:    "unknown_object_detected",
+	VoiceActivity:            "voice_activity",
+	AudioAnomaly:             "audio_anomaly",
+	AudioPeripheryDetected:   "audio_periphery_detected",
+	SmartNoiseClassified:     "smart_noise_classified",
+	TabSwitch:                "tab_switch",
+	CopyPasteAttempt:         "copy_paste_attempt",
+	PrintScreenAttempt:       "print_screen_attempt",
+	ContextMenuAttempt:       "context_menu_attempt",
+	FullscreenExit:           "fullscreen_exit",
+	ExternalDisplayDetected:  "external_display_detected",
+	VPNProxyDetected:         "vpn_proxy_detected",
+	SuspiciousNetworkDevice:  "suspicious_network_device",
+	EmotionStressSpike:       "emotion_stress_spike",
+	FocusLossDetected:        "focus_loss_detected",
+	BlinkPatternAnomaly:      "blink_pattern_anomaly",
+	TypingDynamicsAnomaly:    "typing_dynamics_anomaly",
+	HandCursorDesync:         "hand_cursor_desync",
+	ForbiddenProcessDetected: "forbidden_process_detected",
+	HardwareDeviceAnomaly:    "hardware_device_anomaly",
+	RemoteAccessDetected:     "remote_access_detected",
+	HardwareIDMismatch:       "hardware_id_mismatch",
+	VirtualMonitorDetected:   "virtual_monitor_detected",
+	VirtualMachineDetected:   "virtual_machine_detected",
+	HeadPoseAnomaly:          "head_pose_anomaly",
+	LivenessCheckFailed:      "liveness_check_failed",
+	FaceOccluded:             "face_occluded",
+	WhisperDetected:          "whisper_detected",
+	SecondSpeakerDetected:    "second_speaker_detected",
+	AudioPlaybackDetected:    "audio_playback_detected",
+	// Secondary Camera events (Fix 7) — UPPERCASE to match penalty rules
+	SidecamDeviceDisplaced:    "SIDECAM_DEVICE_DISPLACED",
+	SidecamHandsOffDesk:       "SIDECAM_HANDS_OFF_DESK",
+	SidecamBatteryCritical:    "SIDECAM_BATTERY_CRITICAL",
+	SidecamStreamDisconnected: "SIDECAM_STREAM_DISCONNECTED",
+	SidecamCalibrationFailed:  "SIDECAM_CALIBRATION_FAILED",
+	SidecamThermalThrottle:    "SIDECAM_THERMAL_THROTTLE",
+	// Backend AI deep scan events — UPPERCASE to match penalty rules
+	BackendAIFaceMismatch:     "BACKEND_AI_FACE_MISMATCH",
+	BackendAIScreenReflection: "BACKEND_AI_SCREEN_REFLECTION",
+	BackendAIMicroExpression:  "BACKEND_AI_MICRO_EXPRESSION",
+	BackendAIHiddenObject:     "BACKEND_AI_HIDDEN_OBJECT",
+	BackendAIDeepfakeDetected: "BACKEND_AI_DEEPFAKE_DETECTED",
+	BackendAIVoiceSynth:       "BACKEND_AI_VOICE_SYNTH",
+	GazeTelemetry:            "gaze_telemetry",
+	MouseTelemetry:           "mouse_telemetry",
+	KeyboardTelemetry:        "keyboard_telemetry",
+	FocusScoreUpdate:         "focus_score_update",
+	HeadPoseTelemetry:        "head_pose_telemetry",
+	FaceEmbeddingTelemetry:   "face_embedding_telemetry",
+	AudioLevelTelemetry:      "audio_level_telemetry",
+}
+
 // String returns a human-readable label for the event type.
+// Uses a package-level map lookup — O(1) with zero allocations per call.
 func (et EventType) String() string {
-	names := map[EventType]string{
-		GazeDeviation:            "gaze_deviation",
-		FaceMismatch:             "face_mismatch",
-		FaceNotDetected:          "face_not_detected",
-		FaceSpoofDetected:        "face_spoof_detected",
-		MultiplePersons:          "multiple_persons",
-		DynamicFaceRecheckFail:   "dynamic_face_recheck_fail",
-		PhoneDetected:            "phone_detected",
-		BookDetected:             "book_detected",
-		EarbudsDetected:          "earbuds_detected",
-		UnknownObjectDetected:    "unknown_object_detected",
-		VoiceActivity:            "voice_activity",
-		AudioAnomaly:             "audio_anomaly",
-		AudioPeripheryDetected:   "audio_periphery_detected",
-		SmartNoiseClassified:     "smart_noise_classified",
-		TabSwitch:                "tab_switch",
-		CopyPasteAttempt:         "copy_paste_attempt",
-		PrintScreenAttempt:       "print_screen_attempt",
-		ContextMenuAttempt:       "context_menu_attempt",
-		FullscreenExit:           "fullscreen_exit",
-		ExternalDisplayDetected:  "external_display_detected",
-		VPNProxyDetected:         "vpn_proxy_detected",
-		SuspiciousNetworkDevice:  "suspicious_network_device",
-		EmotionStressSpike:       "emotion_stress_spike",
-		FocusLossDetected:        "focus_loss_detected",
-		BlinkPatternAnomaly:      "blink_pattern_anomaly",
-		TypingDynamicsAnomaly:    "typing_dynamics_anomaly",
-		HandCursorDesync:         "hand_cursor_desync",
-		ForbiddenProcessDetected: "forbidden_process_detected",
-		HardwareDeviceAnomaly:    "hardware_device_anomaly",
-		RemoteAccessDetected:     "remote_access_detected",
-		HardwareIDMismatch:       "hardware_id_mismatch",
-		VirtualMonitorDetected:   "virtual_monitor_detected",
-		VirtualMachineDetected:   "virtual_machine_detected",
-		HeadPoseAnomaly:          "head_pose_anomaly",
-		LivenessCheckFailed:      "liveness_check_failed",
-		FaceOccluded:             "face_occluded",
-		WhisperDetected:          "whisper_detected",
-		SecondSpeakerDetected:    "second_speaker_detected",
-		AudioPlaybackDetected:    "audio_playback_detected",
-		// Secondary Camera events (Fix 7) — UPPERCASE to match penalty rules
-		SidecamDeviceDisplaced:    "SIDECAM_DEVICE_DISPLACED",
-		SidecamHandsOffDesk:       "SIDECAM_HANDS_OFF_DESK",
-		SidecamBatteryCritical:    "SIDECAM_BATTERY_CRITICAL",
-		SidecamStreamDisconnected: "SIDECAM_STREAM_DISCONNECTED",
-		SidecamCalibrationFailed:  "SIDECAM_CALIBRATION_FAILED",
-		SidecamThermalThrottle:    "SIDECAM_THERMAL_THROTTLE",
-		// Backend AI deep scan events — UPPERCASE to match penalty rules
-		BackendAIFaceMismatch:     "BACKEND_AI_FACE_MISMATCH",
-		BackendAIScreenReflection: "BACKEND_AI_SCREEN_REFLECTION",
-		BackendAIMicroExpression:  "BACKEND_AI_MICRO_EXPRESSION",
-		BackendAIHiddenObject:     "BACKEND_AI_HIDDEN_OBJECT",
-		BackendAIDeepfakeDetected: "BACKEND_AI_DEEPFAKE_DETECTED",
-		BackendAIVoiceSynth:       "BACKEND_AI_VOICE_SYNTH",
-		GazeTelemetry:            "gaze_telemetry",
-		MouseTelemetry:           "mouse_telemetry",
-		KeyboardTelemetry:        "keyboard_telemetry",
-		FocusScoreUpdate:         "focus_score_update",
-		HeadPoseTelemetry:        "head_pose_telemetry",
-		FaceEmbeddingTelemetry:   "face_embedding_telemetry",
-		AudioLevelTelemetry:      "audio_level_telemetry",
-	}
-	if name, ok := names[et]; ok {
+	if name, ok := eventTypeNames[et]; ok {
 		return name
 	}
 	return "unspecified"
 }
 
+// eventTypeByName is the reverse lookup map for ParseEventType.
+// Initialized once at package load — O(1) string-to-EventType conversion.
+var eventTypeByName = func() map[string]EventType {
+	m := make(map[string]EventType, len(eventTypeNames))
+	for et, name := range eventTypeNames {
+		m[name] = et
+	}
+	return m
+}()
+
 // ParseEventType converts a string event type name back to its EventType constant.
 // Returns EventTypeUnspecified if the name is not recognized.
+// Uses a package-level reverse map — O(1) lookup instead of O(N) linear scan.
 func ParseEventType(name string) EventType {
-	for et := EventType(0); et <= 106; et++ {
-		if et.String() == name {
-			return et
-		}
+	if et, ok := eventTypeByName[name]; ok {
+		return et
 	}
 	return EventTypeUnspecified
 }

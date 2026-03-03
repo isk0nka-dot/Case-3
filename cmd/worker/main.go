@@ -104,6 +104,13 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialise clickhouse: %w", err)
 	}
+	defer func() {
+		if err := chWriter.Close(); err != nil {
+			logger.Error("clickhouse close error", zap.Error(err))
+		} else {
+			logger.Info("clickhouse writer closed (buffers flushed)")
+		}
+	}()
 	logger.Info("clickhouse connected",
 		zap.Strings("addrs", cfg.ClickHouse.Addrs),
 		zap.String("database", cfg.ClickHouse.Database),
@@ -126,6 +133,13 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialise postgres: %w", err)
 	}
+	defer func() {
+		if err := pgRepo.Close(); err != nil {
+			logger.Error("postgresql close error", zap.Error(err))
+		} else {
+			logger.Info("postgresql connection pool closed")
+		}
+	}()
 	logger.Info("postgresql connected",
 		zap.String("host", cfg.Postgres.Host),
 		zap.Int("port", cfg.Postgres.Port),
@@ -148,6 +162,13 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialise minio: %w", err)
 	}
+	defer func() {
+		if err := evidenceStore.Close(); err != nil {
+			logger.Error("minio store close error", zap.Error(err))
+		} else {
+			logger.Info("minio store closed")
+		}
+	}()
 
 	minioClient := minioStore.Client(evidenceStore)
 	if minioClient == nil {
@@ -278,11 +299,13 @@ func run() error {
 	// STEP 11: Send startup notification.
 	// =================================================================
 	if telegramAlerter != nil {
-		_ = telegramAlerter.SendDirect(alerting.MsgWorkerStartup(
+		if err := telegramAlerter.SendDirect(alerting.MsgWorkerStartup(
 			version, cfg.Redis.Addr, cfg.Redis.WorkerConcurrency,
 			time.Now().Format("2006-01-02 15:04:05 MST"),
 			[]string{"job:video_export", "job:forensic_report", "job:ai_analysis"},
-		))
+		)); err != nil {
+			logger.Warn("failed to send startup alert", zap.Error(err))
+		}
 	}
 
 	// =================================================================
@@ -328,9 +351,11 @@ func run() error {
 	logger.Info("argus-worker stopped gracefully")
 
 	if telegramAlerter != nil {
-		_ = telegramAlerter.SendDirect(alerting.MsgWorkerShutdown(
+		if err := telegramAlerter.SendDirect(alerting.MsgWorkerShutdown(
 			time.Now().Format("2006-01-02 15:04:05 MST"),
-		))
+		)); err != nil {
+			logger.Warn("failed to send shutdown alert", zap.Error(err))
+		}
 		telegramAlerter.Close()
 	}
 

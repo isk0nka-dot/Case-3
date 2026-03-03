@@ -163,6 +163,10 @@ type RedisConfig struct {
 // InferenceConfig controls the backend AI inference service.
 // Used by cmd/inference (standalone GPU gateway) and cmd/worker (gRPC client).
 type InferenceConfig struct {
+	// GRPCHost is the hostname for the inference gRPC server. Default: "localhost".
+	// Override via EVENT_COLLECTOR_INFERENCE_GRPC_HOST for Docker/Kubernetes.
+	GRPCHost string `yaml:"grpc_host"`
+
 	// GRPCPort is the port the inference gRPC server listens on. Default: 50061.
 	GRPCPort int `yaml:"grpc_port"`
 
@@ -186,9 +190,14 @@ type InferenceConfig struct {
 	Concurrency int `yaml:"concurrency"`
 }
 
-// GRPCAddr returns the inference gRPC server address as "localhost:{port}".
+// GRPCAddr returns the inference gRPC server address as "{host}:{port}".
+// Configurable via EVENT_COLLECTOR_INFERENCE_GRPC_HOST + EVENT_COLLECTOR_INFERENCE_GRPC_PORT.
 func (c InferenceConfig) GRPCAddr() string {
-	return fmt.Sprintf("localhost:%d", c.GRPCPort)
+	host := c.GRPCHost
+	if host == "" {
+		host = "localhost"
+	}
+	return fmt.Sprintf("%s:%d", host, c.GRPCPort)
 }
 
 // ---------------------------------------------------------------------------
@@ -920,6 +929,9 @@ func applyDefaults(cfg *Config) {
 	}
 
 	// --- Inference (backend AI gateway) ---
+	if cfg.Inference.GRPCHost == "" {
+		cfg.Inference.GRPCHost = "localhost"
+	}
 	if cfg.Inference.GRPCPort == 0 {
 		cfg.Inference.GRPCPort = 50061
 	}
@@ -1053,6 +1065,11 @@ func applyEnvOverrides(cfg *Config) {
 			cfg.WorkerPool.Size = size
 		}
 	}
+	if v := os.Getenv("EVENT_COLLECTOR_WORKER_POOL_QUEUE_SIZE"); v != "" {
+		if qs, err := strconv.Atoi(v); err == nil {
+			cfg.WorkerPool.QueueSize = qs
+		}
+	}
 
 	// Auth — JWT configuration (CRITICAL: always set via env in production).
 	if v := os.Getenv("EVENT_COLLECTOR_JWT_ALGORITHM"); v != "" {
@@ -1072,6 +1089,9 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("EVENT_COLLECTOR_JWT_ISSUER"); v != "" {
 		cfg.Auth.Issuer = v
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_JWT_AUDIENCE"); v != "" {
+		cfg.Auth.Audience = v
 	}
 
 	// Session — Eduser endpoint.
@@ -1127,6 +1147,9 @@ func applyEnvOverrides(cfg *Config) {
 	}
 
 	// Inference (backend AI gateway).
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_GRPC_HOST"); v != "" {
+		cfg.Inference.GRPCHost = v
+	}
 	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_GRPC_PORT"); v != "" {
 		if port, err := strconv.Atoi(v); err == nil {
 			cfg.Inference.GRPCPort = port
