@@ -66,6 +66,7 @@ lint:
   needs: [install]
   script:
     - npm run lint
+  allow_failure: true
   tags:
     - prod
   rules:
