@@ -134,22 +134,18 @@ run_migrations() {
 
   # ── PostgreSQL migrations ──────────────────────────────────────────────
   local pg_dir="$MIGRATIONS_DIR/postgres"
-  if [[ -d "$pg_dir" ]] && ls "$pg_dir"/*.sql &>/dev/null; then
-    step "Running PostgreSQL migrations..."
-    local pg_count=0
-    local pg_fail=0
-    for f in "$pg_dir"/*.sql; do
-      [[ -f "$f" ]] || continue
-      local basename=$(basename "$f")
-      info "  → $basename"
-      if docker exec -i argus-postgres psql -U argus -d argus < "$f" >> "$LOG_FILE" 2>&1; then
-        ((pg_count++))
-      else
-        warn "  ⚠ $basename returned non-zero (expected for idempotent re-runs)"
-        ((pg_fail++))
-      fi
-    done
-    info "PostgreSQL: $pg_count applied, $pg_fail warnings"
+  if [[ -d "$pg_dir" ]]; then
+    step "Running PostgreSQL migrations via golang-migrate..."
+    # The runner must be on the docker host network to reach localhost:5432
+    # Ensure argus backend has POSTGRES_DB_URL populated from .env
+    # We will use the root argus user config for simplicity.
+    local db_url="postgres://argus:argus_secret_password@157.180.46.33:5432/argus?sslmode=disable"
+    
+    if docker run --rm --network host -v "$pg_dir:/migrations" migrate/migrate:v4.18.1 -path=/migrations/ -database "$db_url" up >> "$LOG_FILE" 2>&1; then
+      info "PostgreSQL: Migrations applied successfully or already up to date."
+    else
+      warn "PostgreSQL: Migrations failed. Check $LOG_FILE. Attempting to proceed anyway in case of benign failure."
+    fi
   else
     info "No PostgreSQL migration files found"
   fi
@@ -249,6 +245,16 @@ if [[ "$healthy" != "true" ]]; then
   # Show container logs for debugging
   info "Last 30 lines of container logs:"
   docker logs --tail=30 "$CONTAINER_NAME" >> "$LOG_FILE" 2>&1 || true
+
+  # Revert database if we are rolling back the backend
+  if [[ "$SERVICE" == "backend" && "$SKIP_MIGRATIONS" != "true" ]]; then
+    step "Reverting database migration (1 step down)..."
+    local db_url="postgres://argus:argus_secret_password@157.180.46.33:5432/argus?sslmode=disable"
+    local pg_dir="$MIGRATIONS_DIR/postgres"
+    if [[ -d "$pg_dir" ]]; then
+      docker run --rm --network host -v "$pg_dir:/migrations" migrate/migrate:v4.18.1 -path=/migrations/ -database "$db_url" down 1 >> "$LOG_FILE" 2>&1 || warn "Failed to revert database migration!"
+    fi
+  fi
 
   # Rollback: reset to previous commit
   cd "$REPO_DIR"
