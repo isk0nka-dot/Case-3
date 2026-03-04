@@ -26,14 +26,12 @@ const heroRef = ref<HTMLElement | null>(null)
 const featuresRef = ref<HTMLElement | null>(null)
 const settingsRef = ref<HTMLElement | null>(null)
 const archiveRef = ref<HTMLElement | null>(null)
-const showcaseRef = ref<HTMLElement | null>(null)
 const statsRef = ref<HTMLElement | null>(null)
 const ctaRef = ref<HTMLElement | null>(null)
 
 const featuresVisible = ref(false)
 const settingsVisible = ref(false)
 const archiveVisible = ref(false)
-const showcaseVisible = ref(false)
 const statsVisible = ref(false)
 const ctaVisible = ref(false)
 
@@ -381,7 +379,7 @@ onMounted(() => {
           if (entry.target === featuresRef.value) featuresVisible.value = true
           if (entry.target === settingsRef.value) settingsVisible.value = true
           if (entry.target === archiveRef.value) archiveVisible.value = true
-          if (entry.target === showcaseRef.value) showcaseVisible.value = true
+
           if (entry.target === comparisonRef.value) comparisonVisible.value = true
           if (entry.target === pricingRef.value) pricingVisible.value = true
           if (entry.target === statsRef.value) {
@@ -401,7 +399,7 @@ onMounted(() => {
   if (featuresRef.value) observer.observe(featuresRef.value)
   if (settingsRef.value) observer.observe(settingsRef.value)
   if (archiveRef.value) observer.observe(archiveRef.value)
-  if (showcaseRef.value) observer.observe(showcaseRef.value)
+
   if (comparisonRef.value) observer.observe(comparisonRef.value)
   if (pricingRef.value) observer.observe(pricingRef.value)
   if (statsRef.value) observer.observe(statsRef.value)
@@ -2976,115 +2974,7 @@ const archiveKernelLabels: Record<string, string> = {
 
     <!-- ============================== -->
     <!--  INTERACTIVE SHOWCASE          -->
-    <!-- ============================== -->
-    <section
-      id="showcase"
-      ref="showcaseRef"
-      class="relative py-32 px-6"
-      style="background: #0F151D;"
-    >
-      <div class="max-w-7xl mx-auto">
-        <div class="text-center mb-16">
-          <span
-            class="text-xs font-bold uppercase tracking-widest"
-            style="color: #4285F4;"
-          >Платформа</span>
-          <h2 class="text-4xl md:text-5xl font-bold text-white mt-4 tracking-tight">
-            Контроль в реальном времени
-          </h2>
-        </div>
 
-        <!-- Mock monitoring grid -->
-        <div
-          class="relative rounded-2xl border overflow-hidden transition-all duration-1000"
-          :class="showcaseVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-16'"
-          style="background: #1A2130; border-color: rgba(255,255,255,0.06);"
-        >
-          <div
-            class="flex items-center justify-between px-6 py-4 border-b"
-            style="border-color: rgba(255,255,255,0.06);"
-          >
-            <div class="flex items-center gap-3">
-              <div
-                class="size-3 rounded-full animate-pulse"
-                style="background: #34A853;"
-              />
-              <span class="text-sm font-semibold text-white">Мониторинг · 847 активных сессий</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-xs text-white/30 font-mono">14:32:15 UTC+6</span>
-            </div>
-          </div>
-
-          <div
-            class="grid grid-cols-4 gap-px p-px"
-            style="background: rgba(255,255,255,0.04);"
-          >
-            <div
-              v-for="i in 8"
-              :key="i"
-              class="aspect-video relative"
-              style="background: #0D1117;"
-            >
-              <div class="absolute inset-0 flex items-center justify-center">
-                <div class="flex flex-col items-center gap-2 opacity-20">
-                  <UIcon
-                    name="i-lucide-video"
-                    class="size-8 text-white"
-                  />
-                  <span class="text-[9px] font-mono text-white/60">CAM-{{ String(i).padStart(3, '0') }}</span>
-                </div>
-              </div>
-              <div
-                class="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded"
-                style="background: rgba(0,0,0,0.6);"
-              >
-                <div
-                  class="size-1.5 rounded-full"
-                  :style="{ background: i === 3 || i === 7 ? '#EA4335' : i === 5 ? '#FBBC05' : '#34A853' }"
-                />
-                <span class="text-[7px] font-mono text-white/60">{{ i === 3 || i === 7 ? 'ALERT' : i === 5 ? 'WARN' : 'OK' }}</span>
-              </div>
-              <div class="absolute bottom-2 right-2">
-                <span
-                  class="text-[10px] font-bold font-mono tabular-nums"
-                  :style="{ color: i === 3 ? '#EA4335' : i === 7 ? '#EA4335' : i === 5 ? '#FBBC05' : '#34A853' }"
-                >
-                  {{ i === 3 ? '34%' : i === 7 ? '41%' : i === 5 ? '67%' : `${85 + i}%` }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div
-            class="px-6 py-4 border-t"
-            style="border-color: rgba(255,255,255,0.06);"
-          >
-            <div class="flex items-center gap-6 overflow-x-auto">
-              <div
-                v-for="(v, idx) in violationTypes"
-                :key="v.label"
-                class="flex items-center gap-2 px-3 py-2 rounded-lg shrink-0 transition-all duration-700"
-                :class="showcaseVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'"
-                :style="{
-                  transitionDelay: `${800 + idx * 200}ms`,
-                  background: v.severity === 'critical' ? 'rgba(234, 67, 53, 0.08)' : v.severity === 'warning' ? 'rgba(251, 188, 5, 0.08)' : 'rgba(66, 133, 244, 0.06)',
-                  border: `1px solid ${v.severity === 'critical' ? 'rgba(234, 67, 53, 0.15)' : v.severity === 'warning' ? 'rgba(251, 188, 5, 0.15)' : 'rgba(66, 133, 244, 0.1)'}`
-                }"
-              >
-                <div
-                  class="size-2 rounded-full"
-                  :class="v.severity === 'critical' ? 'animate-pulse' : ''"
-                  :style="{ background: v.severity === 'critical' ? '#EA4335' : v.severity === 'warning' ? '#FBBC05' : '#4285F4' }"
-                />
-                <span class="text-xs font-medium text-white/70">{{ v.label }}</span>
-                <span class="text-[10px] font-mono text-white/30">{{ v.time }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <!-- ============================== -->
     <!--  SOCIAL PROOF / STATS          -->
