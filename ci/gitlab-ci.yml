@@ -96,13 +96,6 @@ deploy-production:
   needs:
     - job: lint
     - job: typecheck
-  before_script:
-    # Load SSH key from GitLab CI File variable
-    - eval $(ssh-agent -s)
-    - chmod 600 "${DEPLOY_SSH_KEY}"
-    - ssh-add "${DEPLOY_SSH_KEY}"
-    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - ssh-keyscan -H ${DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null
   script:
     - |
       # Determine git ref for the deploy
@@ -115,12 +108,11 @@ deploy-production:
       fi
 
       echo "═══════════════════════════════════════════════════════════"
-      echo "  Deploying frontend to ${DEPLOY_HOST}"
+      echo "  Deploying frontend LOCALLY on prod server"
       echo "  Ref: ${DEPLOY_REF}"
       echo "═══════════════════════════════════════════════════════════"
 
-      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} \
-        "/opt/argus/scripts/deploy.sh --service=frontend --ref=${DEPLOY_REF}"
+      /opt/argus/scripts/deploy.sh --service=frontend --ref=${DEPLOY_REF}
   environment:
     name: production
     url: https://argusai.kz
