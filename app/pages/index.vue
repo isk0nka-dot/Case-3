@@ -435,13 +435,7 @@ const features = [
   }
 ]
 
-// Violation types for showcase
-const violationTypes = [
-  { label: 'Телефон обнаружен', severity: 'critical', time: '0:42' },
-  { label: 'Отклонение взгляда', severity: 'warning', time: '1:15' },
-  { label: '2 лица в кадре', severity: 'critical', time: '2:33' },
-  { label: 'Шёпот обнаружен', severity: 'info', time: '3:07' }
-]
+
 
 // --- Comparison Section ---
 const comparisonRef = ref<HTMLElement | null>(null)
@@ -2971,10 +2965,6 @@ const archiveKernelLabels: Record<string, string> = {
         </p>
       </div>
     </section>
-
-    <!-- ============================== -->
-    <!--  INTERACTIVE SHOWCASE          -->
-
 
     <!-- ============================== -->
     <!--  SOCIAL PROOF / STATS          -->
