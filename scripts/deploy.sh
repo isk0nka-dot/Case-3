@@ -99,7 +99,7 @@ info "Current HEAD: $ROLLBACK_SHORT ($ROLLBACK_SHA)"
 # ── Step 2: Fetch and reset to target ref ────────────────────────────────────
 step "Fetching latest code from origin..."
 if [[ -n "$CI_JOB_TOKEN" ]]; then
-  git remote set-url origin "https://oauth2:${CI_JOB_TOKEN}@gitlab.com/argus_ai_group/argus-${SERVICE}.git"
+  git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/argus_ai_group/argus-${SERVICE}.git"
 fi
 git fetch origin --prune --quiet
 
