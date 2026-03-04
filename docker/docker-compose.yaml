@@ -42,11 +42,11 @@ services:
         BUILD_TIME: ${BUILD_TIME:-unknown}
     image: argus/backend:${BACKEND_TAG:-latest}
     container_name: argus-backend
-    entrypoint: ["/app/event-collector", "-config", "/app/config/config.yaml"]
+    entrypoint: [ "/app/event-collector", "-config", "/app/config/config.yaml" ]
     ports:
-      - "${BACKEND_GRPC_PORT:-50051}:50051"   # gRPC event ingestion
-      - "${BACKEND_HTTP_PORT:-8080}:8080"     # HTTP admin API + health
-    user: "0:0"   # Root required for Docker socket access (infra monitoring)
+      - "${BACKEND_GRPC_PORT:-50051}:50051" # gRPC event ingestion
+      - "${BACKEND_HTTP_PORT:-8080}:8080" # HTTP admin API + health
+    user: "0:0" # Root required for Docker socket access (infra monitoring)
     volumes:
       - ./config.yaml:/app/config/config.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -103,7 +103,7 @@ services:
       - argus-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -131,7 +131,7 @@ services:
       - argus-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -176,7 +176,7 @@ services:
     networks:
       - argus-network
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1" ]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -214,7 +214,7 @@ services:
     networks:
       - argus-network
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1" ]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -252,7 +252,7 @@ services:
     networks:
       - argus-network
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1" ]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -326,7 +326,7 @@ services:
     networks:
       - argus-network
     healthcheck:
-      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1"]
+      test: [ "CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -362,7 +362,7 @@ services:
     networks:
       - argus-network
     healthcheck:
-      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1"]
+      test: [ "CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -398,7 +398,7 @@ services:
     networks:
       - argus-network
     healthcheck:
-      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1"]
+      test: [ "CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -421,7 +421,7 @@ services:
     networks:
       - argus-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-argus} -d ${POSTGRES_DB:-argus}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-argus} -d ${POSTGRES_DB:-argus}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -443,7 +443,7 @@ services:
     networks:
       - argus-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -485,7 +485,7 @@ services:
     networks:
       - argus-network
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: [ "CMD", "mc", "ready", "local" ]
       interval: 10s
       timeout: 5s
       retries: 5
