@@ -435,8 +435,6 @@ const features = [
   }
 ]
 
-
-
 // --- Comparison Section ---
 const comparisonRef = ref<HTMLElement | null>(null)
 const comparisonVisible = ref(false)
