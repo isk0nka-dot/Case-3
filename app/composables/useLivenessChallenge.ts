@@ -30,13 +30,13 @@ import { EventType, Severity, EventSource } from '~/lib/proto/types'
 // Types
 // ---------------------------------------------------------------------------
 
-export type ChallengeType =
-  | 'turn_head_left'
-  | 'turn_head_right'
-  | 'look_up'
-  | 'look_down'
-  | 'blink_twice'
-  | 'nod_yes'
+export type ChallengeType
+  = | 'turn_head_left'
+    | 'turn_head_right'
+    | 'look_up'
+    | 'look_down'
+    | 'blink_twice'
+    | 'nod_yes'
 
 export type ChallengeStatus = 'idle' | 'active' | 'verifying' | 'passed' | 'failed' | 'timeout'
 
@@ -46,7 +46,7 @@ export interface LivenessChallenge {
   instruction: string
   status: ChallengeStatus
   issuedAt: number
-  deadline: number        // issuedAt + responseWindowMs
+  deadline: number // issuedAt + responseWindowMs
   completedAt: number | null
   attempts: number
 }
@@ -70,13 +70,13 @@ export interface ChallengeConfig {
 // Challenge definitions
 // ---------------------------------------------------------------------------
 
-const CHALLENGE_POOL: { type: ChallengeType; instruction: string }[] = [
+const CHALLENGE_POOL: { type: ChallengeType, instruction: string }[] = [
   { type: 'turn_head_left', instruction: 'Поверните голову влево' },
   { type: 'turn_head_right', instruction: 'Поверните голову вправо' },
   { type: 'look_up', instruction: 'Посмотрите вверх' },
   { type: 'look_down', instruction: 'Посмотрите вниз' },
   { type: 'blink_twice', instruction: 'Моргните дважды' },
-  { type: 'nod_yes', instruction: 'Кивните головой' },
+  { type: 'nod_yes', instruction: 'Кивните головой' }
 ]
 
 // ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ export function useLivenessChallenge(config: ChallengeConfig = {}) {
     responseWindowMs = 10_000,
     maxChallenges = 8,
     headPoseThreshold = 20,
-    blinkCountRequired = 2,
+    blinkCountRequired = 2
   } = config
 
   // State
@@ -126,7 +126,7 @@ export function useLivenessChallenge(config: ChallengeConfig = {}) {
   }
 
   /** Generate a random challenge, avoiding the last used type. */
-  function pickChallenge(): { type: ChallengeType; instruction: string } {
+  function pickChallenge(): { type: ChallengeType, instruction: string } {
     const lastType = challengeHistory.value.length > 0
       ? challengeHistory.value[challengeHistory.value.length - 1]!.type
       : null
@@ -151,7 +151,7 @@ export function useLivenessChallenge(config: ChallengeConfig = {}) {
       issuedAt: now,
       deadline: now + responseWindowMs,
       completedAt: null,
-      attempts: 0,
+      attempts: 0
     }
 
     // Record blink baseline for blink challenges
@@ -317,6 +317,6 @@ export function useLivenessChallenge(config: ChallengeConfig = {}) {
     start,
     stop,
     verifyFrame,
-    onEvent,
+    onEvent
   }
 }

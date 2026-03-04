@@ -72,7 +72,7 @@ export interface DeviceFingerprint {
 // Fingerprinting functions
 // ---------------------------------------------------------------------------
 
-function getGPUInfo(): { renderer: string; vendor: string; maxTextureSize: number } {
+function getGPUInfo(): { renderer: string, vendor: string, maxTextureSize: number } {
   try {
     const canvas = document.createElement('canvas')
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
@@ -96,7 +96,7 @@ function getGPUInfo(): { renderer: string; vendor: string; maxTextureSize: numbe
     return {
       renderer: String(renderer),
       vendor: String(vendor),
-      maxTextureSize: Number(maxTextureSize),
+      maxTextureSize: Number(maxTextureSize)
     }
   } catch {
     return { renderer: 'error', vendor: 'error', maxTextureSize: 0 }
@@ -179,7 +179,7 @@ function getCanvasFingerprint(): string {
   }
 }
 
-function detectVirtualMachine(gpuRenderer: string, gpuVendor: string): { isVM: boolean; signals: string[] } {
+function detectVirtualMachine(gpuRenderer: string, gpuVendor: string): { isVM: boolean, signals: string[] } {
   const signals: string[] = []
 
   // GPU-based VM detection
@@ -221,7 +221,7 @@ function detectVirtualMachine(gpuRenderer: string, gpuVendor: string): { isVM: b
 
   return {
     isVM: signals.length >= 2,
-    signals,
+    signals
   }
 }
 
@@ -287,7 +287,7 @@ export function useDeviceFingerprint() {
       new Date().getTimezoneOffset().toString(),
       audioHash,
       gpu.maxTextureSize.toString(),
-      canvasHash,
+      canvasHash
     ]
 
     const deviceId = stableHash(components.join('|'))
@@ -308,7 +308,7 @@ export function useDeviceFingerprint() {
       canvasHash,
       isVirtualMachine: vmCheck.isVM,
       vmSignals: vmCheck.signals,
-      capturedAt: Date.now(),
+      capturedAt: Date.now()
     }
 
     fingerprint.value = result
@@ -328,7 +328,7 @@ export function useDeviceFingerprint() {
             hardwareIdHash: result.deviceId,
             mismatchComponent: `vm:${vmCheck.signals.join(',')}`,
             monitorCount: 1,
-            virtualMonitor: true,
+            virtualMonitor: true
           }
         },
         `Виртуальная машина: ${vmCheck.signals.join(', ')}`,
@@ -362,7 +362,7 @@ export function useDeviceFingerprint() {
       [current.timezoneOffset === baseline.timezoneOffset, 1],
       [current.audioHash === baseline.audioHash, 3],
       [current.canvasHash === baseline.canvasHash, 2],
-      [current.maxTextureSize === baseline.maxTextureSize, 1],
+      [current.maxTextureSize === baseline.maxTextureSize, 1]
     ]
 
     for (const [match, weight] of weights) {
@@ -385,7 +385,7 @@ export function useDeviceFingerprint() {
             hardwareIdHash: current.deviceId,
             mismatchComponent: `similarity=${similarity.toFixed(3)}`,
             monitorCount: 1,
-            virtualMonitor: false,
+            virtualMonitor: false
           }
         },
         `Смена устройства обнаружена: сходство ${(similarity * 100).toFixed(0)}%`,
@@ -402,6 +402,6 @@ export function useDeviceFingerprint() {
     isCapturing,
     capture,
     verify,
-    onEvent,
+    onEvent
   }
 }

@@ -17,7 +17,7 @@ onMounted(() => {
       title: 'Доступ запрещён',
       description: 'У вас нет прав для просмотра этой страницы. Требуются права Супер Администратора.',
       icon: 'i-lucide-shield-alert',
-      color: 'error',
+      color: 'error'
     })
     // Clean up the URL query parameter
     router.replace({ path: '/dashboard', query: {} })
@@ -52,7 +52,6 @@ function delayedBlur() {
 const formatTime = formatTimeShort
 const formatStartTime = formatTimeShort
 
-
 // Status helpers delegated to useStatusHelpers composable
 </script>
 
@@ -63,10 +62,16 @@ const formatStartTime = formatTimeShort
       <!-- Page header row -->
       <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 class="text-2xl font-bold" style="color: var(--argus-text);">
+          <h1
+            class="text-2xl font-bold"
+            style="color: var(--argus-text);"
+          >
             Дашборд
           </h1>
-          <p class="text-sm mt-1" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-sm mt-1"
+            style="color: var(--argus-text-dimmed);"
+          >
             Мониторинг в реальном времени — Интеграция Eduser
           </p>
         </div>
@@ -86,15 +91,27 @@ const formatStartTime = formatTimeShort
               @mouseleave="($event.currentTarget as HTMLElement).style.background = accentBg(0.06)"
               @click="store.clearFilter()"
             >
-              <UIcon name="i-lucide-x" class="size-3" />
+              <UIcon
+                name="i-lucide-x"
+                class="size-3"
+              />
               Сбросить
             </button>
           </Transition>
 
-          <div class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full" :style="{ background: successBg(0.1), color: 'var(--argus-success)' }">
+          <div
+            class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full"
+            :style="{ background: successBg(0.1), color: 'var(--argus-success)' }"
+          >
             <span class="relative flex size-1.5">
-              <span class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" :class="isDark ? 'bg-emerald-400' : 'bg-emerald-500'" />
-              <span class="relative inline-flex size-1.5 rounded-full" :class="isDark ? 'bg-emerald-400' : 'bg-emerald-600'" />
+              <span
+                class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                :class="isDark ? 'bg-emerald-400' : 'bg-emerald-500'"
+              />
+              <span
+                class="relative inline-flex size-1.5 rounded-full"
+                :class="isDark ? 'bg-emerald-400' : 'bg-emerald-600'"
+              />
             </span>
             Система активна
           </div>
@@ -109,8 +126,14 @@ const formatStartTime = formatTimeShort
             @mouseleave="($event.currentTarget as HTMLElement).style.background = store.rightPanelOpen ? errorBg(0.1) : 'var(--argus-bg-hover)'"
             @click="store.toggleRightPanel()"
           >
-            <UIcon :name="store.rightPanelOpen ? 'i-lucide-panel-right-close' : 'i-lucide-panel-right-open'" class="size-3.5" />
-            <span v-if="!store.rightPanelOpen" class="relative">
+            <UIcon
+              :name="store.rightPanelOpen ? 'i-lucide-panel-right-close' : 'i-lucide-panel-right-open'"
+              class="size-3.5"
+            />
+            <span
+              v-if="!store.rightPanelOpen"
+              class="relative"
+            >
               Нарушения
               <span class="absolute -top-1.5 -right-4 flex items-center justify-center size-4 rounded-full text-[9px] font-bold text-white bg-red-500">
                 {{ store.filteredCriticalAlerts.length }}
@@ -134,7 +157,10 @@ const formatStartTime = formatTimeShort
             }"
             @click="examSelectorOpen = !examSelectorOpen"
           >
-            <UIcon name="i-lucide-filter" class="size-4 shrink-0" />
+            <UIcon
+              name="i-lucide-filter"
+              class="size-4 shrink-0"
+            />
             <span class="flex-1 text-left truncate">
               {{ store.selectedExam ? store.selectedExam.examName : 'Все экзамены' }}
             </span>
@@ -153,12 +179,19 @@ const formatStartTime = formatTimeShort
               :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
             >
               <!-- Search within exams -->
-              <div class="p-2 border-b" style="border-color: var(--argus-border);">
+              <div
+                class="p-2 border-b"
+                style="border-color: var(--argus-border);"
+              >
                 <div
                   class="flex items-center gap-2 px-3 py-2 rounded-lg"
                   :style="{ background: 'var(--argus-bg-hover)' }"
                 >
-                  <UIcon name="i-heroicons-magnifying-glass" class="size-3.5 shrink-0" style="color: var(--argus-text-dimmed);" />
+                  <UIcon
+                    name="i-heroicons-magnifying-glass"
+                    class="size-3.5 shrink-0"
+                    style="color: var(--argus-text-dimmed);"
+                  />
                   <input
                     v-model="examSearchTerm"
                     type="text"
@@ -182,14 +215,23 @@ const formatStartTime = formatTimeShort
                   @mouseleave="!store.isFiltered ? null : (($event.currentTarget as HTMLElement).style.background = 'transparent')"
                   @click="handleExamSelect(null)"
                 >
-                  <UIcon name="i-lucide-globe" class="size-4 shrink-0" />
+                  <UIcon
+                    name="i-lucide-globe"
+                    class="size-4 shrink-0"
+                  />
                   <span class="font-medium">Все экзамены</span>
-                  <span class="ml-auto text-xs" style="color: var(--argus-text-dimmed);">
+                  <span
+                    class="ml-auto text-xs"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     {{ store.totalParticipants }}
                   </span>
                 </button>
 
-                <div class="mx-3 my-1 border-t" style="border-color: var(--argus-border-subtle);" />
+                <div
+                  class="mx-3 my-1 border-t"
+                  style="border-color: var(--argus-border-subtle);"
+                />
 
                 <!-- Individual exam options -->
                 <button
@@ -204,10 +246,19 @@ const formatStartTime = formatTimeShort
                   @mouseleave="($event.currentTarget as HTMLElement).style.background = store.selectedExamId === exam.id ? accentBg(0.06) : 'transparent'"
                   @click="handleExamSelect(exam.id)"
                 >
-                  <UIcon name="i-lucide-book-open" class="size-4 shrink-0" style="color: var(--argus-text-dimmed);" />
+                  <UIcon
+                    name="i-lucide-book-open"
+                    class="size-4 shrink-0"
+                    style="color: var(--argus-text-dimmed);"
+                  />
                   <div class="flex-1 min-w-0">
-                    <p class="font-medium truncate">{{ exam.examName }}</p>
-                    <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">
+                    <p class="font-medium truncate">
+                      {{ exam.examName }}
+                    </p>
+                    <p
+                      class="text-[10px] mt-0.5"
+                      style="color: var(--argus-text-dimmed);"
+                    >
                       {{ exam.participants }} участников
                     </p>
                   </div>
@@ -243,7 +294,11 @@ const formatStartTime = formatTimeShort
               boxShadow: searchFocused ? `0 0 0 3px ${accentBg(0.1)}` : 'none'
             }"
           >
-            <UIcon name="i-heroicons-magnifying-glass" class="size-5 shrink-0" :style="{ color: searchFocused ? 'var(--argus-accent)' : 'var(--argus-text-dimmed)' }" />
+            <UIcon
+              name="i-heroicons-magnifying-glass"
+              class="size-5 shrink-0"
+              :style="{ color: searchFocused ? 'var(--argus-accent)' : 'var(--argus-text-dimmed)' }"
+            />
             <input
               v-model="store.studentSearchQuery"
               type="text"
@@ -256,7 +311,11 @@ const formatStartTime = formatTimeShort
               @focus="searchFocused = true"
               @blur="delayedBlur"
             >
-            <span v-if="store.studentSearchQuery" class="text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
+            <span
+              v-if="store.studentSearchQuery"
+              class="text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+              :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+            >
               {{ store.searchResults.length }} результатов
             </span>
           </div>
@@ -268,11 +327,20 @@ const formatStartTime = formatTimeShort
               class="absolute z-50 mt-2 left-0 right-0 rounded-xl border shadow-xl overflow-hidden"
               :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
             >
-              <div class="px-4 py-2.5 border-b flex items-center justify-between" style="border-color: var(--argus-border);">
-                <span class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+              <div
+                class="px-4 py-2.5 border-b flex items-center justify-between"
+                style="border-color: var(--argus-border);"
+              >
+                <span
+                  class="text-[11px] font-medium uppercase tracking-wider"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Результаты поиска
                 </span>
-                <span class="text-[10px]" style="color: var(--argus-text-dimmed);">
+                <span
+                  class="text-[10px]"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   {{ store.searchResults.length }} найдено
                 </span>
               </div>
@@ -293,7 +361,10 @@ const formatStartTime = formatTimeShort
                   <!-- Info -->
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
-                      <p class="text-sm font-medium truncate" style="color: var(--argus-text);">
+                      <p
+                        class="text-sm font-medium truncate"
+                        style="color: var(--argus-text);"
+                      >
                         {{ student.name }}
                       </p>
                       <span
@@ -303,7 +374,10 @@ const formatStartTime = formatTimeShort
                         {{ statusLabel(student.status) }}
                       </span>
                     </div>
-                    <p class="text-[11px] mt-0.5" style="color: var(--argus-text-dimmed);">
+                    <p
+                      class="text-[11px] mt-0.5"
+                      style="color: var(--argus-text-dimmed);"
+                    >
                       ИИН: {{ student.iin }} · {{ student.examName }}
                     </p>
                   </div>
@@ -315,7 +389,10 @@ const formatStartTime = formatTimeShort
                     >
                       {{ student.integrityScore }}%
                     </p>
-                    <p class="text-[10px]" style="color: var(--argus-text-dimmed);">
+                    <p
+                      class="text-[10px]"
+                      style="color: var(--argus-text-dimmed);"
+                    >
                       {{ student.violations }} нарушений
                     </p>
                   </div>
@@ -332,18 +409,34 @@ const formatStartTime = formatTimeShort
         <div class="glass-card rounded-xl p-5">
           <div class="flex items-start justify-between">
             <div>
-              <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Активные сессии
               </p>
-              <p class="text-3xl font-bold mt-2" style="color: var(--argus-text);">
+              <p
+                class="text-3xl font-bold mt-2"
+                style="color: var(--argus-text);"
+              >
                 {{ store.filteredActiveSessions }}
               </p>
-              <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-xs mt-1.5"
+                style="color: var(--argus-text-dimmed);"
+              >
                 {{ store.filteredTotalParticipants }} {{ store.isFiltered ? 'в экзамене' : 'всего участников' }}
               </p>
             </div>
-            <div class="flex items-center justify-center size-10 rounded-lg" :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }">
-              <UIcon name="i-lucide-users" class="size-5" style="color: var(--argus-accent);" />
+            <div
+              class="flex items-center justify-center size-10 rounded-lg"
+              :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }"
+            >
+              <UIcon
+                name="i-lucide-users"
+                class="size-5"
+                style="color: var(--argus-accent);"
+              />
             </div>
           </div>
         </div>
@@ -352,18 +445,34 @@ const formatStartTime = formatTimeShort
         <div class="glass-card glow-error rounded-xl p-5">
           <div class="flex items-start justify-between">
             <div>
-              <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Критические нарушения
               </p>
-              <p class="text-3xl font-bold mt-2" style="color: var(--argus-error);">
+              <p
+                class="text-3xl font-bold mt-2"
+                style="color: var(--argus-error);"
+              >
                 {{ store.filteredCriticalViolations }}
               </p>
-              <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-xs mt-1.5"
+                style="color: var(--argus-text-dimmed);"
+              >
                 {{ store.filteredCriticalAlerts.length }} нерешённых
               </p>
             </div>
-            <div class="flex items-center justify-center size-10 rounded-lg" :style="{ background: errorBg(0.1), border: `1px solid ${errorBg(0.15)}` }">
-              <UIcon name="i-lucide-shield-alert" class="size-5" style="color: var(--argus-error);" />
+            <div
+              class="flex items-center justify-center size-10 rounded-lg"
+              :style="{ background: errorBg(0.1), border: `1px solid ${errorBg(0.15)}` }"
+            >
+              <UIcon
+                name="i-lucide-shield-alert"
+                class="size-5"
+                style="color: var(--argus-error);"
+              />
             </div>
           </div>
         </div>
@@ -372,13 +481,22 @@ const formatStartTime = formatTimeShort
         <div class="glass-card rounded-xl p-5">
           <div class="flex items-start justify-between">
             <div class="w-full">
-              <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Средний балл честности
               </p>
-              <p class="text-3xl font-bold mt-2" style="color: var(--argus-text);">
+              <p
+                class="text-3xl font-bold mt-2"
+                style="color: var(--argus-text);"
+              >
                 {{ store.filteredAvgIntegrity }}%
               </p>
-              <div class="mt-3 w-full h-1.5 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
+              <div
+                class="mt-3 w-full h-1.5 rounded-full overflow-hidden"
+                style="background: var(--argus-bg-hover);"
+              >
                 <div
                   class="h-full rounded-full transition-all duration-700"
                   :style="{
@@ -396,10 +514,16 @@ const formatStartTime = formatTimeShort
         </div>
 
         <!-- Состояние системы (Super Admin only — global infrastructure metric) -->
-        <div v-if="authStore.isSuperAdmin" class="glass-card rounded-xl p-5">
+        <div
+          v-if="authStore.isSuperAdmin"
+          class="glass-card rounded-xl p-5"
+        >
           <div class="flex items-start justify-between">
             <div>
-              <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Состояние системы
               </p>
               <div class="flex items-center gap-2 mt-2">
@@ -413,36 +537,68 @@ const formatStartTime = formatTimeShort
                     :class="store.systemHealth === 'operational' ? 'bg-emerald-500' : store.systemHealth === 'degraded' ? 'bg-yellow-500' : 'bg-red-500'"
                   />
                 </span>
-                <p class="text-lg font-bold" style="color: var(--argus-text);">
+                <p
+                  class="text-lg font-bold"
+                  style="color: var(--argus-text);"
+                >
                   {{ store.systemHealthLabel }}
                 </p>
               </div>
-              <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-xs mt-1.5"
+                style="color: var(--argus-text-dimmed);"
+              >
                 {{ store.systemHealthUptime }}% аптайм
               </p>
             </div>
-            <div class="flex items-center justify-center size-10 rounded-lg" :style="{ background: successBg(0.1), border: `1px solid ${successBg(0.15)}` }">
-              <UIcon name="i-lucide-server" class="size-5" style="color: var(--argus-success);" />
+            <div
+              class="flex items-center justify-center size-10 rounded-lg"
+              :style="{ background: successBg(0.1), border: `1px solid ${successBg(0.15)}` }"
+            >
+              <UIcon
+                name="i-lucide-server"
+                class="size-5"
+                style="color: var(--argus-success);"
+              />
             </div>
           </div>
         </div>
 
         <!-- Экзамены завершённые (Org Admin replacement card when system card is hidden) -->
-        <div v-else class="glass-card rounded-xl p-5">
+        <div
+          v-else
+          class="glass-card rounded-xl p-5"
+        >
           <div class="flex items-start justify-between">
             <div>
-              <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Экзамены за сегодня
               </p>
-              <p class="text-3xl font-bold mt-2" style="color: var(--argus-text);">
+              <p
+                class="text-3xl font-bold mt-2"
+                style="color: var(--argus-text);"
+              >
                 {{ store.activeExams.length }}
               </p>
-              <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-xs mt-1.5"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Активных экзаменов
               </p>
             </div>
-            <div class="flex items-center justify-center size-10 rounded-lg" :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }">
-              <UIcon name="i-lucide-calendar-check" class="size-5" style="color: var(--argus-accent);" />
+            <div
+              class="flex items-center justify-center size-10 rounded-lg"
+              :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }"
+            >
+              <UIcon
+                name="i-lucide-calendar-check"
+                class="size-5"
+                style="color: var(--argus-accent);"
+              />
             </div>
           </div>
         </div>
@@ -452,14 +608,27 @@ const formatStartTime = formatTimeShort
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <!-- Active Exams Table -->
         <div class="glass-card rounded-xl overflow-hidden">
-          <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+          <div
+            class="flex items-center justify-between px-5 py-4 border-b"
+            style="border-color: var(--argus-border);"
+          >
             <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-book-open" class="size-4" style="color: var(--argus-text-dimmed);" />
-              <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+              <UIcon
+                name="i-lucide-book-open"
+                class="size-4"
+                style="color: var(--argus-text-dimmed);"
+              />
+              <h2
+                class="text-sm font-semibold"
+                style="color: var(--argus-text);"
+              >
                 Активные экзамены
               </h2>
             </div>
-            <span class="text-[10px] font-medium px-2 py-1 rounded-full" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
+            <span
+              class="text-[10px] font-medium px-2 py-1 rounded-full"
+              :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+            >
               {{ store.activeExams.length }} активных
             </span>
           </div>
@@ -468,16 +637,28 @@ const formatStartTime = formatTimeShort
             <table class="w-full text-sm">
               <thead>
                 <tr style="border-bottom: 1px solid var(--argus-border);">
-                  <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+                  <th
+                    class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     Название экзамена
                   </th>
-                  <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+                  <th
+                    class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     Время начала
                   </th>
-                  <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+                  <th
+                    class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     Участники
                   </th>
-                  <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+                  <th
+                    class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     Уровень нарушений
                   </th>
                 </tr>
@@ -505,12 +686,19 @@ const formatStartTime = formatTimeShort
                       {{ exam.examName }}
                     </button>
                   </td>
-                  <td class="px-5 py-3" style="color: var(--argus-text-dimmed);">
+                  <td
+                    class="px-5 py-3"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     {{ formatStartTime(exam.startTime) }}
                   </td>
                   <td class="px-5 py-3">
                     <div class="flex items-center gap-1.5">
-                      <UIcon name="i-lucide-users" class="size-3.5" style="color: var(--argus-text-dimmed);" />
+                      <UIcon
+                        name="i-lucide-users"
+                        class="size-3.5"
+                        style="color: var(--argus-text-dimmed);"
+                      />
                       <span style="color: var(--argus-text-muted);">{{ exam.participants }}</span>
                     </div>
                   </td>
@@ -533,34 +721,63 @@ const formatStartTime = formatTimeShort
 
         <!-- Violation Trends Chart -->
         <div class="glass-card rounded-xl overflow-hidden">
-          <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+          <div
+            class="flex items-center justify-between px-5 py-4 border-b"
+            style="border-color: var(--argus-border);"
+          >
             <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-trending-up" class="size-4" style="color: var(--argus-text-dimmed);" />
-              <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+              <UIcon
+                name="i-lucide-trending-up"
+                class="size-4"
+                style="color: var(--argus-text-dimmed);"
+              />
+              <h2
+                class="text-sm font-semibold"
+                style="color: var(--argus-text);"
+              >
                 Тренды нарушений
               </h2>
             </div>
-            <span class="text-[10px] font-medium px-2 py-1 rounded-full" :style="{ background: 'var(--argus-bg-hover)', color: 'var(--argus-text-dimmed)' }">
+            <span
+              class="text-[10px] font-medium px-2 py-1 rounded-full"
+              :style="{ background: 'var(--argus-bg-hover)', color: 'var(--argus-text-dimmed)' }"
+            >
               Последние 12 часов
             </span>
           </div>
 
           <div class="p-5">
-            <ViolationChart :data="store.violationTrends" :dark-mode="isDark" />
+            <ViolationChart
+              :data="store.violationTrends"
+              :dark-mode="isDark"
+            />
           </div>
         </div>
       </div>
 
       <!-- Bottom: Студенты в зоне риска -->
       <div class="glass-card rounded-xl overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+        <div
+          class="flex items-center justify-between px-5 py-4 border-b"
+          style="border-color: var(--argus-border);"
+        >
           <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-alert-triangle" class="size-4" style="color: var(--argus-error);" />
-            <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+            <UIcon
+              name="i-lucide-alert-triangle"
+              class="size-4"
+              style="color: var(--argus-error);"
+            />
+            <h2
+              class="text-sm font-semibold"
+              style="color: var(--argus-text);"
+            >
               Студенты в зоне риска
             </h2>
           </div>
-          <p class="text-[11px]" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-[11px]"
+            style="color: var(--argus-text-dimmed);"
+          >
             {{ store.isFiltered ? store.selectedExam?.examName : 'Наименьшие баллы честности среди активных экзаменов' }}
           </p>
         </div>
@@ -582,15 +799,24 @@ const formatStartTime = formatTimeShort
             </div>
 
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium truncate" style="color: var(--argus-text);">
+              <p
+                class="text-sm font-medium truncate"
+                style="color: var(--argus-text);"
+              >
                 {{ student.name }}
               </p>
-              <p class="text-xs truncate" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-xs truncate"
+                style="color: var(--argus-text-dimmed);"
+              >
                 {{ student.examName }}
               </p>
             </div>
 
-            <span class="text-[11px] font-medium px-2.5 py-1 rounded-full" :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }">
+            <span
+              class="text-[11px] font-medium px-2.5 py-1 rounded-full"
+              :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }"
+            >
               {{ student.violations }} нарушений
             </span>
 
@@ -603,7 +829,10 @@ const formatStartTime = formatTimeShort
               >
                 {{ student.integrityScore }}%
               </p>
-              <div class="mt-1 w-full h-1 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
+              <div
+                class="mt-1 w-full h-1 rounded-full overflow-hidden"
+                style="background: var(--argus-bg-hover);"
+              >
                 <div
                   class="h-full rounded-full transition-all duration-500"
                   :style="{
@@ -625,11 +854,21 @@ const formatStartTime = formatTimeShort
           v-else
           class="flex flex-col items-center justify-center py-12 px-6"
         >
-          <UIcon name="i-lucide-check-circle" class="size-10 mb-3" style="color: var(--argus-success);" />
-          <p class="text-sm font-medium" style="color: var(--argus-text);">
+          <UIcon
+            name="i-lucide-check-circle"
+            class="size-10 mb-3"
+            style="color: var(--argus-success);"
+          />
+          <p
+            class="text-sm font-medium"
+            style="color: var(--argus-text);"
+          >
             Нет студентов в зоне риска
           </p>
-          <p class="text-xs mt-1" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-xs mt-1"
+            style="color: var(--argus-text-dimmed);"
+          >
             В выбранном экзамене нет студентов с низким баллом честности
           </p>
         </div>
@@ -646,23 +885,39 @@ const formatStartTime = formatTimeShort
         opacity: store.rightPanelOpen ? 1 : 0
       }"
     >
-      <div v-if="store.rightPanelOpen" class="flex flex-col h-full w-80">
+      <div
+        v-if="store.rightPanelOpen"
+        class="flex flex-col h-full w-80"
+      >
         <!-- Header -->
-        <div class="flex items-center justify-between px-4 h-14 border-b shrink-0" style="border-color: var(--argus-border);">
+        <div
+          class="flex items-center justify-between px-4 h-14 border-b shrink-0"
+          style="border-color: var(--argus-border);"
+        >
           <div class="flex items-center gap-2">
             <span class="relative flex size-2">
               <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
               <span class="relative inline-flex size-2 rounded-full bg-red-500" />
             </span>
-            <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+            <h2
+              class="text-sm font-semibold"
+              style="color: var(--argus-text);"
+            >
               Нарушения
             </h2>
-            <span v-if="store.isFiltered" class="text-[9px] font-medium px-1.5 py-0.5 rounded-full" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
+            <span
+              v-if="store.isFiltered"
+              class="text-[9px] font-medium px-1.5 py-0.5 rounded-full"
+              :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+            >
               Фильтр
             </span>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }">
+            <span
+              class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+              :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }"
+            >
               {{ store.filteredAlerts.length }}
             </span>
             <button
@@ -672,7 +927,10 @@ const formatStartTime = formatTimeShort
               @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
               @click="store.toggleRightPanel()"
             >
-              <UIcon name="i-lucide-x" class="size-3.5" />
+              <UIcon
+                name="i-lucide-x"
+                class="size-3.5"
+              />
             </button>
           </div>
         </div>
@@ -689,7 +947,10 @@ const formatStartTime = formatTimeShort
           >
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium truncate" style="color: var(--argus-text);">
+                <p
+                  class="text-sm font-medium truncate"
+                  style="color: var(--argus-text);"
+                >
                   {{ alert.studentName }}
                 </p>
                 <div class="flex items-center gap-1.5 mt-1">
@@ -703,12 +964,18 @@ const formatStartTime = formatTimeShort
                     {{ alert.violationType }}
                   </span>
                 </div>
-                <p class="text-[10px] mt-1" style="color: var(--argus-text-dimmed);">
+                <p
+                  class="text-[10px] mt-1"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   {{ alert.examName }}
                 </p>
               </div>
               <div class="flex flex-col items-end gap-1.5 shrink-0">
-                <span class="text-[10px]" style="color: var(--argus-text-dimmed);">
+                <span
+                  class="text-[10px]"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   {{ formatTime(alert.timestamp) }}
                 </span>
                 <button
@@ -718,7 +985,10 @@ const formatStartTime = formatTimeShort
                   @mouseleave="($event.currentTarget as HTMLElement).style.background = accentBg(0.08)"
                   @click.stop="store.openMonitoringModalFromAlert(alert)"
                 >
-                  <UIcon name="i-lucide-eye" class="size-3" />
+                  <UIcon
+                    name="i-lucide-eye"
+                    class="size-3"
+                  />
                   Просмотр
                 </button>
               </div>
@@ -730,8 +1000,15 @@ const formatStartTime = formatTimeShort
             v-if="store.filteredAlerts.length === 0"
             class="flex flex-col items-center justify-center py-12 px-4"
           >
-            <UIcon name="i-lucide-check-circle" class="size-8 mb-2" style="color: var(--argus-success);" />
-            <p class="text-xs text-center" style="color: var(--argus-text-dimmed);">
+            <UIcon
+              name="i-lucide-check-circle"
+              class="size-8 mb-2"
+              style="color: var(--argus-success);"
+            />
+            <p
+              class="text-xs text-center"
+              style="color: var(--argus-text-dimmed);"
+            >
               Нет нарушений для выбранного экзамена
             </p>
           </div>

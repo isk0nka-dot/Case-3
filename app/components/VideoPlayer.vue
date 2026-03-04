@@ -12,7 +12,7 @@ import {
   Track,
   ConnectionState,
   type RemoteTrackPublication,
-  type RemoteParticipant,
+  type RemoteParticipant
 } from 'livekit-client'
 import { useAdminAPI } from '~/composables/useAdminAPI'
 
@@ -57,8 +57,8 @@ async function connect() {
       adaptiveStream: true,
       dynacast: true,
       videoCaptureDefaults: {
-        resolution: { width: 640, height: 480, frameRate: 15 },
-      },
+        resolution: { width: 640, height: 480, frameRate: 15 }
+      }
     })
 
     // Event listeners
@@ -114,7 +114,6 @@ async function connect() {
         }
       })
     })
-
   } catch (err: any) {
     connectionState.value = 'error'
     errorMessage.value = err.message || 'Connection failed'
@@ -169,7 +168,10 @@ const stateColor = computed(() => {
 </script>
 
 <template>
-  <div class="relative w-full h-full overflow-hidden" style="background: var(--argus-bg-deep);">
+  <div
+    class="relative w-full h-full overflow-hidden"
+    style="background: var(--argus-bg-deep);"
+  >
     <!-- Actual video element (hidden when no stream) -->
     <video
       ref="videoRef"
@@ -195,7 +197,11 @@ const stateColor = computed(() => {
             class="size-10 rounded-full border-2 animate-spin"
             style="border-color: var(--argus-border); border-top-color: var(--argus-accent);"
           />
-          <UIcon name="i-lucide-video" class="absolute inset-0 m-auto size-4" style="color: var(--argus-accent);" />
+          <UIcon
+            name="i-lucide-video"
+            class="absolute inset-0 m-auto size-4"
+            style="color: var(--argus-accent);"
+          />
         </div>
 
         <!-- Idle / waiting -->
@@ -203,8 +209,15 @@ const stateColor = computed(() => {
           v-else-if="connectionState === 'connected'"
           class="flex flex-col items-center gap-1 opacity-40"
         >
-          <UIcon name="i-lucide-video" class="size-8" style="color: var(--argus-text-dimmed);" />
-          <span class="text-[9px] font-medium" style="color: var(--argus-text-dimmed);">Ожидание камеры студента</span>
+          <UIcon
+            name="i-lucide-video"
+            class="size-8"
+            style="color: var(--argus-text-dimmed);"
+          />
+          <span
+            class="text-[9px] font-medium"
+            style="color: var(--argus-text-dimmed);"
+          >Ожидание камеры студента</span>
         </div>
 
         <!-- Error state -->
@@ -212,8 +225,15 @@ const stateColor = computed(() => {
           v-else-if="connectionState === 'error'"
           class="flex flex-col items-center gap-1 opacity-60"
         >
-          <UIcon name="i-lucide-video-off" class="size-8" style="color: var(--argus-error);" />
-          <span class="text-[9px] font-medium" style="color: var(--argus-error);">{{ errorMessage || 'Нет соединения' }}</span>
+          <UIcon
+            name="i-lucide-video-off"
+            class="size-8"
+            style="color: var(--argus-error);"
+          />
+          <span
+            class="text-[9px] font-medium"
+            style="color: var(--argus-error);"
+          >{{ errorMessage || 'Нет соединения' }}</span>
           <button
             class="mt-1 px-2 py-0.5 rounded text-[8px] font-bold cursor-pointer transition-all"
             style="background: var(--argus-accent); color: #fff;"
@@ -224,9 +244,19 @@ const stateColor = computed(() => {
         </div>
 
         <!-- Disconnected / Idle -->
-        <div v-else class="flex flex-col items-center gap-1 opacity-30">
-          <UIcon name="i-lucide-video" class="size-8" style="color: var(--argus-text-dimmed);" />
-          <span class="text-[9px] font-medium" style="color: var(--argus-text-dimmed);">ВИДЕОПОТОК</span>
+        <div
+          v-else
+          class="flex flex-col items-center gap-1 opacity-30"
+        >
+          <UIcon
+            name="i-lucide-video"
+            class="size-8"
+            style="color: var(--argus-text-dimmed);"
+          />
+          <span
+            class="text-[9px] font-medium"
+            style="color: var(--argus-text-dimmed);"
+          >ВИДЕОПОТОК</span>
         </div>
       </div>
     </div>
@@ -238,7 +268,7 @@ const stateColor = computed(() => {
       :style="{
         background: `${stateColor}20`,
         color: stateColor,
-        border: `1px solid ${stateColor}30`,
+        border: `1px solid ${stateColor}30`
       }"
     >
       <span

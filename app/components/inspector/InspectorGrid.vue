@@ -52,7 +52,10 @@ function handleFilter(sessionId: string) {
 </script>
 
 <template>
-  <div :style="gridStyle" class="inspector-grid">
+  <div
+    :style="gridStyle"
+    class="inspector-grid"
+  >
     <TransitionGroup name="grid-reorder">
       <InspectorCell
         v-for="(session, index) in sortedSessions"
@@ -72,9 +75,21 @@ function handleFilter(sessionId: string) {
       v-if="sortedSessions.length === 0"
       class="col-span-full flex flex-col items-center justify-center py-16"
     >
-      <UIcon name="i-lucide-video-off" class="size-12 mb-3" style="color: var(--argus-text-dimmed);" />
-      <p class="text-sm font-medium" style="color: var(--argus-text);">Нет активных сессий</p>
-      <p class="text-xs mt-1" style="color: var(--argus-text-dimmed);">
+      <UIcon
+        name="i-lucide-video-off"
+        class="size-12 mb-3"
+        style="color: var(--argus-text-dimmed);"
+      />
+      <p
+        class="text-sm font-medium"
+        style="color: var(--argus-text);"
+      >
+        Нет активных сессий
+      </p>
+      <p
+        class="text-xs mt-1"
+        style="color: var(--argus-text-dimmed);"
+      >
         Измените критерии поиска или сбросьте фильтр
       </p>
     </div>

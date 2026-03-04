@@ -1254,9 +1254,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
     const q = monitoringSearchQuery.value.trim().toLowerCase()
     if (q) {
       sessions = sessions.filter(s =>
-        s.studentName.toLowerCase().includes(q) ||
-        s.iin.includes(q) ||
-        s.phone.replace(/\s/g, '').includes(q.replace(/\s/g, ''))
+        s.studentName.toLowerCase().includes(q)
+        || s.iin.includes(q)
+        || s.phone.replace(/\s/g, '').includes(q.replace(/\s/g, ''))
       )
     }
 
@@ -1343,7 +1343,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
         exam.voided = examSessions.filter(s => s.status === 'voided').length
         exam.participants = examSessions.length
       }
-
     } catch (err) {
       console.error('[Store] Failed to fetch archive data:', err)
       archiveError.value = String(err)
@@ -1419,9 +1418,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
     const q = archiveSearchQuery.value.trim().toLowerCase()
     if (q) {
       sessions = sessions.filter(s =>
-        s.studentName.toLowerCase().includes(q) ||
-        s.iin.includes(q) ||
-        s.phone.replace(/\s/g, '').includes(q.replace(/\s/g, ''))
+        s.studentName.toLowerCase().includes(q)
+        || s.iin.includes(q)
+        || s.phone.replace(/\s/g, '').includes(q.replace(/\s/g, ''))
       )
     }
 
@@ -1543,7 +1542,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const orgNameMap: Record<string, string> = {
     'org-eduser': 'EDUSER',
     'org-nis': 'НИШ',
-    'org-kaznu': 'КазНУ',
+    'org-kaznu': 'КазНУ'
   }
 
   function getOrgName(orgId: string): string {
@@ -1554,7 +1553,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const orgFilteredActiveExams = computed(() => {
     const authStore = useAuthStore()
     const orgId = authStore.effectiveOrgId
-    if (!orgId) return activeExams.value  // null = all orgs (Super Admin)
+    if (!orgId) return activeExams.value // null = all orgs (Super Admin)
     return activeExams.value.filter(e => e.orgId === orgId)
   })
 

@@ -28,7 +28,7 @@ function showErrorToast(err: unknown, fallback = 'Ошибка') {
     title: message,
     icon: isServerDown ? 'i-lucide-wifi-off' : 'i-lucide-alert-circle',
     color: 'error',
-    duration: isServerDown ? 0 : undefined, // persistent for server errors
+    duration: isServerDown ? 0 : undefined // persistent for server errors
   })
 }
 
@@ -57,7 +57,7 @@ const newOrg = reactive({
   // Primary Admin fields
   adminFullName: '',
   adminPhone: '',
-  adminPassword: '',
+  adminPassword: ''
 })
 
 // --- Focus management: auto-focus first input when create modal opens ---
@@ -77,7 +77,7 @@ const createdCredentials = reactive({
   orgId: '',
   adminFullName: '',
   adminPhone: '',
-  adminPassword: '',
+  adminPassword: ''
 })
 const credentialsCopied = ref(false)
 
@@ -91,9 +91,9 @@ function generateSecurePassword(): string {
   crypto.getRandomValues(arr)
   // Guarantee at least one of each class in first 4 chars.
   let pwd = upper[arr[0]! % upper.length]!
-            + lower[arr[1]! % lower.length]!
-            + digits[arr[2]! % digits.length]!
-            + symbols[arr[3]! % symbols.length]!
+    + lower[arr[1]! % lower.length]!
+    + digits[arr[2]! % digits.length]!
+    + symbols[arr[3]! % symbols.length]!
   for (let i = 4; i < 16; i++) {
     pwd += all[arr[i]! % all.length]!
   }
@@ -115,7 +115,7 @@ function copyCredentials() {
     `Организация: ${createdCredentials.orgName} (${createdCredentials.orgId})`,
     `Админ: ${createdCredentials.adminFullName}`,
     `Логин (телефон): +7${createdCredentials.adminPhone}`,
-    `Пароль: ${createdCredentials.adminPassword}`,
+    `Пароль: ${createdCredentials.adminPassword}`
   ].join('\n')
   navigator.clipboard.writeText(text)
   credentialsCopied.value = true
@@ -154,7 +154,7 @@ async function confirmDeleteOrg() {
     toast.add({
       title: `Организация «${orgToDelete.value.name}» удалена`,
       icon: 'i-lucide-check-circle',
-      color: 'success',
+      color: 'success'
     })
     // Remove from local state immediately
     organizations.value = organizations.value.filter(o => o.orgId !== orgToDelete.value!.orgId)
@@ -182,7 +182,7 @@ const newUser = reactive({
   password: '',
   fullName: '',
   email: '',
-  role: 'proctor' as string,
+  role: 'proctor' as string
 })
 
 // --- API Keys tab state ---
@@ -193,7 +193,7 @@ const createKeyLoading = ref(false)
 const newKey = reactive({
   name: '',
   permissions: [] as string[],
-  environment: 'live' as 'live' | 'test',
+  environment: 'live' as 'live' | 'test'
 })
 const newlyCreatedSecret = ref<string | null>(null)
 const revokeLoadingId = ref<string | null>(null)
@@ -210,7 +210,7 @@ const editOrgData = reactive({
   region: '',
   plan: '',
   maxSessions: 0,
-  maxEventsRps: 0,
+  maxEventsRps: 0
 })
 
 // --- Feature Toggles state ---
@@ -265,7 +265,7 @@ const featureToggles = reactive<OrgFeatureToggles>({
   system_vpn_detection: true,
   system_network_scan: true,
   system_multi_monitor: true,
-  system_hardware_id_binding: true,
+  system_hardware_id_binding: true
 })
 
 const featureSaving = ref(false)
@@ -277,7 +277,7 @@ interface FeatureGroup {
   icon: string
   color: string
   description?: string
-  features: { key: keyof OrgFeatureToggles; label: string; description: string; badge?: string }[]
+  features: { key: keyof OrgFeatureToggles, label: string, description: string, badge?: string }[]
 }
 
 const featureGroups: FeatureGroup[] = [
@@ -290,7 +290,7 @@ const featureGroups: FeatureGroup[] = [
       { key: 'ai_emotion_analysis', label: 'Анализ эмоций', description: 'Стресс и подозрительные эмоции' },
       { key: 'ai_anti_spoofing', label: 'Anti-spoofing', description: 'Защита от подмены лица (фото/видео)' },
       { key: 'ai_voice_detection', label: 'Голосовая детекция', description: 'Обнаружение речи и шёпота' },
-      { key: 'ai_blink_analysis', label: 'Анализ моргания', description: 'Паттерны моргания для liveness' },
+      { key: 'ai_blink_analysis', label: 'Анализ моргания', description: 'Паттерны моргания для liveness' }
     ]
   },
   {
@@ -302,14 +302,14 @@ const featureGroups: FeatureGroup[] = [
       { key: 'browser_print_screen_block', label: 'Блокировка скриншотов', description: 'Запрет PrintScreen / снимков экрана' },
       { key: 'browser_vm_block', label: 'Блокировка VM', description: 'Обнаружение виртуальных машин' },
       { key: 'browser_context_menu_block', label: 'Блокировка контекстного меню', description: 'Запрет правого клика' },
-      { key: 'browser_remote_access_block', label: 'Блокировка удалённого доступа', description: 'TeamViewer, AnyDesk и др.' },
+      { key: 'browser_remote_access_block', label: 'Блокировка удалённого доступа', description: 'TeamViewer, AnyDesk и др.' }
     ]
   },
   {
     id: 'behavioral', label: 'Поведенческий анализ', icon: 'i-lucide-brain-circuit', color: 'var(--argus-accent)',
     features: [
       { key: 'behavioral_typing_dynamics', label: 'Динамика набора текста', description: 'Анализ биометрического почерка клавиатурного ввода: WPM, латентность между нажатиями, ритм набора', badge: 'Kernel-данные' },
-      { key: 'behavioral_cursor_sync', label: 'Синхронизация руки и курсора', description: 'Корреляция физических движений руки с перемещением курсора для детекции удалённого управления', badge: 'Kernel-данные' },
+      { key: 'behavioral_cursor_sync', label: 'Синхронизация руки и курсора', description: 'Корреляция физических движений руки с перемещением курсора для детекции удалённого управления', badge: 'Kernel-данные' }
     ]
   },
   {
@@ -320,7 +320,7 @@ const featureGroups: FeatureGroup[] = [
       { key: 'system_vpn_detection', label: 'VPN/Proxy детекция', description: 'Обнаружение VPN и прокси-серверов' },
       { key: 'system_network_scan', label: 'Сканирование сети', description: 'Анализ локальной сети' },
       { key: 'system_multi_monitor', label: 'Мульти-монитор', description: 'Обнаружение нескольких мониторов' },
-      { key: 'system_hardware_id_binding', label: 'Привязка к устройству', description: 'Проверка Hardware ID' },
+      { key: 'system_hardware_id_binding', label: 'Привязка к устройству', description: 'Проверка Hardware ID' }
     ]
   }
 ]
@@ -332,7 +332,7 @@ function countEnabledInGroup(group: FeatureGroup): number {
 
 // Toggle all features in a group
 function toggleGroup(group: FeatureGroup, value: boolean) {
-  group.features.forEach(f => {
+  group.features.forEach((f) => {
     featureToggles[f.key] = value
   })
 }
@@ -365,7 +365,7 @@ async function saveFeatureToggles() {
 function loadFeatureToggles() {
   // In real impl, load from API. For now, use defaults.
   // Reset all to true as default for each org
-  Object.keys(featureToggles).forEach(key => {
+  Object.keys(featureToggles).forEach((key) => {
     (featureToggles as any)[key] = true
   })
 }
@@ -375,11 +375,11 @@ const filteredOrgs = computed(() => {
   const q = searchQuery.value.toLowerCase().trim()
   if (!q) return organizations.value
   return organizations.value.filter(org =>
-    org.name.toLowerCase().includes(q) ||
-    org.orgId.toLowerCase().includes(q) ||
-    org.slug.toLowerCase().includes(q) ||
-    (org.city && org.city.toLowerCase().includes(q)) ||
-    (org.contactEmail && org.contactEmail.toLowerCase().includes(q))
+    org.name.toLowerCase().includes(q)
+    || org.orgId.toLowerCase().includes(q)
+    || org.slug.toLowerCase().includes(q)
+    || (org.city && org.city.toLowerCase().includes(q))
+    || (org.contactEmail && org.contactEmail.toLowerCase().includes(q))
   )
 })
 
@@ -466,7 +466,7 @@ const orgTypeOptions = [
   { value: 'school', label: 'Школа' },
   { value: 'testing_center', label: 'Тестовый центр' },
   { value: 'corporate', label: 'Корпоративный' },
-  { value: 'government', label: 'Государственный' },
+  { value: 'government', label: 'Государственный' }
 ]
 
 const planOptions = [
@@ -474,13 +474,13 @@ const planOptions = [
   { value: 'standard', label: 'Standard' },
   { value: 'professional', label: 'Professional' },
   { value: 'enterprise', label: 'Enterprise' },
-  { value: 'unlimited', label: 'Unlimited' },
+  { value: 'unlimited', label: 'Unlimited' }
 ]
 
 const roleOptions = [
   { value: 'org_admin', label: 'Орг. Админ' },
   { value: 'proctor', label: 'Проктор' },
-  { value: 'viewer', label: 'Наблюдатель' },
+  { value: 'viewer', label: 'Наблюдатель' }
 ]
 
 const permissionOptions = [
@@ -488,7 +488,7 @@ const permissionOptions = [
   { value: 'events:read', label: 'events:read' },
   { value: 'sessions:read', label: 'sessions:read' },
   { value: 'sessions:write', label: 'sessions:write' },
-  { value: 'analytics:read', label: 'analytics:read' },
+  { value: 'analytics:read', label: 'analytics:read' }
 ]
 
 // --- Data fetching ---
@@ -497,7 +497,7 @@ async function fetchOrganizations() {
   try {
     const [orgsData, statsData] = await Promise.all([
       adminAPI.listOrgs({ search: searchQuery.value || undefined }),
-      adminAPI.getStats(),
+      adminAPI.getStats()
     ])
     organizations.value = orgsData
     stats.value = statsData
@@ -534,12 +534,12 @@ function openCreateOrgModal() {
 // --- Create form validation: all mandatory fields must be filled ---
 const isCreateFormValid = computed(() => {
   return !!(
-    newOrg.orgId.trim() &&
-    newOrg.name.trim() &&
-    newOrg.slug.trim() &&
-    newOrg.adminFullName.trim() &&
-    newOrg.adminPhone.trim() &&
-    newOrg.adminPassword.length >= 6
+    newOrg.orgId.trim()
+    && newOrg.name.trim()
+    && newOrg.slug.trim()
+    && newOrg.adminFullName.trim()
+    && newOrg.adminPhone.trim()
+    && newOrg.adminPassword.length >= 6
   )
 })
 
@@ -581,7 +581,7 @@ async function submitCreateOrg() {
       maxEventsRps: newOrg.maxEventsRps,
       adminFullName: newOrg.adminFullName,
       adminPhone: newOrg.adminPhone,
-      adminPassword: newOrg.adminPassword,
+      adminPassword: newOrg.adminPassword
     }
 
     console.log('[Organizations] Creating org+admin with payload (password redacted)')
@@ -690,7 +690,7 @@ async function submitCreateUser() {
       password: newUser.password,
       fullName: newUser.fullName,
       email: newUser.email || undefined,
-      role: newUser.role,
+      role: newUser.role
     })
     toast.add({ title: 'Пользователь создан', icon: 'i-lucide-check-circle', color: 'success' })
     showCreateUserForm.value = false
@@ -722,7 +722,7 @@ async function submitCreateKey() {
     const response = await adminAPI.createAPIKey(selectedOrg.value.orgId, {
       name: newKey.name,
       permissions: newKey.permissions.length > 0 ? newKey.permissions : undefined,
-      environment: newKey.environment,
+      environment: newKey.environment
     })
     newlyCreatedSecret.value = response.secret
     toast.add({ title: 'API ключ создан', icon: 'i-lucide-check-circle', color: 'success' })
@@ -765,7 +765,7 @@ async function submitUpdateOrg() {
       region: editOrgData.region || undefined,
       plan: editOrgData.plan,
       maxSessions: editOrgData.maxSessions,
-      maxEventsRps: editOrgData.maxEventsRps,
+      maxEventsRps: editOrgData.maxEventsRps
     })
     selectedOrg.value = updated
     toast.add({ title: 'Организация обновлена', icon: 'i-lucide-check-circle', color: 'success' })
@@ -827,15 +827,28 @@ onMounted(() => {
             class="flex items-center justify-center size-10 rounded-xl"
             :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }"
           >
-            <UIcon name="i-lucide-building-2" class="size-5" style="color: var(--argus-accent);" />
+            <UIcon
+              name="i-lucide-building-2"
+              class="size-5"
+              style="color: var(--argus-accent);"
+            />
           </div>
           <div>
-            <h1 class="text-xl font-bold" style="color: var(--argus-text);">
+            <h1
+              class="text-xl font-bold"
+              style="color: var(--argus-text);"
+            >
               Организации
             </h1>
-            <p class="text-xs mt-0.5" style="color: var(--argus-text-dimmed);">
+            <p
+              class="text-xs mt-0.5"
+              style="color: var(--argus-text-dimmed);"
+            >
               Управление организациями и пользователями платформы
-              <span class="ml-1 font-semibold" style="color: var(--argus-text-muted);">
+              <span
+                class="ml-1 font-semibold"
+                style="color: var(--argus-text-muted);"
+              >
                 ({{ organizations.length }})
               </span>
             </p>
@@ -850,7 +863,11 @@ onMounted(() => {
           :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)', color: 'var(--argus-text-dimmed)' }"
           @click="refreshAll"
         >
-          <UIcon name="i-lucide-refresh-cw" class="size-3.5" :class="{ 'animate-spin': loading }" />
+          <UIcon
+            name="i-lucide-refresh-cw"
+            class="size-3.5"
+            :class="{ 'animate-spin': loading }"
+          />
           Обновить
         </button>
 
@@ -860,7 +877,10 @@ onMounted(() => {
           :style="{ background: 'var(--argus-accent)', color: '#fff' }"
           @click="openCreateOrgModal"
         >
-          <UIcon name="i-lucide-plus" class="size-4" />
+          <UIcon
+            name="i-lucide-plus"
+            class="size-4"
+          />
           Создать организацию
         </button>
       </div>
@@ -875,14 +895,27 @@ onMounted(() => {
         class="flex items-center gap-3 px-4 py-3 rounded-xl border"
         :style="{ background: 'var(--argus-bg-card)', borderColor: accentBg(0.2) }"
       >
-        <div class="flex items-center justify-center size-9 rounded-lg shrink-0" :style="{ background: accentBg(0.08) }">
-          <UIcon name="i-lucide-building-2" class="size-4" style="color: var(--argus-accent);" />
+        <div
+          class="flex items-center justify-center size-9 rounded-lg shrink-0"
+          :style="{ background: accentBg(0.08) }"
+        >
+          <UIcon
+            name="i-lucide-building-2"
+            class="size-4"
+            style="color: var(--argus-accent);"
+          />
         </div>
         <div class="min-w-0">
-          <p class="text-lg font-bold tabular-nums leading-tight" style="color: var(--argus-accent);">
+          <p
+            class="text-lg font-bold tabular-nums leading-tight"
+            style="color: var(--argus-accent);"
+          >
             {{ stats.totalOrganizations }}
           </p>
-          <p class="text-[9px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-[9px] font-medium uppercase tracking-wider"
+            style="color: var(--argus-text-dimmed);"
+          >
             Организации
           </p>
         </div>
@@ -893,14 +926,27 @@ onMounted(() => {
         class="flex items-center gap-3 px-4 py-3 rounded-xl border"
         :style="{ background: 'var(--argus-bg-card)', borderColor: successBg(0.2) }"
       >
-        <div class="flex items-center justify-center size-9 rounded-lg shrink-0" :style="{ background: successBg(0.08) }">
-          <UIcon name="i-lucide-users" class="size-4" :style="{ color: isDark ? '#34d399' : '#059669' }" />
+        <div
+          class="flex items-center justify-center size-9 rounded-lg shrink-0"
+          :style="{ background: successBg(0.08) }"
+        >
+          <UIcon
+            name="i-lucide-users"
+            class="size-4"
+            :style="{ color: isDark ? '#34d399' : '#059669' }"
+          />
         </div>
         <div class="min-w-0">
-          <p class="text-lg font-bold tabular-nums leading-tight" :style="{ color: isDark ? '#34d399' : '#059669' }">
+          <p
+            class="text-lg font-bold tabular-nums leading-tight"
+            :style="{ color: isDark ? '#34d399' : '#059669' }"
+          >
             {{ stats.totalUsers }}
           </p>
-          <p class="text-[9px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-[9px] font-medium uppercase tracking-wider"
+            style="color: var(--argus-text-dimmed);"
+          >
             Пользователи
           </p>
         </div>
@@ -911,14 +957,27 @@ onMounted(() => {
         class="flex items-center gap-3 px-4 py-3 rounded-xl border"
         :style="{ background: 'var(--argus-bg-card)', borderColor: purpleBg(0.2) }"
       >
-        <div class="flex items-center justify-center size-9 rounded-lg shrink-0" :style="{ background: purpleBg(0.08) }">
-          <UIcon name="i-lucide-key-round" class="size-4" :style="{ color: isDark ? '#a78bfa' : '#7c3aed' }" />
+        <div
+          class="flex items-center justify-center size-9 rounded-lg shrink-0"
+          :style="{ background: purpleBg(0.08) }"
+        >
+          <UIcon
+            name="i-lucide-key-round"
+            class="size-4"
+            :style="{ color: isDark ? '#a78bfa' : '#7c3aed' }"
+          />
         </div>
         <div class="min-w-0">
-          <p class="text-lg font-bold tabular-nums leading-tight" :style="{ color: isDark ? '#a78bfa' : '#7c3aed' }">
+          <p
+            class="text-lg font-bold tabular-nums leading-tight"
+            :style="{ color: isDark ? '#a78bfa' : '#7c3aed' }"
+          >
             {{ stats.totalApiKeys }}
           </p>
-          <p class="text-[9px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-[9px] font-medium uppercase tracking-wider"
+            style="color: var(--argus-text-dimmed);"
+          >
             API Ключи
           </p>
         </div>
@@ -941,7 +1000,11 @@ onMounted(() => {
             boxShadow: searchFocused ? `0 0 0 3px ${accentBg(0.1)}` : 'none'
           }"
         >
-          <UIcon name="i-lucide-search" class="size-3.5 shrink-0" style="color: var(--argus-text-dimmed);" />
+          <UIcon
+            name="i-lucide-search"
+            class="size-3.5 shrink-0"
+            style="color: var(--argus-text-dimmed);"
+          />
           <input
             v-model="searchQuery"
             type="text"
@@ -950,17 +1013,24 @@ onMounted(() => {
             style="color: var(--argus-text);"
             @focus="searchFocused = true"
             @blur="searchFocused = false"
-          />
+          >
           <button
             v-if="searchQuery"
             class="cursor-pointer"
             @click="searchQuery = ''"
           >
-            <UIcon name="i-lucide-x" class="size-3.5" style="color: var(--argus-text-dimmed);" />
+            <UIcon
+              name="i-lucide-x"
+              class="size-3.5"
+              style="color: var(--argus-text-dimmed);"
+            />
           </button>
         </div>
 
-        <div class="flex items-center gap-2 text-xs" style="color: var(--argus-text-dimmed);">
+        <div
+          class="flex items-center gap-2 text-xs"
+          style="color: var(--argus-text-dimmed);"
+        >
           <span class="font-medium">{{ filteredOrgs.length }}</span>
           <span>из</span>
           <span class="font-medium">{{ organizations.length }}</span>
@@ -971,9 +1041,21 @@ onMounted(() => {
     <!-- ============================== -->
     <!--  LOADING STATE                 -->
     <!-- ============================== -->
-    <div v-if="loading" class="flex flex-col items-center justify-center py-20 gap-4">
-      <UIcon name="i-lucide-loader-2" class="size-8 animate-spin" style="color: var(--argus-accent);" />
-      <p class="text-sm font-medium" style="color: var(--argus-text-dimmed);">Загрузка организаций...</p>
+    <div
+      v-if="loading"
+      class="flex flex-col items-center justify-center py-20 gap-4"
+    >
+      <UIcon
+        name="i-lucide-loader-2"
+        class="size-8 animate-spin"
+        style="color: var(--argus-accent);"
+      />
+      <p
+        class="text-sm font-medium"
+        style="color: var(--argus-text-dimmed);"
+      >
+        Загрузка организаций...
+      </p>
     </div>
 
     <!-- ============================== -->
@@ -984,8 +1066,15 @@ onMounted(() => {
       class="flex flex-col items-center justify-center py-20 gap-4 rounded-xl border"
       :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
     >
-      <UIcon name="i-lucide-building-2" class="size-12" style="color: var(--argus-text-dimmed); opacity: 0.4;" />
-      <p class="text-sm font-medium" style="color: var(--argus-text-dimmed);">
+      <UIcon
+        name="i-lucide-building-2"
+        class="size-12"
+        style="color: var(--argus-text-dimmed); opacity: 0.4;"
+      />
+      <p
+        class="text-sm font-medium"
+        style="color: var(--argus-text-dimmed);"
+      >
         {{ searchQuery ? 'Ничего не найдено' : 'Нет организаций' }}
       </p>
       <button
@@ -994,7 +1083,10 @@ onMounted(() => {
         :style="{ background: 'var(--argus-accent)', color: '#fff' }"
         @click="openCreateOrgModal"
       >
-        <UIcon name="i-lucide-plus" class="size-3.5" />
+        <UIcon
+          name="i-lucide-plus"
+          class="size-3.5"
+        />
         Создать первую организацию
       </button>
     </div>
@@ -1002,14 +1094,17 @@ onMounted(() => {
     <!-- ============================== -->
     <!--  ORGANIZATION CARDS GRID       -->
     <!-- ============================== -->
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div
+      v-else
+      class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+    >
       <div
         v-for="org in filteredOrgs"
         :key="org.id"
         class="rounded-xl border transition-all cursor-pointer group"
         :style="{
           background: 'var(--argus-bg-card)',
-          borderColor: 'var(--argus-border)',
+          borderColor: 'var(--argus-border)'
         }"
         @click="openOrgDetail(org)"
       >
@@ -1018,7 +1113,10 @@ onMounted(() => {
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
-                <h3 class="text-sm font-bold truncate" style="color: var(--argus-text);">
+                <h3
+                  class="text-sm font-bold truncate"
+                  style="color: var(--argus-text);"
+                >
                   {{ org.name }}
                 </h3>
                 <!-- Status Dot -->
@@ -1029,11 +1127,20 @@ onMounted(() => {
                 />
               </div>
               <div class="flex items-center gap-2 mt-1">
-                <span class="text-[10px] font-mono" style="color: var(--argus-text-dimmed);">
+                <span
+                  class="text-[10px] font-mono"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   {{ org.orgId }}
                 </span>
-                <span class="text-[10px]" style="color: var(--argus-border);">|</span>
-                <span class="text-[10px] font-mono" style="color: var(--argus-text-dimmed);">
+                <span
+                  class="text-[10px]"
+                  style="color: var(--argus-border);"
+                >|</span>
+                <span
+                  class="text-[10px] font-mono"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   {{ org.slug }}
                 </span>
               </div>
@@ -1057,13 +1164,33 @@ onMounted(() => {
         <div class="px-5 pb-3 space-y-2">
           <!-- City + Email row -->
           <div class="flex items-center gap-4 flex-wrap">
-            <div v-if="org.city" class="flex items-center gap-1.5">
-              <UIcon name="i-lucide-map-pin" class="size-3" style="color: var(--argus-text-dimmed);" />
-              <span class="text-[11px]" style="color: var(--argus-text-muted);">{{ org.city }}</span>
+            <div
+              v-if="org.city"
+              class="flex items-center gap-1.5"
+            >
+              <UIcon
+                name="i-lucide-map-pin"
+                class="size-3"
+                style="color: var(--argus-text-dimmed);"
+              />
+              <span
+                class="text-[11px]"
+                style="color: var(--argus-text-muted);"
+              >{{ org.city }}</span>
             </div>
-            <div v-if="org.contactEmail" class="flex items-center gap-1.5 min-w-0">
-              <UIcon name="i-lucide-mail" class="size-3 shrink-0" style="color: var(--argus-text-dimmed);" />
-              <span class="text-[11px] truncate" style="color: var(--argus-text-muted);">{{ org.contactEmail }}</span>
+            <div
+              v-if="org.contactEmail"
+              class="flex items-center gap-1.5 min-w-0"
+            >
+              <UIcon
+                name="i-lucide-mail"
+                class="size-3 shrink-0"
+                style="color: var(--argus-text-dimmed);"
+              />
+              <span
+                class="text-[11px] truncate"
+                style="color: var(--argus-text-muted);"
+              >{{ org.contactEmail }}</span>
             </div>
           </div>
 
@@ -1076,14 +1203,28 @@ onMounted(() => {
               {{ orgTypeLabel(org.orgType) }}
             </span>
             <div class="flex items-center gap-1.5">
-              <UIcon name="i-lucide-monitor" class="size-3" style="color: var(--argus-text-dimmed);" />
-              <span class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">
+              <UIcon
+                name="i-lucide-monitor"
+                class="size-3"
+                style="color: var(--argus-text-dimmed);"
+              />
+              <span
+                class="text-[10px] font-medium"
+                style="color: var(--argus-text-dimmed);"
+              >
                 {{ org.maxSessions }} сессий
               </span>
             </div>
             <div class="flex items-center gap-1.5">
-              <UIcon name="i-lucide-zap" class="size-3" style="color: var(--argus-text-dimmed);" />
-              <span class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">
+              <UIcon
+                name="i-lucide-zap"
+                class="size-3"
+                style="color: var(--argus-text-dimmed);"
+              />
+              <span
+                class="text-[10px] font-medium"
+                style="color: var(--argus-text-dimmed);"
+              >
                 {{ org.maxEventsRps }} ev/s
               </span>
             </div>
@@ -1095,7 +1236,10 @@ onMounted(() => {
           class="flex items-center justify-between px-5 py-2.5 border-t"
           :style="{ borderColor: 'var(--argus-border-subtle)' }"
         >
-          <span class="text-[10px]" style="color: var(--argus-text-dimmed);">
+          <span
+            class="text-[10px]"
+            style="color: var(--argus-text-dimmed);"
+          >
             Создана: {{ formatDate(org.createdAt) }}
           </span>
           <div class="flex items-center gap-1">
@@ -1105,7 +1249,10 @@ onMounted(() => {
               title="Пользователи"
               @click.stop="openOrgDetail(org); switchTab('users')"
             >
-              <UIcon name="i-lucide-users" class="size-3" />
+              <UIcon
+                name="i-lucide-users"
+                class="size-3"
+              />
             </button>
             <button
               class="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all cursor-pointer"
@@ -1113,7 +1260,10 @@ onMounted(() => {
               title="API Ключи"
               @click.stop="openOrgDetail(org); switchTab('keys')"
             >
-              <UIcon name="i-lucide-key-round" class="size-3" />
+              <UIcon
+                name="i-lucide-key-round"
+                class="size-3"
+              />
             </button>
             <button
               class="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all cursor-pointer"
@@ -1121,7 +1271,10 @@ onMounted(() => {
               title="Настройки"
               @click.stop="openOrgDetail(org); switchTab('settings')"
             >
-              <UIcon name="i-lucide-settings" class="size-3" />
+              <UIcon
+                name="i-lucide-settings"
+                class="size-3"
+              />
             </button>
             <button
               v-if="org.orgId !== '*'"
@@ -1130,7 +1283,10 @@ onMounted(() => {
               title="Удалить организацию"
               @click.stop="openDeleteOrgModal(org)"
             >
-              <UIcon name="i-lucide-trash-2" class="size-3" />
+              <UIcon
+                name="i-lucide-trash-2"
+                class="size-3"
+              />
             </button>
           </div>
         </div>
@@ -1140,19 +1296,41 @@ onMounted(() => {
     <!-- ============================== -->
     <!--  CREATE ORG MODAL              -->
     <!-- ============================== -->
-    <UModal v-model:open="showCreateOrgModal" :close="false" :ui="{ overlay: 'z-[100]', content: 'z-[100]' }">
+    <UModal
+      v-model:open="showCreateOrgModal"
+      :close="false"
+      :ui="{ overlay: 'z-[100]', content: 'z-[100]' }"
+    >
       <template #content>
-        <div class="p-6 max-h-[85vh] overflow-y-auto" :style="{ background: 'var(--argus-bg-card)' }" @click.stop>
+        <div
+          class="p-6 max-h-[85vh] overflow-y-auto"
+          :style="{ background: 'var(--argus-bg-card)' }"
+          @click.stop
+        >
           <div class="flex items-center gap-3 mb-6">
             <div
               class="flex items-center justify-center size-10 rounded-xl"
               :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }"
             >
-              <UIcon name="i-lucide-building-2" class="size-5" style="color: var(--argus-accent);" />
+              <UIcon
+                name="i-lucide-building-2"
+                class="size-5"
+                style="color: var(--argus-accent);"
+              />
             </div>
             <div>
-              <h2 class="text-lg font-bold" style="color: var(--argus-text);">Создать организацию</h2>
-              <p class="text-xs" style="color: var(--argus-text-dimmed);">Заполните данные новой организации</p>
+              <h2
+                class="text-lg font-bold"
+                style="color: var(--argus-text);"
+              >
+                Создать организацию
+              </h2>
+              <p
+                class="text-xs"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Заполните данные новой организации
+              </p>
             </div>
           </div>
 
@@ -1160,7 +1338,10 @@ onMounted(() => {
             <!-- Row: orgId + slug -->
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   ID организации *
                 </label>
                 <input
@@ -1174,10 +1355,13 @@ onMounted(() => {
                     border: '1px solid var(--argus-border)',
                     color: 'var(--argus-text)'
                   }"
-                />
+                >
               </div>
               <div>
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Slug *
                 </label>
                 <input
@@ -1190,13 +1374,16 @@ onMounted(() => {
                     border: '1px solid var(--argus-border)',
                     color: 'var(--argus-text)'
                   }"
-                />
+                >
               </div>
             </div>
 
             <!-- Name -->
             <div>
-              <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+              <label
+                class="block text-[11px] font-medium mb-1.5"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Название организации *
               </label>
               <input
@@ -1209,13 +1396,16 @@ onMounted(() => {
                   border: '1px solid var(--argus-border)',
                   color: 'var(--argus-text)'
                 }"
-              />
+              >
             </div>
 
             <!-- Row: orgType + plan -->
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Тип организации
                 </label>
                 <select
@@ -1227,13 +1417,20 @@ onMounted(() => {
                     color: 'var(--argus-text)'
                   }"
                 >
-                  <option v-for="opt in orgTypeOptions" :key="opt.value" :value="opt.value">
+                  <option
+                    v-for="opt in orgTypeOptions"
+                    :key="opt.value"
+                    :value="opt.value"
+                  >
                     {{ opt.label }}
                   </option>
                 </select>
               </div>
               <div>
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Тарифный план
                 </label>
                 <select
@@ -1245,7 +1442,11 @@ onMounted(() => {
                     color: 'var(--argus-text)'
                   }"
                 >
-                  <option v-for="opt in planOptions" :key="opt.value" :value="opt.value">
+                  <option
+                    v-for="opt in planOptions"
+                    :key="opt.value"
+                    :value="opt.value"
+                  >
                     {{ opt.label }}
                   </option>
                 </select>
@@ -1255,7 +1456,10 @@ onMounted(() => {
             <!-- Row: contactEmail + contactPhone -->
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Email контакт
                 </label>
                 <input
@@ -1268,10 +1472,13 @@ onMounted(() => {
                     border: '1px solid var(--argus-border)',
                     color: 'var(--argus-text)'
                   }"
-                />
+                >
               </div>
               <div>
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Телефон
                 </label>
                 <input
@@ -1284,14 +1491,17 @@ onMounted(() => {
                     border: '1px solid var(--argus-border)',
                     color: 'var(--argus-text)'
                   }"
-                />
+                >
               </div>
             </div>
 
             <!-- Row: city + region -->
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Город
                 </label>
                 <input
@@ -1304,10 +1514,13 @@ onMounted(() => {
                     border: '1px solid var(--argus-border)',
                     color: 'var(--argus-text)'
                   }"
-                />
+                >
               </div>
               <div>
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Регион
                 </label>
                 <input
@@ -1320,14 +1533,17 @@ onMounted(() => {
                     border: '1px solid var(--argus-border)',
                     color: 'var(--argus-text)'
                   }"
-                />
+                >
               </div>
             </div>
 
             <!-- Row: maxSessions + maxEventsRps -->
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Макс. сессий
                 </label>
                 <input
@@ -1340,10 +1556,13 @@ onMounted(() => {
                     border: '1px solid var(--argus-border)',
                     color: 'var(--argus-text)'
                   }"
-                />
+                >
               </div>
               <div>
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Макс. событий/сек
                 </label>
                 <input
@@ -1356,28 +1575,48 @@ onMounted(() => {
                     border: '1px solid var(--argus-border)',
                     color: 'var(--argus-text)'
                   }"
-                />
+                >
               </div>
             </div>
 
             <!-- ═══ PRIMARY ADMIN SECTION ═══ -->
-            <div class="pt-4 mt-2 border-t" :style="{ borderColor: 'var(--argus-border)' }">
+            <div
+              class="pt-4 mt-2 border-t"
+              :style="{ borderColor: 'var(--argus-border)' }"
+            >
               <div class="flex items-center gap-2 mb-3">
                 <div
                   class="flex items-center justify-center size-7 rounded-lg"
                   :style="{ background: successBg(0.1), border: `1px solid ${successBg(0.15)}` }"
                 >
-                  <UIcon name="i-lucide-user-plus" class="size-3.5" :style="{ color: isDark ? '#34d399' : '#059669' }" />
+                  <UIcon
+                    name="i-lucide-user-plus"
+                    class="size-3.5"
+                    :style="{ color: isDark ? '#34d399' : '#059669' }"
+                  />
                 </div>
                 <div>
-                  <p class="text-xs font-bold" style="color: var(--argus-text);">Primary Admin</p>
-                  <p class="text-[10px]" style="color: var(--argus-text-dimmed);">Администратор организации (org_admin)</p>
+                  <p
+                    class="text-xs font-bold"
+                    style="color: var(--argus-text);"
+                  >
+                    Primary Admin
+                  </p>
+                  <p
+                    class="text-[10px]"
+                    style="color: var(--argus-text-dimmed);"
+                  >
+                    Администратор организации (org_admin)
+                  </p>
                 </div>
               </div>
 
               <!-- Admin Full Name -->
               <div class="mb-3">
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   ФИО администратора *
                 </label>
                 <input
@@ -1390,12 +1629,15 @@ onMounted(() => {
                     border: '1px solid var(--argus-border)',
                     color: 'var(--argus-text)'
                   }"
-                />
+                >
               </div>
 
               <!-- Admin Phone -->
               <div class="mb-3">
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Телефон (логин) *
                 </label>
                 <div class="flex items-center gap-0">
@@ -1419,13 +1661,16 @@ onMounted(() => {
                       border: '1px solid var(--argus-border)',
                       color: 'var(--argus-text)'
                     }"
-                  />
+                  >
                 </div>
               </div>
 
               <!-- Admin Password -->
               <div class="mb-1">
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Пароль *
                 </label>
                 <div class="flex items-center gap-2">
@@ -1439,7 +1684,7 @@ onMounted(() => {
                       border: '1px solid var(--argus-border)',
                       color: 'var(--argus-text)'
                     }"
-                  />
+                  >
                   <button
                     type="button"
                     class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold cursor-pointer transition-all shrink-0"
@@ -1450,7 +1695,10 @@ onMounted(() => {
                     }"
                     @click="fillGeneratedPassword"
                   >
-                    <UIcon name="i-lucide-key-round" class="size-3.5" />
+                    <UIcon
+                      name="i-lucide-key-round"
+                      class="size-3.5"
+                    />
                     Сгенерировать
                   </button>
                 </div>
@@ -1458,7 +1706,10 @@ onMounted(() => {
             </div>
 
             <!-- Actions -->
-            <div class="flex items-center justify-end gap-3 pt-4 border-t" :style="{ borderColor: 'var(--argus-border)' }">
+            <div
+              class="flex items-center justify-end gap-3 pt-4 border-t"
+              :style="{ borderColor: 'var(--argus-border)' }"
+            >
               <button
                 class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all"
                 :style="{ background: 'var(--argus-bg-elevated)', color: 'var(--argus-text-dimmed)', border: '1px solid var(--argus-border)' }"
@@ -1476,8 +1727,16 @@ onMounted(() => {
                 :disabled="createOrgLoading || !isCreateFormValid"
                 @click="submitCreateOrg"
               >
-                <UIcon v-if="createOrgLoading" name="i-lucide-loader-2" class="size-3.5 animate-spin" />
-                <UIcon v-else name="i-lucide-plus" class="size-3.5" />
+                <UIcon
+                  v-if="createOrgLoading"
+                  name="i-lucide-loader-2"
+                  class="size-3.5 animate-spin"
+                />
+                <UIcon
+                  v-else
+                  name="i-lucide-plus"
+                  class="size-3.5"
+                />
                 + Создать
               </button>
             </div>
@@ -1489,22 +1748,39 @@ onMounted(() => {
     <!-- ============================== -->
     <!--  CREDENTIAL POPUP              -->
     <!-- ============================== -->
-    <UModal v-model:open="showCredentialPopup" :close="false" :dismissible="false">
+    <UModal
+      v-model:open="showCredentialPopup"
+      :close="false"
+      :dismissible="false"
+    >
       <template #content>
-        <div class="p-6" :style="{ background: 'var(--argus-bg-card)' }">
+        <div
+          class="p-6"
+          :style="{ background: 'var(--argus-bg-card)' }"
+        >
           <!-- Header -->
           <div class="flex items-center gap-3 mb-5">
             <div
               class="flex items-center justify-center size-10 rounded-xl"
               :style="{ background: isDark ? 'rgba(52,211,153,0.12)' : 'rgba(5,150,105,0.08)' }"
             >
-              <UIcon name="i-lucide-check-circle" class="size-5" :style="{ color: isDark ? '#34d399' : '#059669' }" />
+              <UIcon
+                name="i-lucide-check-circle"
+                class="size-5"
+                :style="{ color: isDark ? '#34d399' : '#059669' }"
+              />
             </div>
             <div>
-              <h3 class="text-sm font-bold" style="color: var(--argus-text);">
+              <h3
+                class="text-sm font-bold"
+                style="color: var(--argus-text);"
+              >
                 Организация создана
               </h3>
-              <p class="text-[11px] mt-0.5" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-[11px] mt-0.5"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Сохраните учётные данные администратора
               </p>
             </div>
@@ -1520,12 +1796,21 @@ onMounted(() => {
           >
             <!-- Org Name -->
             <div>
-              <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--argus-text-dimmed);">
+              <div
+                class="text-[10px] uppercase tracking-wider font-semibold mb-1"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Организация
               </div>
-              <div class="text-xs font-bold" style="color: var(--argus-text);">
+              <div
+                class="text-xs font-bold"
+                style="color: var(--argus-text);"
+              >
                 {{ createdCredentials.orgName }}
-                <span class="font-mono text-[10px] ml-1" style="color: var(--argus-text-dimmed);">
+                <span
+                  class="font-mono text-[10px] ml-1"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   ({{ createdCredentials.orgId }})
                 </span>
               </div>
@@ -1533,27 +1818,42 @@ onMounted(() => {
 
             <!-- Admin Name -->
             <div>
-              <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--argus-text-dimmed);">
+              <div
+                class="text-[10px] uppercase tracking-wider font-semibold mb-1"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Администратор
               </div>
-              <div class="text-xs font-bold" style="color: var(--argus-text);">
+              <div
+                class="text-xs font-bold"
+                style="color: var(--argus-text);"
+              >
                 {{ createdCredentials.adminFullName }}
               </div>
             </div>
 
             <!-- Phone / Login -->
             <div>
-              <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--argus-text-dimmed);">
+              <div
+                class="text-[10px] uppercase tracking-wider font-semibold mb-1"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Логин (телефон)
               </div>
-              <div class="text-xs font-mono font-bold" style="color: var(--argus-text);">
+              <div
+                class="text-xs font-mono font-bold"
+                style="color: var(--argus-text);"
+              >
                 +7{{ createdCredentials.adminPhone }}
               </div>
             </div>
 
             <!-- Password -->
             <div>
-              <div class="text-[10px] uppercase tracking-wider font-semibold mb-1" style="color: var(--argus-text-dimmed);">
+              <div
+                class="text-[10px] uppercase tracking-wider font-semibold mb-1"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Пароль
               </div>
               <div
@@ -1610,8 +1910,15 @@ onMounted(() => {
               border: `1px solid ${isDark ? 'rgba(251,191,36,0.15)' : 'rgba(245,158,11,0.12)'}`
             }"
           >
-            <UIcon name="i-lucide-alert-triangle" class="size-3.5 shrink-0 mt-0.5" :style="{ color: isDark ? '#fbbf24' : '#d97706' }" />
-            <span class="text-[11px] leading-relaxed" :style="{ color: isDark ? '#fbbf24' : '#d97706' }">
+            <UIcon
+              name="i-lucide-alert-triangle"
+              class="size-3.5 shrink-0 mt-0.5"
+              :style="{ color: isDark ? '#fbbf24' : '#d97706' }"
+            />
+            <span
+              class="text-[11px] leading-relaxed"
+              :style="{ color: isDark ? '#fbbf24' : '#d97706' }"
+            >
               Пароль показывается только один раз. Убедитесь, что вы его сохранили.
             </span>
           </div>
@@ -1624,7 +1931,10 @@ onMounted(() => {
     <!-- ============================== -->
     <Teleport to="body">
       <Transition name="fade">
-        <div v-if="showDeleteOrgModal && orgToDelete" class="fixed inset-0 z-[200] flex items-center justify-center p-4">
+        <div
+          v-if="showDeleteOrgModal && orgToDelete"
+          class="fixed inset-0 z-[200] flex items-center justify-center p-4"
+        >
           <!-- Backdrop -->
           <div
             class="absolute inset-0"
@@ -1644,13 +1954,23 @@ onMounted(() => {
                 class="flex items-center justify-center size-11 rounded-xl shrink-0"
                 :style="{ background: errorBg(0.1), border: `1px solid ${errorBg(0.15)}` }"
               >
-                <UIcon name="i-lucide-alert-triangle" class="size-5" :style="{ color: isDark ? '#f87171' : '#dc2626' }" />
+                <UIcon
+                  name="i-lucide-alert-triangle"
+                  class="size-5"
+                  :style="{ color: isDark ? '#f87171' : '#dc2626' }"
+                />
               </div>
               <div>
-                <h3 class="text-sm font-bold" style="color: var(--argus-text);">
+                <h3
+                  class="text-sm font-bold"
+                  style="color: var(--argus-text);"
+                >
                   Удалить организацию?
                 </h3>
-                <p class="text-[11px] mt-0.5" style="color: var(--argus-text-dimmed);">
+                <p
+                  class="text-[11px] mt-0.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Это действие скроет организацию и заблокирует доступ
                 </p>
               </div>
@@ -1664,11 +1984,25 @@ onMounted(() => {
               >
                 <div class="flex items-center justify-between">
                   <div>
-                    <p class="text-xs font-bold" style="color: var(--argus-text);">{{ orgToDelete.name }}</p>
+                    <p
+                      class="text-xs font-bold"
+                      style="color: var(--argus-text);"
+                    >
+                      {{ orgToDelete.name }}
+                    </p>
                     <div class="flex items-center gap-2 mt-1">
-                      <span class="text-[10px] font-mono" style="color: var(--argus-text-dimmed);">{{ orgToDelete.orgId }}</span>
-                      <span class="text-[10px]" style="color: var(--argus-border);">|</span>
-                      <span class="text-[10px] font-mono" style="color: var(--argus-text-dimmed);">{{ orgToDelete.slug }}</span>
+                      <span
+                        class="text-[10px] font-mono"
+                        style="color: var(--argus-text-dimmed);"
+                      >{{ orgToDelete.orgId }}</span>
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-border);"
+                      >|</span>
+                      <span
+                        class="text-[10px] font-mono"
+                        style="color: var(--argus-text-dimmed);"
+                      >{{ orgToDelete.slug }}</span>
                     </div>
                   </div>
                   <span
@@ -1678,27 +2012,59 @@ onMounted(() => {
                     Soft Delete
                   </span>
                 </div>
-                <div v-if="orgToDelete.city || orgToDelete.contactEmail" class="flex items-center gap-3 mt-2">
-                  <div v-if="orgToDelete.city" class="flex items-center gap-1">
-                    <UIcon name="i-lucide-map-pin" class="size-2.5" style="color: var(--argus-text-dimmed);" />
-                    <span class="text-[10px]" style="color: var(--argus-text-dimmed);">{{ orgToDelete.city }}</span>
+                <div
+                  v-if="orgToDelete.city || orgToDelete.contactEmail"
+                  class="flex items-center gap-3 mt-2"
+                >
+                  <div
+                    v-if="orgToDelete.city"
+                    class="flex items-center gap-1"
+                  >
+                    <UIcon
+                      name="i-lucide-map-pin"
+                      class="size-2.5"
+                      style="color: var(--argus-text-dimmed);"
+                    />
+                    <span
+                      class="text-[10px]"
+                      style="color: var(--argus-text-dimmed);"
+                    >{{ orgToDelete.city }}</span>
                   </div>
-                  <div v-if="orgToDelete.contactEmail" class="flex items-center gap-1">
-                    <UIcon name="i-lucide-mail" class="size-2.5" style="color: var(--argus-text-dimmed);" />
-                    <span class="text-[10px]" style="color: var(--argus-text-dimmed);">{{ orgToDelete.contactEmail }}</span>
+                  <div
+                    v-if="orgToDelete.contactEmail"
+                    class="flex items-center gap-1"
+                  >
+                    <UIcon
+                      name="i-lucide-mail"
+                      class="size-2.5"
+                      style="color: var(--argus-text-dimmed);"
+                    />
+                    <span
+                      class="text-[10px]"
+                      style="color: var(--argus-text-dimmed);"
+                    >{{ orgToDelete.contactEmail }}</span>
                   </div>
                 </div>
               </div>
 
-              <p class="text-[11px] mt-3 leading-relaxed" style="color: var(--argus-text-muted);">
+              <p
+                class="text-[11px] mt-3 leading-relaxed"
+                style="color: var(--argus-text-muted);"
+              >
                 Организация будет деактивирована (soft-delete). Все активные сессии и API-ключи будут заблокированы.
                 Исторические данные и evidence сохранятся для юридической отчётности.
               </p>
 
               <!-- Slug confirmation input -->
               <div class="mt-4">
-                <label class="block text-[11px] font-medium mb-1.5" style="color: var(--argus-text-dimmed);">
-                  Введите slug организации <span class="font-bold font-mono" :style="{ color: isDark ? '#f87171' : '#dc2626' }">{{ orgToDelete.slug }}</span> для подтверждения:
+                <label
+                  class="block text-[11px] font-medium mb-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
+                  Введите slug организации <span
+                    class="font-bold font-mono"
+                    :style="{ color: isDark ? '#f87171' : '#dc2626' }"
+                  >{{ orgToDelete.slug }}</span> для подтверждения:
                 </label>
                 <input
                   v-model="deleteConfirmSlug"
@@ -1711,12 +2077,15 @@ onMounted(() => {
                     color: 'var(--argus-text)'
                   }"
                   @keydown.enter="isDeleteConfirmed && confirmDeleteOrg()"
-                />
+                >
               </div>
             </div>
 
             <!-- Actions -->
-            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t" :style="{ borderColor: 'var(--argus-border)' }">
+            <div
+              class="flex items-center justify-end gap-3 px-6 py-4 border-t"
+              :style="{ borderColor: 'var(--argus-border)' }"
+            >
               <button
                 class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all"
                 :style="{ background: 'var(--argus-bg-elevated)', color: 'var(--argus-text-dimmed)', border: '1px solid var(--argus-border)' }"
@@ -1735,8 +2104,16 @@ onMounted(() => {
                 :disabled="!isDeleteConfirmed || deleteOrgLoading"
                 @click="confirmDeleteOrg"
               >
-                <UIcon v-if="deleteOrgLoading" name="i-lucide-loader-2" class="size-3.5 animate-spin" />
-                <UIcon v-else name="i-lucide-trash-2" class="size-3.5" />
+                <UIcon
+                  v-if="deleteOrgLoading"
+                  name="i-lucide-loader-2"
+                  class="size-3.5 animate-spin"
+                />
+                <UIcon
+                  v-else
+                  name="i-lucide-trash-2"
+                  class="size-3.5"
+                />
                 Удалить навсегда
               </button>
             </div>
@@ -1748,22 +2125,40 @@ onMounted(() => {
     <!-- ============================== -->
     <!--  ORG DETAIL MODAL              -->
     <!-- ============================== -->
-    <UModal :open="!!selectedOrg" @update:open="(v: boolean) => { if (!v) selectedOrg = null }" :close="false">
+    <UModal
+      :open="!!selectedOrg"
+      :close="false"
+      @update:open="(v: boolean) => { if (!v) selectedOrg = null }"
+    >
       <template #content>
-        <div v-if="selectedOrg" class="max-h-[85vh] overflow-y-auto" :style="{ background: 'var(--argus-bg-card)' }">
+        <div
+          v-if="selectedOrg"
+          class="max-h-[85vh] overflow-y-auto"
+          :style="{ background: 'var(--argus-bg-card)' }"
+        >
           <!-- Detail Header -->
-          <div class="sticky top-0 z-10 px-6 py-4 border-b" :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }">
+          <div
+            class="sticky top-0 z-10 px-6 py-4 border-b"
+            :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
+          >
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3 min-w-0">
                 <div
                   class="flex items-center justify-center size-10 rounded-xl shrink-0"
                   :style="{ background: planBg(selectedOrg.plan, 0.1), border: `1px solid ${planBg(selectedOrg.plan, 0.2)}` }"
                 >
-                  <UIcon name="i-lucide-building-2" class="size-5" :style="{ color: planTextColor(selectedOrg.plan) }" />
+                  <UIcon
+                    name="i-lucide-building-2"
+                    class="size-5"
+                    :style="{ color: planTextColor(selectedOrg.plan) }"
+                  />
                 </div>
                 <div class="min-w-0">
                   <div class="flex items-center gap-2">
-                    <h2 class="text-base font-bold truncate" style="color: var(--argus-text);">
+                    <h2
+                      class="text-base font-bold truncate"
+                      style="color: var(--argus-text);"
+                    >
                       {{ selectedOrg.name }}
                     </h2>
                     <span
@@ -1782,11 +2177,26 @@ onMounted(() => {
                     </span>
                   </div>
                   <div class="flex items-center gap-2 mt-0.5">
-                    <span class="text-[10px] font-mono" style="color: var(--argus-text-dimmed);">{{ selectedOrg.orgId }}</span>
-                    <span class="text-[10px]" style="color: var(--argus-border);">|</span>
-                    <span class="text-[10px]" style="color: var(--argus-text-dimmed);">{{ selectedOrg.city || '---' }}</span>
-                    <span class="text-[10px]" style="color: var(--argus-border);">|</span>
-                    <span class="text-[10px]" style="color: var(--argus-text-dimmed);">{{ selectedOrg.contactEmail || '---' }}</span>
+                    <span
+                      class="text-[10px] font-mono"
+                      style="color: var(--argus-text-dimmed);"
+                    >{{ selectedOrg.orgId }}</span>
+                    <span
+                      class="text-[10px]"
+                      style="color: var(--argus-border);"
+                    >|</span>
+                    <span
+                      class="text-[10px]"
+                      style="color: var(--argus-text-dimmed);"
+                    >{{ selectedOrg.city || '---' }}</span>
+                    <span
+                      class="text-[10px]"
+                      style="color: var(--argus-border);"
+                    >|</span>
+                    <span
+                      class="text-[10px]"
+                      style="color: var(--argus-text-dimmed);"
+                    >{{ selectedOrg.contactEmail || '---' }}</span>
                   </div>
                 </div>
               </div>
@@ -1795,7 +2205,10 @@ onMounted(() => {
                 :style="{ color: 'var(--argus-text-dimmed)' }"
                 @click="closeOrgDetail"
               >
-                <UIcon name="i-lucide-x" class="size-4" />
+                <UIcon
+                  name="i-lucide-x"
+                  class="size-4"
+                />
               </button>
             </div>
 
@@ -1806,18 +2219,21 @@ onMounted(() => {
                   { id: 'users' as const, label: 'Пользователи', icon: 'i-lucide-users' },
                   { id: 'keys' as const, label: 'API Ключи', icon: 'i-lucide-key-round' },
                   { id: 'settings' as const, label: 'Настройки', icon: 'i-lucide-settings' },
-                  { id: 'features' as const, label: 'Возможности', icon: 'i-lucide-toggle-right' },
+                  { id: 'features' as const, label: 'Возможности', icon: 'i-lucide-toggle-right' }
                 ])"
                 :key="tab.id"
                 class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer"
                 :style="{
                   background: detailTab === tab.id ? accentBg(0.1) : 'transparent',
                   color: detailTab === tab.id ? 'var(--argus-accent)' : 'var(--argus-text-dimmed)',
-                  border: detailTab === tab.id ? `1px solid ${accentBg(0.2)}` : '1px solid transparent',
+                  border: detailTab === tab.id ? `1px solid ${accentBg(0.2)}` : '1px solid transparent'
                 }"
                 @click="switchTab(tab.id)"
               >
-                <UIcon :name="tab.icon" class="size-3.5" />
+                <UIcon
+                  :name="tab.icon"
+                  class="size-3.5"
+                />
                 {{ tab.label }}
               </button>
             </div>
@@ -1831,16 +2247,25 @@ onMounted(() => {
             <div v-if="detailTab === 'users'">
               <!-- Create user toggle -->
               <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-bold" style="color: var(--argus-text);">
+                <h3
+                  class="text-sm font-bold"
+                  style="color: var(--argus-text);"
+                >
                   Пользователи организации
-                  <span class="font-normal text-xs ml-1" style="color: var(--argus-text-dimmed);">({{ orgUsers.length }})</span>
+                  <span
+                    class="font-normal text-xs ml-1"
+                    style="color: var(--argus-text-dimmed);"
+                  >({{ orgUsers.length }})</span>
                 </h3>
                 <button
                   class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
                   :style="{ background: accentBg(0.1), color: 'var(--argus-accent)', border: `1px solid ${accentBg(0.2)}` }"
                   @click="openCreateUserForm"
                 >
-                  <UIcon name="i-lucide-user-plus" class="size-3.5" />
+                  <UIcon
+                    name="i-lucide-user-plus"
+                    class="size-3.5"
+                  />
                   Добавить
                 </button>
               </div>
@@ -1852,29 +2277,46 @@ onMounted(() => {
                 :style="{ background: 'var(--argus-bg-elevated)', borderColor: accentBg(0.2) }"
               >
                 <div class="flex items-center gap-2 mb-2">
-                  <UIcon name="i-lucide-user-plus" class="size-4" style="color: var(--argus-accent);" />
-                  <span class="text-xs font-bold" style="color: var(--argus-text);">Новый пользователь</span>
+                  <UIcon
+                    name="i-lucide-user-plus"
+                    class="size-4"
+                    style="color: var(--argus-accent);"
+                  />
+                  <span
+                    class="text-xs font-bold"
+                    style="color: var(--argus-text);"
+                  >Новый пользователь</span>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">ФИО *</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >ФИО *</label>
                     <input
                       v-model="newUser.fullName"
                       type="text"
                       placeholder="Иванов Иван Иванович"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-card)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Роль *</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Роль *</label>
                     <select
                       v-model="newUser.role"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none cursor-pointer"
                       :style="{ background: 'var(--argus-bg-card)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
                     >
-                      <option v-for="opt in roleOptions" :key="opt.value" :value="opt.value">
+                      <option
+                        v-for="opt in roleOptions"
+                        :key="opt.value"
+                        :value="opt.value"
+                      >
                         {{ opt.label }}
                       </option>
                     </select>
@@ -1883,36 +2325,45 @@ onMounted(() => {
 
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Телефон *</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Телефон *</label>
                     <input
                       v-model="newUser.phone"
                       type="tel"
                       placeholder="+7 700 123 4567"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-card)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Пароль *</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Пароль *</label>
                     <input
                       v-model="newUser.password"
                       type="password"
                       placeholder="Минимум 8 символов"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-card)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                 </div>
 
                 <div>
-                  <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Email</label>
+                  <label
+                    class="block text-[10px] font-medium mb-1"
+                    style="color: var(--argus-text-dimmed);"
+                  >Email</label>
                   <input
                     v-model="newUser.email"
                     type="email"
                     placeholder="user@example.com"
                     class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                     :style="{ background: 'var(--argus-bg-card)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                  />
+                  >
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-2">
@@ -1929,19 +2380,33 @@ onMounted(() => {
                     :disabled="createUserLoading"
                     @click="submitCreateUser"
                   >
-                    <UIcon v-if="createUserLoading" name="i-lucide-loader-2" class="size-3 animate-spin" />
+                    <UIcon
+                      v-if="createUserLoading"
+                      name="i-lucide-loader-2"
+                      class="size-3 animate-spin"
+                    />
                     Создать
                   </button>
                 </div>
               </div>
 
               <!-- Users Loading -->
-              <div v-if="usersLoading" class="flex items-center justify-center py-10">
-                <UIcon name="i-lucide-loader-2" class="size-5 animate-spin" style="color: var(--argus-accent);" />
+              <div
+                v-if="usersLoading"
+                class="flex items-center justify-center py-10"
+              >
+                <UIcon
+                  name="i-lucide-loader-2"
+                  class="size-5 animate-spin"
+                  style="color: var(--argus-accent);"
+                />
               </div>
 
               <!-- Users List -->
-              <div v-else-if="orgUsers.length > 0" class="space-y-2">
+              <div
+                v-else-if="orgUsers.length > 0"
+                class="space-y-2"
+              >
                 <div
                   v-for="u in orgUsers"
                   :key="u.id"
@@ -1953,11 +2418,18 @@ onMounted(() => {
                       class="flex items-center justify-center size-8 rounded-lg shrink-0"
                       :style="{ background: roleBg(u.role, 0.1) }"
                     >
-                      <UIcon name="i-lucide-user" class="size-3.5" :style="{ color: roleTextColor(u.role) }" />
+                      <UIcon
+                        name="i-lucide-user"
+                        class="size-3.5"
+                        :style="{ color: roleTextColor(u.role) }"
+                      />
                     </div>
                     <div class="min-w-0">
                       <div class="flex items-center gap-2">
-                        <span class="text-xs font-bold truncate" style="color: var(--argus-text);">{{ u.fullName }}</span>
+                        <span
+                          class="text-xs font-bold truncate"
+                          style="color: var(--argus-text);"
+                        >{{ u.fullName }}</span>
                         <span
                           class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider shrink-0"
                           :style="{
@@ -1974,17 +2446,30 @@ onMounted(() => {
                         />
                       </div>
                       <div class="flex items-center gap-2 mt-0.5">
-                        <span class="text-[10px]" style="color: var(--argus-text-dimmed);">{{ u.phone }}</span>
-                        <span v-if="u.email" class="text-[10px]" style="color: var(--argus-text-dimmed);">{{ u.email }}</span>
+                        <span
+                          class="text-[10px]"
+                          style="color: var(--argus-text-dimmed);"
+                        >{{ u.phone }}</span>
+                        <span
+                          v-if="u.email"
+                          class="text-[10px]"
+                          style="color: var(--argus-text-dimmed);"
+                        >{{ u.email }}</span>
                       </div>
                     </div>
                   </div>
 
                   <div class="text-right shrink-0 ml-3">
-                    <div class="text-[10px]" style="color: var(--argus-text-dimmed);">
+                    <div
+                      class="text-[10px]"
+                      style="color: var(--argus-text-dimmed);"
+                    >
                       Вход: {{ u.lastLoginAt ? formatDateTime(u.lastLoginAt) : '—' }}
                     </div>
-                    <div class="text-[10px]" style="color: var(--argus-text-dimmed);">
+                    <div
+                      class="text-[10px]"
+                      style="color: var(--argus-text-dimmed);"
+                    >
                       Создан: {{ formatDate(u.createdAt) }}
                     </div>
                   </div>
@@ -1992,9 +2477,21 @@ onMounted(() => {
               </div>
 
               <!-- No Users -->
-              <div v-else class="flex flex-col items-center justify-center py-10 gap-3">
-                <UIcon name="i-lucide-users" class="size-8" style="color: var(--argus-text-dimmed); opacity: 0.3;" />
-                <p class="text-xs" style="color: var(--argus-text-dimmed);">Нет пользователей</p>
+              <div
+                v-else
+                class="flex flex-col items-center justify-center py-10 gap-3"
+              >
+                <UIcon
+                  name="i-lucide-users"
+                  class="size-8"
+                  style="color: var(--argus-text-dimmed); opacity: 0.3;"
+                />
+                <p
+                  class="text-xs"
+                  style="color: var(--argus-text-dimmed);"
+                >
+                  Нет пользователей
+                </p>
               </div>
             </div>
 
@@ -2004,16 +2501,25 @@ onMounted(() => {
             <div v-if="detailTab === 'keys'">
               <!-- Create key toggle -->
               <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-bold" style="color: var(--argus-text);">
+                <h3
+                  class="text-sm font-bold"
+                  style="color: var(--argus-text);"
+                >
                   API Ключи
-                  <span class="font-normal text-xs ml-1" style="color: var(--argus-text-dimmed);">({{ orgApiKeys.length }})</span>
+                  <span
+                    class="font-normal text-xs ml-1"
+                    style="color: var(--argus-text-dimmed);"
+                  >({{ orgApiKeys.length }})</span>
                 </h3>
                 <button
                   class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
                   :style="{ background: purpleBg(0.1), color: isDark ? '#a78bfa' : '#7c3aed', border: `1px solid ${purpleBg(0.2)}` }"
                   @click="openCreateKeyForm"
                 >
-                  <UIcon name="i-lucide-key-round" class="size-3.5" />
+                  <UIcon
+                    name="i-lucide-key-round"
+                    class="size-3.5"
+                  />
                   Создать ключ
                 </button>
               </div>
@@ -2025,12 +2531,22 @@ onMounted(() => {
                 :style="{ background: warningBg(0.05), borderColor: warningBg(0.3) }"
               >
                 <div class="flex items-center gap-2">
-                  <UIcon name="i-lucide-alert-triangle" class="size-4" :style="{ color: isDark ? '#fbbf24' : '#d97706' }" />
-                  <span class="text-xs font-bold" :style="{ color: isDark ? '#fbbf24' : '#d97706' }">
+                  <UIcon
+                    name="i-lucide-alert-triangle"
+                    class="size-4"
+                    :style="{ color: isDark ? '#fbbf24' : '#d97706' }"
+                  />
+                  <span
+                    class="text-xs font-bold"
+                    :style="{ color: isDark ? '#fbbf24' : '#d97706' }"
+                  >
                     Секретный ключ создан! Сохраните его сейчас.
                   </span>
                 </div>
-                <p class="text-[10px]" style="color: var(--argus-text-dimmed);">
+                <p
+                  class="text-[10px]"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Этот секрет отображается только один раз. Скопируйте и сохраните его в безопасном месте.
                 </p>
                 <div
@@ -2044,7 +2560,10 @@ onMounted(() => {
                     title="Скопировать"
                     @click="copyToClipboard(newlyCreatedSecret!)"
                   >
-                    <UIcon name="i-lucide-copy" class="size-3.5" />
+                    <UIcon
+                      name="i-lucide-copy"
+                      class="size-3.5"
+                    />
                   </button>
                 </div>
                 <button
@@ -2063,37 +2582,57 @@ onMounted(() => {
                 :style="{ background: 'var(--argus-bg-elevated)', borderColor: purpleBg(0.2) }"
               >
                 <div class="flex items-center gap-2 mb-2">
-                  <UIcon name="i-lucide-key-round" class="size-4" :style="{ color: isDark ? '#a78bfa' : '#7c3aed' }" />
-                  <span class="text-xs font-bold" style="color: var(--argus-text);">Новый API ключ</span>
+                  <UIcon
+                    name="i-lucide-key-round"
+                    class="size-4"
+                    :style="{ color: isDark ? '#a78bfa' : '#7c3aed' }"
+                  />
+                  <span
+                    class="text-xs font-bold"
+                    style="color: var(--argus-text);"
+                  >Новый API ключ</span>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Название *</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Название *</label>
                     <input
                       v-model="newKey.name"
                       type="text"
                       placeholder="Production API Key"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-card)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Среда</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Среда</label>
                     <select
                       v-model="newKey.environment"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none cursor-pointer"
                       :style="{ background: 'var(--argus-bg-card)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
                     >
-                      <option value="live">Live</option>
-                      <option value="test">Test</option>
+                      <option value="live">
+                        Live
+                      </option>
+                      <option value="test">
+                        Test
+                      </option>
                     </select>
                   </div>
                 </div>
 
                 <!-- Permissions -->
                 <div>
-                  <label class="block text-[10px] font-medium mb-2" style="color: var(--argus-text-dimmed);">Разрешения</label>
+                  <label
+                    class="block text-[10px] font-medium mb-2"
+                    style="color: var(--argus-text-dimmed);"
+                  >Разрешения</label>
                   <div class="flex flex-wrap gap-2">
                     <button
                       v-for="perm in permissionOptions"
@@ -2102,7 +2641,7 @@ onMounted(() => {
                       :style="{
                         background: newKey.permissions.includes(perm.value) ? purpleBg(0.15) : 'var(--argus-bg-card)',
                         color: newKey.permissions.includes(perm.value) ? (isDark ? '#a78bfa' : '#7c3aed') : 'var(--argus-text-dimmed)',
-                        border: `1px solid ${newKey.permissions.includes(perm.value) ? purpleBg(0.3) : 'var(--argus-border)'}`,
+                        border: `1px solid ${newKey.permissions.includes(perm.value) ? purpleBg(0.3) : 'var(--argus-border)'}`
                       }"
                       @click="togglePermission(perm.value)"
                     >
@@ -2125,19 +2664,33 @@ onMounted(() => {
                     :disabled="createKeyLoading"
                     @click="submitCreateKey"
                   >
-                    <UIcon v-if="createKeyLoading" name="i-lucide-loader-2" class="size-3 animate-spin" />
+                    <UIcon
+                      v-if="createKeyLoading"
+                      name="i-lucide-loader-2"
+                      class="size-3 animate-spin"
+                    />
                     Создать
                   </button>
                 </div>
               </div>
 
               <!-- Keys Loading -->
-              <div v-if="keysLoading" class="flex items-center justify-center py-10">
-                <UIcon name="i-lucide-loader-2" class="size-5 animate-spin" :style="{ color: isDark ? '#a78bfa' : '#7c3aed' }" />
+              <div
+                v-if="keysLoading"
+                class="flex items-center justify-center py-10"
+              >
+                <UIcon
+                  name="i-lucide-loader-2"
+                  class="size-5 animate-spin"
+                  :style="{ color: isDark ? '#a78bfa' : '#7c3aed' }"
+                />
               </div>
 
               <!-- Keys List -->
-              <div v-else-if="orgApiKeys.length > 0" class="space-y-2">
+              <div
+                v-else-if="orgApiKeys.length > 0"
+                class="space-y-2"
+              >
                 <div
                   v-for="k in orgApiKeys"
                   :key="k.id"
@@ -2145,7 +2698,7 @@ onMounted(() => {
                   :style="{
                     background: 'var(--argus-bg-elevated)',
                     borderColor: k.isActive ? 'var(--argus-border-subtle)' : errorBg(0.2),
-                    opacity: k.isActive ? 1 : 0.6,
+                    opacity: k.isActive ? 1 : 0.6
                   }"
                 >
                   <div class="flex items-center gap-3 min-w-0">
@@ -2161,7 +2714,10 @@ onMounted(() => {
                     </div>
                     <div class="min-w-0">
                       <div class="flex items-center gap-2">
-                        <span class="text-xs font-bold truncate" style="color: var(--argus-text);">{{ k.name }}</span>
+                        <span
+                          class="text-xs font-bold truncate"
+                          style="color: var(--argus-text);"
+                        >{{ k.name }}</span>
                         <span
                           v-if="!k.isActive"
                           class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
@@ -2171,14 +2727,27 @@ onMounted(() => {
                         </span>
                       </div>
                       <div class="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span class="text-[10px] font-mono" style="color: var(--argus-text-dimmed);">
+                        <span
+                          class="text-[10px] font-mono"
+                          style="color: var(--argus-text-dimmed);"
+                        >
                           {{ k.keyId }}
                         </span>
-                        <span class="text-[10px]" style="color: var(--argus-border);">|</span>
-                        <span class="text-[10px] font-mono" style="color: var(--argus-text-dimmed);">
+                        <span
+                          class="text-[10px]"
+                          style="color: var(--argus-border);"
+                        >|</span>
+                        <span
+                          class="text-[10px] font-mono"
+                          style="color: var(--argus-text-dimmed);"
+                        >
                           {{ k.secretPrefix }}***
                         </span>
-                        <span v-if="k.permissions.length > 0" class="text-[10px]" style="color: var(--argus-border);">|</span>
+                        <span
+                          v-if="k.permissions.length > 0"
+                          class="text-[10px]"
+                          style="color: var(--argus-border);"
+                        >|</span>
                         <span
                           v-for="perm in k.permissions"
                           :key="perm"
@@ -2193,10 +2762,17 @@ onMounted(() => {
 
                   <div class="flex items-center gap-3 shrink-0 ml-3">
                     <div class="text-right">
-                      <div class="text-[10px]" style="color: var(--argus-text-dimmed);">
+                      <div
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >
                         Исп.: {{ k.lastUsedAt ? formatDateTime(k.lastUsedAt) : '—' }}
                       </div>
-                      <div v-if="k.expiresAt" class="text-[10px]" style="color: var(--argus-text-dimmed);">
+                      <div
+                        v-if="k.expiresAt"
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >
                         Истекает: {{ formatDate(k.expiresAt) }}
                       </div>
                     </div>
@@ -2207,13 +2783,21 @@ onMounted(() => {
                         background: errorBg(0.1),
                         color: isDark ? '#f87171' : '#dc2626',
                         border: `1px solid ${errorBg(0.2)}`,
-                        opacity: revokeLoadingId === k.id ? 0.7 : 1,
+                        opacity: revokeLoadingId === k.id ? 0.7 : 1
                       }"
                       :disabled="revokeLoadingId === k.id"
                       @click="revokeKey(k.id)"
                     >
-                      <UIcon v-if="revokeLoadingId === k.id" name="i-lucide-loader-2" class="size-3 animate-spin" />
-                      <UIcon v-else name="i-lucide-shield-off" class="size-3" />
+                      <UIcon
+                        v-if="revokeLoadingId === k.id"
+                        name="i-lucide-loader-2"
+                        class="size-3 animate-spin"
+                      />
+                      <UIcon
+                        v-else
+                        name="i-lucide-shield-off"
+                        class="size-3"
+                      />
                       Отозвать
                     </button>
                   </div>
@@ -2221,9 +2805,21 @@ onMounted(() => {
               </div>
 
               <!-- No Keys -->
-              <div v-else class="flex flex-col items-center justify-center py-10 gap-3">
-                <UIcon name="i-lucide-key-round" class="size-8" style="color: var(--argus-text-dimmed); opacity: 0.3;" />
-                <p class="text-xs" style="color: var(--argus-text-dimmed);">Нет API ключей</p>
+              <div
+                v-else
+                class="flex flex-col items-center justify-center py-10 gap-3"
+              >
+                <UIcon
+                  name="i-lucide-key-round"
+                  class="size-8"
+                  style="color: var(--argus-text-dimmed); opacity: 0.3;"
+                />
+                <p
+                  class="text-xs"
+                  style="color: var(--argus-text-dimmed);"
+                >
+                  Нет API ключей
+                </p>
               </div>
             </div>
 
@@ -2231,7 +2827,10 @@ onMounted(() => {
             <!--  TAB: SETTINGS           -->
             <!-- ======================== -->
             <div v-if="detailTab === 'settings'">
-              <h3 class="text-sm font-bold mb-4" style="color: var(--argus-text);">
+              <h3
+                class="text-sm font-bold mb-4"
+                style="color: var(--argus-text);"
+              >
                 Настройки организации
               </h3>
 
@@ -2239,47 +2838,67 @@ onMounted(() => {
                 <!-- Name + Slug -->
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Название</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Название</label>
                     <input
                       v-model="editOrgData.name"
                       type="text"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Slug</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Slug</label>
                     <input
                       v-model="editOrgData.slug"
                       type="text"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                 </div>
 
                 <!-- Type + Plan -->
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Тип организации</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Тип организации</label>
                     <select
                       v-model="editOrgData.orgType"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none cursor-pointer"
                       :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
                     >
-                      <option v-for="opt in orgTypeOptions" :key="opt.value" :value="opt.value">
+                      <option
+                        v-for="opt in orgTypeOptions"
+                        :key="opt.value"
+                        :value="opt.value"
+                      >
                         {{ opt.label }}
                       </option>
                     </select>
                   </div>
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Тарифный план</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Тарифный план</label>
                     <select
                       v-model="editOrgData.plan"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none cursor-pointer"
                       :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
                     >
-                      <option v-for="opt in planOptions" :key="opt.value" :value="opt.value">
+                      <option
+                        v-for="opt in planOptions"
+                        :key="opt.value"
+                        :value="opt.value"
+                      >
                         {{ opt.label }}
                       </option>
                     </select>
@@ -2289,68 +2908,86 @@ onMounted(() => {
                 <!-- Email + Phone -->
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Email контакт</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Email контакт</label>
                     <input
                       v-model="editOrgData.contactEmail"
                       type="email"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Телефон</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Телефон</label>
                     <input
                       v-model="editOrgData.contactPhone"
                       type="tel"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                 </div>
 
                 <!-- City + Region -->
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Город</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Город</label>
                     <input
                       v-model="editOrgData.city"
                       type="text"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Регион</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Регион</label>
                     <input
                       v-model="editOrgData.region"
                       type="text"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                 </div>
 
                 <!-- Limits -->
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Макс. сессий</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Макс. сессий</label>
                     <input
                       v-model.number="editOrgData.maxSessions"
                       type="number"
                       min="1"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                   <div>
-                    <label class="block text-[10px] font-medium mb-1" style="color: var(--argus-text-dimmed);">Макс. событий/сек</label>
+                    <label
+                      class="block text-[10px] font-medium mb-1"
+                      style="color: var(--argus-text-dimmed);"
+                    >Макс. событий/сек</label>
                     <input
                       v-model.number="editOrgData.maxEventsRps"
                       type="number"
                       min="1"
                       class="w-full px-3 py-2 rounded-lg text-xs font-medium outline-none"
                       :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)', color: 'var(--argus-text)' }"
-                    />
+                    >
                   </div>
                 </div>
 
@@ -2359,45 +2996,89 @@ onMounted(() => {
                   class="p-3 rounded-lg space-y-1.5"
                   :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border-subtle)' }"
                 >
-                  <p class="text-[10px] font-bold uppercase tracking-wider mb-2" style="color: var(--argus-text-dimmed);">
+                  <p
+                    class="text-[10px] font-bold uppercase tracking-wider mb-2"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     Информация
                   </p>
                   <div class="grid grid-cols-2 gap-x-4 gap-y-1">
                     <div class="flex items-center justify-between">
-                      <span class="text-[10px]" style="color: var(--argus-text-dimmed);">ID:</span>
-                      <span class="text-[10px] font-mono" style="color: var(--argus-text-muted);">{{ selectedOrg.orgId }}</span>
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >ID:</span>
+                      <span
+                        class="text-[10px] font-mono"
+                        style="color: var(--argus-text-muted);"
+                      >{{ selectedOrg.orgId }}</span>
                     </div>
                     <div class="flex items-center justify-between">
-                      <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Статус:</span>
-                      <span class="text-[10px] font-bold" :style="{ color: selectedOrg.isActive ? (isDark ? '#34d399' : '#059669') : (isDark ? '#f87171' : '#dc2626') }">
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >Статус:</span>
+                      <span
+                        class="text-[10px] font-bold"
+                        :style="{ color: selectedOrg.isActive ? (isDark ? '#34d399' : '#059669') : (isDark ? '#f87171' : '#dc2626') }"
+                      >
                         {{ selectedOrg.isActive ? 'Активна' : 'Неактивна' }}
                       </span>
                     </div>
                     <div class="flex items-center justify-between">
-                      <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Создана:</span>
-                      <span class="text-[10px]" style="color: var(--argus-text-muted);">{{ formatDateTime(selectedOrg.createdAt) }}</span>
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >Создана:</span>
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-muted);"
+                      >{{ formatDateTime(selectedOrg.createdAt) }}</span>
                     </div>
                     <div class="flex items-center justify-between">
-                      <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Обновлена:</span>
-                      <span class="text-[10px]" style="color: var(--argus-text-muted);">{{ formatDateTime(selectedOrg.updatedAt) }}</span>
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >Обновлена:</span>
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-muted);"
+                      >{{ formatDateTime(selectedOrg.updatedAt) }}</span>
                     </div>
                     <div class="flex items-center justify-between">
-                      <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Хранение данных:</span>
-                      <span class="text-[10px]" style="color: var(--argus-text-muted);">{{ selectedOrg.retentionDays }} дней</span>
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >Хранение данных:</span>
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-muted);"
+                      >{{ selectedOrg.retentionDays }} дней</span>
                     </div>
                   </div>
                 </div>
 
                 <!-- Save Button -->
-                <div class="flex items-center justify-end gap-3 pt-4 border-t" :style="{ borderColor: 'var(--argus-border)' }">
+                <div
+                  class="flex items-center justify-end gap-3 pt-4 border-t"
+                  :style="{ borderColor: 'var(--argus-border)' }"
+                >
                   <button
                     class="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold cursor-pointer transition-all"
                     :style="{ background: 'var(--argus-accent)', color: '#fff', opacity: editOrgLoading ? 0.7 : 1 }"
                     :disabled="editOrgLoading"
                     @click="submitUpdateOrg"
                   >
-                    <UIcon v-if="editOrgLoading" name="i-lucide-loader-2" class="size-3.5 animate-spin" />
-                    <UIcon v-else name="i-lucide-save" class="size-3.5" />
+                    <UIcon
+                      v-if="editOrgLoading"
+                      name="i-lucide-loader-2"
+                      class="size-3.5 animate-spin"
+                    />
+                    <UIcon
+                      v-else
+                      name="i-lucide-save"
+                      class="size-3.5"
+                    />
                     Сохранить изменения
                   </button>
                 </div>
@@ -2407,12 +3088,23 @@ onMounted(() => {
             <!-- ======================== -->
             <!--  TAB: FEATURES           -->
             <!-- ======================== -->
-            <div v-if="detailTab === 'features'" class="space-y-4">
+            <div
+              v-if="detailTab === 'features'"
+              class="space-y-4"
+            >
               <!-- Header -->
               <div class="flex items-center justify-between">
                 <div>
-                  <h4 class="text-sm font-bold" style="color: var(--argus-text);">Feature Toggles</h4>
-                  <p class="text-[11px] mt-0.5" style="color: var(--argus-text-dimmed);">
+                  <h4
+                    class="text-sm font-bold"
+                    style="color: var(--argus-text);"
+                  >
+                    Feature Toggles
+                  </h4>
+                  <p
+                    class="text-[11px] mt-0.5"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     Управление доступными правилами прокторинга для организации
                   </p>
                 </div>
@@ -2422,7 +3114,11 @@ onMounted(() => {
                   :disabled="featureSaving"
                   @click="saveFeatureToggles"
                 >
-                  <UIcon :name="featureSaving ? 'i-lucide-loader-2' : 'i-lucide-save'" class="size-3" :class="{ 'animate-spin': featureSaving }" />
+                  <UIcon
+                    :name="featureSaving ? 'i-lucide-loader-2' : 'i-lucide-save'"
+                    class="size-3"
+                    :class="{ 'animate-spin': featureSaving }"
+                  />
                   {{ featureSaving ? 'Сохранение...' : 'Сохранить' }}
                 </button>
               </div>
@@ -2444,14 +3140,30 @@ onMounted(() => {
                       class="flex items-center justify-center size-8 rounded-lg"
                       :style="{ background: `color-mix(in srgb, ${group.color} 10%, transparent)` }"
                     >
-                      <UIcon :name="group.icon" class="size-4" :style="{ color: group.color }" />
+                      <UIcon
+                        :name="group.icon"
+                        class="size-4"
+                        :style="{ color: group.color }"
+                      />
                     </div>
                     <div>
-                      <p class="text-xs font-bold" style="color: var(--argus-text);">{{ group.label }}</p>
-                      <p v-if="group.description" class="text-[9px] max-w-xs leading-tight" :style="{ color: group.color }">
+                      <p
+                        class="text-xs font-bold"
+                        style="color: var(--argus-text);"
+                      >
+                        {{ group.label }}
+                      </p>
+                      <p
+                        v-if="group.description"
+                        class="text-[9px] max-w-xs leading-tight"
+                        :style="{ color: group.color }"
+                      >
                         {{ group.description }}
                       </p>
-                      <p class="text-[10px]" style="color: var(--argus-text-dimmed);">
+                      <p
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >
                         {{ countEnabledInGroup(group) }} из {{ group.features.length }} включено
                       </p>
                     </div>
@@ -2477,7 +3189,10 @@ onMounted(() => {
                 </div>
 
                 <!-- Individual Features -->
-                <div class="divide-y" :style="{ borderColor: 'var(--argus-border)' }">
+                <div
+                  class="divide-y"
+                  :style="{ borderColor: 'var(--argus-border)' }"
+                >
                   <div
                     v-for="feature in group.features"
                     :key="feature.key"
@@ -2485,14 +3200,24 @@ onMounted(() => {
                   >
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-1.5">
-                        <p class="text-[11px] font-medium" style="color: var(--argus-text);">{{ feature.label }}</p>
+                        <p
+                          class="text-[11px] font-medium"
+                          style="color: var(--argus-text);"
+                        >
+                          {{ feature.label }}
+                        </p>
                         <span
                           v-if="feature.badge"
                           class="shrink-0 px-1.5 py-px rounded text-[8px] font-bold uppercase tracking-wide"
                           :style="{ background: `color-mix(in srgb, ${group.color} 12%, transparent)`, color: group.color, border: `1px solid color-mix(in srgb, ${group.color} 20%, transparent)` }"
                         >{{ feature.badge }}</span>
                       </div>
-                      <p class="text-[10px]" style="color: var(--argus-text-dimmed);">{{ feature.description }}</p>
+                      <p
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >
+                        {{ feature.description }}
+                      </p>
                     </div>
 
                     <!-- Individual toggle -->
@@ -2523,7 +3248,10 @@ onMounted(() => {
                   :style="{ background: successBg(0.08), color: isDark ? '#34d399' : '#059669', border: `1px solid ${successBg(0.15)}` }"
                   @click="Object.keys(featureToggles).forEach(k => (featureToggles as any)[k] = true)"
                 >
-                  <UIcon name="i-lucide-check-circle" class="size-3" />
+                  <UIcon
+                    name="i-lucide-check-circle"
+                    class="size-3"
+                  />
                   Включить все
                 </button>
                 <button
@@ -2531,7 +3259,10 @@ onMounted(() => {
                   :style="{ background: errorBg(0.08), color: isDark ? '#f87171' : '#dc2626', border: `1px solid ${errorBg(0.15)}` }"
                   @click="Object.keys(featureToggles).forEach(k => (featureToggles as any)[k] = false)"
                 >
-                  <UIcon name="i-lucide-x-circle" class="size-3" />
+                  <UIcon
+                    name="i-lucide-x-circle"
+                    class="size-3"
+                  />
                   Отключить все
                 </button>
               </div>
@@ -2549,9 +3280,23 @@ onMounted(() => {
     :style="{ background: 'var(--argus-bg-deep)' }"
   >
     <div class="text-center space-y-3">
-      <UIcon name="i-lucide-shield-x" class="size-12 mx-auto" style="color: var(--argus-text-dimmed); opacity: 0.4;" />
-      <p class="text-sm font-medium" style="color: var(--argus-text-dimmed);">Доступ запрещён</p>
-      <p class="text-xs" style="color: var(--argus-text-dimmed);">Эта страница доступна только для Super Admin</p>
+      <UIcon
+        name="i-lucide-shield-x"
+        class="size-12 mx-auto"
+        style="color: var(--argus-text-dimmed); opacity: 0.4;"
+      />
+      <p
+        class="text-sm font-medium"
+        style="color: var(--argus-text-dimmed);"
+      >
+        Доступ запрещён
+      </p>
+      <p
+        class="text-xs"
+        style="color: var(--argus-text-dimmed);"
+      >
+        Эта страница доступна только для Super Admin
+      </p>
     </div>
   </div>
 </template>

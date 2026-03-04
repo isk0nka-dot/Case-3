@@ -159,7 +159,10 @@ function toggleMinimize(): void {
             style="background: rgba(0, 0, 0, 0.5)"
             @click.stop="toggleMinimize"
           >
-            <UIcon name="i-lucide-minimize-2" class="size-3 text-white/60" />
+            <UIcon
+              name="i-lucide-minimize-2"
+              class="size-3 text-white/60"
+            />
           </button>
         </template>
 
@@ -170,7 +173,10 @@ function toggleMinimize(): void {
           style="background: rgba(0, 0, 0, 0.3)"
           @click.stop="toggleMinimize"
         >
-          <UIcon name="i-lucide-maximize-2" class="size-4 text-white/80" />
+          <UIcon
+            name="i-lucide-maximize-2"
+            class="size-4 text-white/80"
+          />
         </button>
       </div>
     </Transition>

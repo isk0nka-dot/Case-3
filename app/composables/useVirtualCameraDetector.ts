@@ -27,7 +27,7 @@ import { EventType, Severity, EventSource } from '~/lib/proto/types'
 
 export interface VirtualCameraReport {
   isVirtual: boolean
-  confidence: number          // 0-1 composite confidence
+  confidence: number // 0-1 composite confidence
   deviceLabel: string
   flags: VirtualCameraFlag[]
   timestamp: number
@@ -60,7 +60,7 @@ const VIRTUAL_CAM_PATTERNS = [
   /akvcam/i,
   /v4l2loopback/i,
   /newtek/i,
-  /ndi/i,
+  /ndi/i
 ]
 
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ export function useVirtualCameraDetector() {
       checkCapabilities(stream),
       checkTimingJitter(stream),
       checkResolution(stream),
-      checkConstraintProbe(stream),
+      checkConstraintProbe(stream)
     ])
 
     // Weighted composite confidence
@@ -346,7 +346,7 @@ export function useVirtualCameraDetector() {
       capabilities: 0.2,
       timing_jitter: 0.2,
       resolution: 0.1,
-      constraint_probe: 0.15,
+      constraint_probe: 0.15
     }
 
     const compositeConfidence = flags.reduce((sum, flag) => {
@@ -361,7 +361,7 @@ export function useVirtualCameraDetector() {
       confidence: Math.min(1, compositeConfidence),
       deviceLabel,
       flags,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     }
 
     report.value = result
@@ -382,7 +382,7 @@ export function useVirtualCameraDetector() {
             hardwareIdHash: deviceLabel,
             mismatchComponent: 'virtual_camera',
             monitorCount: 1,
-            virtualMonitor: false,
+            virtualMonitor: false
           }
         },
         `Обнаружена виртуальная камера: ${deviceLabel} (${(result.confidence * 100).toFixed(0)}%)`,
@@ -398,6 +398,6 @@ export function useVirtualCameraDetector() {
     report,
     isChecking,
     analyze,
-    onEvent,
+    onEvent
   }
 }

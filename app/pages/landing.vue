@@ -145,7 +145,10 @@ const roles = [
 </script>
 
 <template>
-  <div class="landing-root min-h-screen relative overflow-hidden" style="background: #0a0e17;">
+  <div
+    class="landing-root min-h-screen relative overflow-hidden"
+    style="background: #0a0e17;"
+  >
     <!-- Ambient Background -->
     <div class="absolute inset-0 pointer-events-none overflow-hidden">
       <div
@@ -237,20 +240,36 @@ const roles = [
       <!-- Stats Row -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8 mt-16 sm:mt-20 w-full max-w-3xl">
         <div class="text-center">
-          <p class="text-2xl sm:text-3xl font-bold text-white tabular-nums">10K+</p>
-          <p class="text-[10px] sm:text-xs text-white/30 mt-1 uppercase tracking-wider">Concurrent Sessions</p>
+          <p class="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+            10K+
+          </p>
+          <p class="text-[10px] sm:text-xs text-white/30 mt-1 uppercase tracking-wider">
+            Concurrent Sessions
+          </p>
         </div>
         <div class="text-center">
-          <p class="text-2xl sm:text-3xl font-bold text-white tabular-nums">1.2M+</p>
-          <p class="text-[10px] sm:text-xs text-white/30 mt-1 uppercase tracking-wider">Events Processed</p>
+          <p class="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+            1.2M+
+          </p>
+          <p class="text-[10px] sm:text-xs text-white/30 mt-1 uppercase tracking-wider">
+            Events Processed
+          </p>
         </div>
         <div class="text-center">
-          <p class="text-2xl sm:text-3xl font-bold text-white tabular-nums">7ms</p>
-          <p class="text-[10px] sm:text-xs text-white/30 mt-1 uppercase tracking-wider">P50 Latency</p>
+          <p class="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+            7ms
+          </p>
+          <p class="text-[10px] sm:text-xs text-white/30 mt-1 uppercase tracking-wider">
+            P50 Latency
+          </p>
         </div>
         <div class="text-center">
-          <p class="text-2xl sm:text-3xl font-bold text-white tabular-nums">40+</p>
-          <p class="text-[10px] sm:text-xs text-white/30 mt-1 uppercase tracking-wider">Detection Types</p>
+          <p class="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+            40+
+          </p>
+          <p class="text-[10px] sm:text-xs text-white/30 mt-1 uppercase tracking-wider">
+            Detection Types
+          </p>
         </div>
       </div>
     </section>
@@ -258,8 +277,12 @@ const roles = [
     <!-- ===== KEY CAPABILITIES ===== -->
     <section class="relative z-10 max-w-6xl mx-auto px-6 pb-24">
       <div class="text-center mb-12">
-        <h2 class="text-2xl sm:text-3xl font-bold text-white">Ключевые технологии</h2>
-        <p class="text-sm text-white/30 mt-3 max-w-xl mx-auto">Каждая функция построена на production-grade инфраструктуре — Kafka, ClickHouse, OPFS, MediaPipe</p>
+        <h2 class="text-2xl sm:text-3xl font-bold text-white">
+          Ключевые технологии
+        </h2>
+        <p class="text-sm text-white/30 mt-3 max-w-xl mx-auto">
+          Каждая функция построена на production-grade инфраструктуре — Kafka, ClickHouse, OPFS, MediaPipe
+        </p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -273,10 +296,18 @@ const roles = [
             class="flex items-center justify-center size-12 rounded-xl mb-5 transition-all group-hover:scale-105"
             :style="{ background: cap.color + '15', border: '1px solid ' + cap.color + '25' }"
           >
-            <UIcon :name="cap.icon" class="size-6" :style="{ color: cap.color }" />
+            <UIcon
+              :name="cap.icon"
+              class="size-6"
+              :style="{ color: cap.color }"
+            />
           </div>
-          <h3 class="text-base font-bold text-white mb-2">{{ cap.title }}</h3>
-          <p class="text-sm text-white/35 leading-relaxed">{{ cap.description }}</p>
+          <h3 class="text-base font-bold text-white mb-2">
+            {{ cap.title }}
+          </h3>
+          <p class="text-sm text-white/35 leading-relaxed">
+            {{ cap.description }}
+          </p>
         </div>
       </div>
     </section>
@@ -284,8 +315,12 @@ const roles = [
     <!-- ===== ROLE-BASED ACCESS ===== -->
     <section class="relative z-10 max-w-5xl mx-auto px-6 pb-24">
       <div class="text-center mb-12">
-        <h2 class="text-2xl sm:text-3xl font-bold text-white">Единая точка входа — три роли</h2>
-        <p class="text-sm text-white/30 mt-3">Один логин. Система определяет вашу роль автоматически.</p>
+        <h2 class="text-2xl sm:text-3xl font-bold text-white">
+          Единая точка входа — три роли
+        </h2>
+        <p class="text-sm text-white/30 mt-3">
+          Один логин. Система определяет вашу роль автоматически.
+        </p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -299,10 +334,18 @@ const roles = [
             class="flex items-center justify-center size-14 rounded-2xl mx-auto mb-5"
             :style="{ background: role.color + '12', border: '1px solid ' + role.color + '20' }"
           >
-            <UIcon :name="role.icon" class="size-7" :style="{ color: role.color }" />
+            <UIcon
+              :name="role.icon"
+              class="size-7"
+              :style="{ color: role.color }"
+            />
           </div>
-          <h3 class="text-base font-bold text-white mb-2">{{ role.name }}</h3>
-          <p class="text-sm text-white/35 leading-relaxed">{{ role.description }}</p>
+          <h3 class="text-base font-bold text-white mb-2">
+            {{ role.name }}
+          </h3>
+          <p class="text-sm text-white/35 leading-relaxed">
+            {{ role.description }}
+          </p>
         </div>
       </div>
 
@@ -312,7 +355,10 @@ const roles = [
           @click="openLogin"
         >
           <span class="flex items-center gap-2">
-            <UIcon name="i-lucide-log-in" class="size-4" />
+            <UIcon
+              name="i-lucide-log-in"
+              class="size-4"
+            />
             Войти
           </span>
         </button>
@@ -322,8 +368,12 @@ const roles = [
     <!-- ===== PRICING SECTION ===== -->
     <section class="relative z-10 max-w-6xl mx-auto px-6 pb-24">
       <div class="text-center mb-12">
-        <h2 class="text-2xl sm:text-3xl font-bold text-white">Тарифные планы</h2>
-        <p class="text-sm text-white/30 mt-3 max-w-lg mx-auto">Прозрачная стоимость. Все функции AI включены в каждый план. Скидки за объём.</p>
+        <h2 class="text-2xl sm:text-3xl font-bold text-white">
+          Тарифные планы
+        </h2>
+        <p class="text-sm text-white/30 mt-3 max-w-lg mx-auto">
+          Прозрачная стоимость. Все функции AI включены в каждый план. Скидки за объём.
+        </p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
@@ -346,18 +396,31 @@ const roles = [
           </div>
 
           <!-- Tier Header -->
-          <div class="mb-6" :class="{ 'pt-2': tier.badge }">
+          <div
+            class="mb-6"
+            :class="{ 'pt-2': tier.badge }"
+          >
             <div class="flex items-center gap-2 mb-1">
-              <span class="text-xs font-medium uppercase tracking-wider" :style="{ color: tier.accent }">{{ tier.nameEn }}</span>
+              <span
+                class="text-xs font-medium uppercase tracking-wider"
+                :style="{ color: tier.accent }"
+              >{{ tier.nameEn }}</span>
             </div>
-            <h3 class="text-xl font-bold text-white">{{ tier.name }}</h3>
-            <p class="text-xs text-white/30 mt-1">{{ tier.audience }}</p>
+            <h3 class="text-xl font-bold text-white">
+              {{ tier.name }}
+            </h3>
+            <p class="text-xs text-white/30 mt-1">
+              {{ tier.audience }}
+            </p>
           </div>
 
           <!-- Price -->
           <div class="mb-6">
             <span class="text-3xl font-extrabold text-white">{{ tier.price }}</span>
-            <span v-if="tier.unit" class="text-sm text-white/30 ml-1">{{ tier.unit }}</span>
+            <span
+              v-if="tier.unit"
+              class="text-sm text-white/30 ml-1"
+            >{{ tier.unit }}</span>
           </div>
 
           <!-- Features List -->
@@ -372,7 +435,10 @@ const roles = [
                 class="size-4 shrink-0 mt-0.5"
                 :style="{ color: feature.startsWith('Всё из') ? tier.accent : 'rgba(255,255,255,0.25)' }"
               />
-              <span :class="feature.startsWith('Всё из') ? 'font-medium' : ''" :style="{ color: feature.startsWith('Всё из') ? tier.accent : 'rgba(255,255,255,0.5)' }">
+              <span
+                :class="feature.startsWith('Всё из') ? 'font-medium' : ''"
+                :style="{ color: feature.startsWith('Всё из') ? tier.accent : 'rgba(255,255,255,0.5)' }"
+              >
                 {{ feature }}
               </span>
             </li>
@@ -397,20 +463,29 @@ const roles = [
         class="rounded-3xl p-10 sm:p-14 text-center"
         style="background: linear-gradient(135deg, rgba(66, 133, 244, 0.08), rgba(162, 89, 255, 0.08)); border: 1px solid rgba(255,255,255,0.06);"
       >
-        <h2 class="text-2xl sm:text-3xl font-bold text-white mb-3">Готовы к трансформации?</h2>
-        <p class="text-sm text-white/35 mb-8 max-w-md mx-auto">Запустите AI-прокторинг за 15 минут. Без установки ПО, без сложной интеграции.</p>
+        <h2 class="text-2xl sm:text-3xl font-bold text-white mb-3">
+          Готовы к трансформации?
+        </h2>
+        <p class="text-sm text-white/35 mb-8 max-w-md mx-auto">
+          Запустите AI-прокторинг за 15 минут. Без установки ПО, без сложной интеграции.
+        </p>
         <button
           class="scanner-btn px-10 py-4 rounded-xl text-base font-bold text-white transition-all"
           @click="openLogin"
         >
           Начать бесплатный пробный период
         </button>
-        <p class="text-xs text-white/20 mt-5">14 дней бесплатно · Без привязки карты · Полный доступ</p>
+        <p class="text-xs text-white/20 mt-5">
+          14 дней бесплатно · Без привязки карты · Полный доступ
+        </p>
       </div>
     </section>
 
     <!-- ===== FOOTER ===== -->
-    <footer class="relative z-10 border-t py-8 px-6" style="border-color: rgba(255,255,255,0.06);">
+    <footer
+      class="relative z-10 border-t py-8 px-6"
+      style="border-color: rgba(255,255,255,0.06);"
+    >
       <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-2">
           <ArgusLogo :size="20" />
@@ -423,7 +498,10 @@ const roles = [
     </footer>
 
     <!-- Login Modal -->
-    <LoginModal v-model="showLoginModal" @login-success="handleLoginSuccess" />
+    <LoginModal
+      v-model="showLoginModal"
+      @login-success="handleLoginSuccess"
+    />
   </div>
 </template>
 

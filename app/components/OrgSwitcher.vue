@@ -46,9 +46,9 @@ const filteredOrgs = computed(() => {
   if (!searchQuery.value.trim()) return organizations.value
   const q = searchQuery.value.toLowerCase().trim()
   return organizations.value.filter(org =>
-    org.name.toLowerCase().includes(q) ||
-    org.orgId.toLowerCase().includes(q) ||
-    (org.city && org.city.toLowerCase().includes(q))
+    org.name.toLowerCase().includes(q)
+    || org.orgId.toLowerCase().includes(q)
+    || (org.city && org.city.toLowerCase().includes(q))
   )
 })
 
@@ -146,10 +146,16 @@ onUnmounted(() => {
 
       <!-- Label -->
       <div class="flex-1 min-w-0">
-        <p class="text-xs font-medium truncate" style="color: var(--argus-text);">
+        <p
+          class="text-xs font-medium truncate"
+          style="color: var(--argus-text);"
+        >
           {{ triggerLabel }}
         </p>
-        <p class="text-[10px] truncate" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-[10px] truncate"
+          style="color: var(--argus-text-dimmed);"
+        >
           {{ authStore.selectedOrgId ? authStore.selectedOrgId : 'Глобальный контекст' }}
         </p>
       </div>
@@ -189,12 +195,15 @@ onUnmounted(() => {
               placeholder="Поиск организации..."
               class="flex-1 bg-transparent text-xs outline-none placeholder:text-[var(--argus-text-dimmed)]"
               style="color: var(--argus-text);"
-            />
+            >
           </div>
         </div>
 
         <!-- Divider -->
-        <div class="h-px" style="background: var(--argus-border);" />
+        <div
+          class="h-px"
+          style="background: var(--argus-border);"
+        />
 
         <!-- "All Organizations" option -->
         <button
@@ -202,7 +211,10 @@ onUnmounted(() => {
           :class="!authStore.selectedOrgId ? 'org-switcher-item--selected' : ''"
           @click="selectOrg(null)"
         >
-          <div class="flex items-center justify-center w-6 h-6 rounded-md" style="background: var(--argus-bg-elevated);">
+          <div
+            class="flex items-center justify-center w-6 h-6 rounded-md"
+            style="background: var(--argus-bg-elevated);"
+          >
             <UIcon
               name="i-lucide-globe"
               class="w-3.5 h-3.5"
@@ -210,8 +222,18 @@ onUnmounted(() => {
             />
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-medium" style="color: var(--argus-text);">Все организации</p>
-            <p class="text-[10px]" style="color: var(--argus-text-dimmed);">Агрегированный просмотр</p>
+            <p
+              class="text-xs font-medium"
+              style="color: var(--argus-text);"
+            >
+              Все организации
+            </p>
+            <p
+              class="text-[10px]"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Агрегированный просмотр
+            </p>
           </div>
           <UIcon
             v-if="!authStore.selectedOrgId"
@@ -221,10 +243,16 @@ onUnmounted(() => {
         </button>
 
         <!-- Divider -->
-        <div class="h-px" style="background: var(--argus-border);" />
+        <div
+          class="h-px"
+          style="background: var(--argus-border);"
+        />
 
         <!-- Organizations list -->
-        <div class="org-switcher-list overflow-y-auto" style="max-height: 240px;">
+        <div
+          class="org-switcher-list overflow-y-auto"
+          style="max-height: 240px;"
+        >
           <!-- Loading state -->
           <div
             v-if="isLoading"
@@ -235,7 +263,10 @@ onUnmounted(() => {
               class="w-4 h-4 animate-spin"
               style="color: var(--argus-text-dimmed);"
             />
-            <span class="text-xs" style="color: var(--argus-text-dimmed);">Загрузка...</span>
+            <span
+              class="text-xs"
+              style="color: var(--argus-text-dimmed);"
+            >Загрузка...</span>
           </div>
 
           <!-- Error state -->
@@ -243,7 +274,10 @@ onUnmounted(() => {
             v-else-if="loadError"
             class="flex items-center gap-2 px-3 py-3"
           >
-            <UIcon name="i-lucide-alert-circle" class="w-4 h-4 flex-shrink-0 text-red-400" />
+            <UIcon
+              name="i-lucide-alert-circle"
+              class="w-4 h-4 flex-shrink-0 text-red-400"
+            />
             <span class="text-xs text-red-400">{{ loadError }}</span>
           </div>
 
@@ -257,7 +291,12 @@ onUnmounted(() => {
               class="w-5 h-5 mx-auto mb-1"
               style="color: var(--argus-text-dimmed);"
             />
-            <p class="text-xs" style="color: var(--argus-text-dimmed);">Ничего не найдено</p>
+            <p
+              class="text-xs"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Ничего не найдено
+            </p>
           </div>
 
           <!-- Empty list -->
@@ -265,7 +304,12 @@ onUnmounted(() => {
             v-else-if="filteredOrgs.length === 0"
             class="px-3 py-4 text-center"
           >
-            <p class="text-xs" style="color: var(--argus-text-dimmed);">Нет организаций</p>
+            <p
+              class="text-xs"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Нет организаций
+            </p>
           </div>
 
           <!-- Org items -->
@@ -287,7 +331,10 @@ onUnmounted(() => {
             <!-- Org info -->
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-1.5">
-                <p class="text-xs font-medium truncate" style="color: var(--argus-text);">
+                <p
+                  class="text-xs font-medium truncate"
+                  style="color: var(--argus-text);"
+                >
                   {{ org.name }}
                 </p>
                 <!-- Plan badge -->
@@ -298,9 +345,14 @@ onUnmounted(() => {
                   {{ org.plan }}
                 </span>
               </div>
-              <p class="text-[10px] truncate" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-[10px] truncate"
+                style="color: var(--argus-text-dimmed);"
+              >
                 {{ org.orgId }}
-                <template v-if="org.city"> &middot; {{ org.city }}</template>
+                <template v-if="org.city">
+                  &middot; {{ org.city }}
+                </template>
               </p>
             </div>
 
@@ -321,9 +373,15 @@ onUnmounted(() => {
         </div>
 
         <!-- Footer with org count -->
-        <div class="h-px" style="background: var(--argus-border);" />
+        <div
+          class="h-px"
+          style="background: var(--argus-border);"
+        />
         <div class="px-3 py-1.5">
-          <p class="text-[10px] tabular-nums" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-[10px] tabular-nums"
+            style="color: var(--argus-text-dimmed);"
+          >
             {{ organizations.length }} {{ organizations.length === 1 ? 'организация' : 'организаций' }}
           </p>
         </div>

@@ -27,7 +27,7 @@ const activeFragment = ref<EvidenceFragment | null>(null)
 const videoUrl = ref('')
 const videoLoading = ref(false)
 const verifying = ref<string | null>(null)
-const verifyResults = ref<Record<string, { valid: boolean; checkedAt: string }>>({})
+const verifyResults = ref<Record<string, { valid: boolean, checkedAt: string }>>({})
 
 // Fetch evidence fragments for session
 async function fetchEvidence() {
@@ -104,8 +104,15 @@ watch(() => props.sessionId, () => fetchEvidence())
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <UIcon name="i-lucide-film" class="size-4" style="color: var(--argus-accent);" />
-        <span class="text-xs font-semibold" style="color: var(--argus-text);">Видеодоказательства</span>
+        <UIcon
+          name="i-lucide-film"
+          class="size-4"
+          style="color: var(--argus-accent);"
+        />
+        <span
+          class="text-xs font-semibold"
+          style="color: var(--argus-text);"
+        >Видеодоказательства</span>
         <span
           v-if="!loading"
           class="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
@@ -130,8 +137,14 @@ watch(() => props.sessionId, () => fetchEvidence())
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex items-center justify-center py-6">
-      <div class="animate-spin rounded-full size-5 border-2 border-t-transparent" style="border-color: var(--argus-accent); border-top-color: transparent;" />
+    <div
+      v-if="loading"
+      class="flex items-center justify-center py-6"
+    >
+      <div
+        class="animate-spin rounded-full size-5 border-2 border-t-transparent"
+        style="border-color: var(--argus-accent); border-top-color: transparent;"
+      />
     </div>
 
     <!-- Error -->
@@ -139,8 +152,17 @@ watch(() => props.sessionId, () => fetchEvidence())
       v-else-if="error && fragments.length === 0"
       class="text-center py-6"
     >
-      <UIcon name="i-lucide-alert-circle" class="size-8 mb-2" style="color: var(--argus-text-dimmed);" />
-      <p class="text-xs" style="color: var(--argus-text-dimmed);">{{ error }}</p>
+      <UIcon
+        name="i-lucide-alert-circle"
+        class="size-8 mb-2"
+        style="color: var(--argus-text-dimmed);"
+      />
+      <p
+        class="text-xs"
+        style="color: var(--argus-text-dimmed);"
+      >
+        {{ error }}
+      </p>
     </div>
 
     <!-- Empty state -->
@@ -148,21 +170,44 @@ watch(() => props.sessionId, () => fetchEvidence())
       v-else-if="fragments.length === 0"
       class="text-center py-6"
     >
-      <UIcon name="i-lucide-video-off" class="size-8 mb-2" style="color: var(--argus-text-dimmed);" />
-      <p class="text-xs font-medium" style="color: var(--argus-text);">Нет видеодоказательств</p>
-      <p class="text-[10px] mt-1" style="color: var(--argus-text-dimmed);">Для данной сессии видеозаписи не были зафиксированы</p>
+      <UIcon
+        name="i-lucide-video-off"
+        class="size-8 mb-2"
+        style="color: var(--argus-text-dimmed);"
+      />
+      <p
+        class="text-xs font-medium"
+        style="color: var(--argus-text);"
+      >
+        Нет видеодоказательств
+      </p>
+      <p
+        class="text-[10px] mt-1"
+        style="color: var(--argus-text-dimmed);"
+      >
+        Для данной сессии видеозаписи не были зафиксированы
+      </p>
     </div>
 
     <!-- Fragment List -->
-    <div v-else class="space-y-2">
+    <div
+      v-else
+      class="space-y-2"
+    >
       <!-- Active Video Player -->
       <div
         v-if="activeFragment"
         class="rounded-lg border overflow-hidden"
         :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-deep)' }"
       >
-        <div v-if="videoLoading" class="flex items-center justify-center py-12">
-          <div class="animate-spin rounded-full size-6 border-2 border-t-transparent" style="border-color: var(--argus-accent); border-top-color: transparent;" />
+        <div
+          v-if="videoLoading"
+          class="flex items-center justify-center py-12"
+        >
+          <div
+            class="animate-spin rounded-full size-6 border-2 border-t-transparent"
+            style="border-color: var(--argus-accent); border-top-color: transparent;"
+          />
         </div>
         <video
           v-else-if="videoUrl"
@@ -171,9 +216,15 @@ watch(() => props.sessionId, () => fetchEvidence())
           class="w-full max-h-[240px] bg-black"
           preload="metadata"
         />
-        <div class="px-3 py-2 flex items-center justify-between" style="border-top: 1px solid var(--argus-border);">
+        <div
+          class="px-3 py-2 flex items-center justify-between"
+          style="border-top: 1px solid var(--argus-border);"
+        >
           <div class="flex items-center gap-2">
-            <span class="text-[9px] font-mono" style="color: var(--argus-text-dimmed);">
+            <span
+              class="text-[9px] font-mono"
+              style="color: var(--argus-text-dimmed);"
+            >
               SHA-256: {{ truncateHash(activeFragment.sha256Hash) }}
             </span>
           </div>
@@ -208,25 +259,43 @@ watch(() => props.sessionId, () => fetchEvidence())
             color: 'var(--argus-accent)'
           }"
         >
-          <UIcon name="i-lucide-play" class="size-3.5" />
+          <UIcon
+            name="i-lucide-play"
+            class="size-3.5"
+          />
         </div>
 
         <!-- Fragment info -->
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
-            <span class="text-[10px] font-semibold" style="color: var(--argus-text);">
+            <span
+              class="text-[10px] font-semibold"
+              style="color: var(--argus-text);"
+            >
               {{ formatDuration(frag.durationSec) }}
             </span>
-            <span class="text-[9px]" style="color: var(--argus-text-dimmed);">
+            <span
+              class="text-[9px]"
+              style="color: var(--argus-text-dimmed);"
+            >
               {{ formatTime(frag.startTime) }} — {{ formatTime(frag.endTime) }}
             </span>
           </div>
           <div class="flex items-center gap-2 mt-0.5">
-            <span class="text-[8px] font-mono" style="color: var(--argus-text-dimmed);">
+            <span
+              class="text-[8px] font-mono"
+              style="color: var(--argus-text-dimmed);"
+            >
               {{ truncateHash(frag.sha256Hash) }}
             </span>
-            <span class="text-[8px]" style="color: var(--argus-border);">|</span>
-            <span class="text-[8px]" style="color: var(--argus-text-dimmed);">
+            <span
+              class="text-[8px]"
+              style="color: var(--argus-border);"
+            >|</span>
+            <span
+              class="text-[8px]"
+              style="color: var(--argus-text-dimmed);"
+            >
               {{ formatFileSize(frag.sizeBytes) }}
             </span>
           </div>
@@ -262,7 +331,11 @@ watch(() => props.sessionId, () => fetchEvidence())
               class="animate-spin rounded-full size-2.5 border border-t-transparent"
               style="border-color: var(--argus-text-dimmed); border-top-color: transparent;"
             />
-            <UIcon v-else name="i-lucide-shield-check" class="size-2.5" />
+            <UIcon
+              v-else
+              name="i-lucide-shield-check"
+              class="size-2.5"
+            />
             Проверить
           </button>
         </div>

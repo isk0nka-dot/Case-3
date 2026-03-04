@@ -35,7 +35,7 @@ const dashboardChildren = computed(() => {
   const items = [
     { label: 'Обзор', icon: 'i-lucide-gauge', to: '/dashboard' },
     { label: 'Регионы', icon: 'i-lucide-map-pin', to: '/dashboard/regions' },
-    { label: 'Нарушения', icon: 'i-heroicons-exclamation-triangle', to: '/dashboard/violations' },
+    { label: 'Нарушения', icon: 'i-heroicons-exclamation-triangle', to: '/dashboard/violations' }
   ]
   // Infrastructure and Executive are global/system pages — Super Admin only
   if (authStore.isSuperAdmin) {
@@ -56,7 +56,7 @@ const topNavigation = computed(() => {
     { label: 'Форензик', icon: 'i-lucide-file-search', to: '/forensic' },
     { label: 'Апелляции', icon: 'i-lucide-scale', to: '/appeals' },
     { label: 'Экспорт', icon: 'i-lucide-hard-drive-download', to: '/dashboard/exports' },
-    { label: 'Аналитика', icon: 'i-lucide-bar-chart-3', to: '/analytics' },
+    { label: 'Аналитика', icon: 'i-lucide-bar-chart-3', to: '/analytics' }
   ]
   // Integrations page — visible to org_admin + super_admin
   if (authStore.isSuperAdmin || authStore.isOrgAdmin) {
@@ -71,7 +71,7 @@ const topNavigation = computed(() => {
 
 // Super Admin-only navigation items
 const adminNavigation = [
-  { label: 'Организации', icon: 'i-lucide-building-2', to: '/organizations' },
+  { label: 'Организации', icon: 'i-lucide-building-2', to: '/organizations' }
 ]
 
 const route = useRoute()
@@ -132,7 +132,11 @@ onUnmounted(() => {
     <!-- Landing page renders without sidebar chrome -->
     <NuxtPage v-if="isLandingPage" />
 
-    <div v-else class="flex h-screen overflow-hidden" style="background: var(--argus-bg-deep);">
+    <div
+      v-else
+      class="flex h-screen overflow-hidden"
+      style="background: var(--argus-bg-deep);"
+    >
       <!-- ===== LEFT SIDEBAR ===== -->
       <aside
         class="hidden lg:flex flex-col shrink-0 sidebar-transition border-r"
@@ -167,7 +171,10 @@ onUnmounted(() => {
             @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
             @click="store.toggleLeftSidebar()"
           >
-            <UIcon name="i-lucide-panel-left-close" class="size-4" />
+            <UIcon
+              name="i-lucide-panel-left-close"
+              class="size-4"
+            />
           </button>
 
           <button
@@ -183,7 +190,10 @@ onUnmounted(() => {
             @mouseleave="($event.currentTarget as HTMLElement).style.background = 'var(--argus-bg-card)'"
             @click="store.toggleLeftSidebar()"
           >
-            <UIcon name="i-lucide-panel-left-open" class="size-3.5" />
+            <UIcon
+              name="i-lucide-panel-left-open"
+              class="size-3.5"
+            />
           </button>
         </div>
 
@@ -206,7 +216,10 @@ onUnmounted(() => {
               @mouseleave="($event.currentTarget as HTMLElement).style.background = isDashboardRoute ? (isDark ? 'rgba(56, 189, 248, 0.1)' : 'rgba(37, 99, 235, 0.1)') : 'transparent'"
               @click="store.leftSidebarOpen ? store.toggleDashboardMenu() : store.toggleLeftSidebar()"
             >
-              <UIcon name="i-lucide-layout-dashboard" class="size-[18px] shrink-0" />
+              <UIcon
+                name="i-lucide-layout-dashboard"
+                class="size-[18px] shrink-0"
+              />
               <span
                 class="sidebar-label flex-1 text-left"
                 :class="store.leftSidebarOpen ? 'sidebar-label-visible' : 'sidebar-label-hidden'"
@@ -242,7 +255,10 @@ onUnmounted(() => {
               class="sub-menu-container"
               :class="store.dashboardMenuOpen ? 'sub-menu-open' : 'sub-menu-closed'"
             >
-              <div class="ml-4 mt-1 space-y-0.5 border-l" style="border-color: var(--argus-border);">
+              <div
+                class="ml-4 mt-1 space-y-0.5 border-l"
+                style="border-color: var(--argus-border);"
+              >
                 <NuxtLink
                   v-for="child in dashboardChildren"
                   :key="child.label"
@@ -255,7 +271,10 @@ onUnmounted(() => {
                   @mouseenter="($event.currentTarget as HTMLElement).style.background = route.path === child.to ? (isDark ? 'rgba(56, 189, 248, 0.08)' : 'rgba(37, 99, 235, 0.08)') : 'var(--argus-bg-hover)'"
                   @mouseleave="($event.currentTarget as HTMLElement).style.background = route.path === child.to ? (isDark ? 'rgba(56, 189, 248, 0.08)' : 'rgba(37, 99, 235, 0.08)') : 'transparent'"
                 >
-                  <UIcon :name="child.icon" class="size-[15px] shrink-0" />
+                  <UIcon
+                    :name="child.icon"
+                    class="size-[15px] shrink-0"
+                  />
                   <span>{{ child.label }}</span>
                 </NuxtLink>
               </div>
@@ -264,12 +283,18 @@ onUnmounted(() => {
 
           <!-- ===== SUPER ADMIN SECTION ===== -->
           <template v-if="authStore.isSuperAdmin">
-            <div class="my-2 mx-3 border-t" style="border-color: var(--argus-border-subtle);" />
+            <div
+              class="my-2 mx-3 border-t"
+              style="border-color: var(--argus-border-subtle);"
+            />
             <div
               v-if="store.leftSidebarOpen"
               class="px-3 py-1"
             >
-              <span class="text-[10px] font-semibold uppercase tracking-widest" style="color: var(--argus-text-muted);">
+              <span
+                class="text-[10px] font-semibold uppercase tracking-widest"
+                style="color: var(--argus-text-muted);"
+              >
                 Администрирование
               </span>
             </div>
@@ -289,7 +314,10 @@ onUnmounted(() => {
               @mouseenter="($event.currentTarget as HTMLElement).style.background = route.path === item.to ? (isDark ? 'rgba(56, 189, 248, 0.1)' : 'rgba(37, 99, 235, 0.1)') : 'var(--argus-bg-hover)'"
               @mouseleave="($event.currentTarget as HTMLElement).style.background = route.path === item.to ? (isDark ? 'rgba(56, 189, 248, 0.1)' : 'rgba(37, 99, 235, 0.1)') : 'transparent'"
             >
-              <UIcon :name="item.icon" class="size-[18px] shrink-0" />
+              <UIcon
+                :name="item.icon"
+                class="size-[18px] shrink-0"
+              />
               <span
                 class="sidebar-label"
                 :class="store.leftSidebarOpen ? 'sidebar-label-visible' : 'sidebar-label-hidden'"
@@ -314,7 +342,10 @@ onUnmounted(() => {
           </template>
 
           <!-- Separator -->
-          <div class="my-2 mx-3 border-t" style="border-color: var(--argus-border-subtle);" />
+          <div
+            class="my-2 mx-3 border-t"
+            style="border-color: var(--argus-border-subtle);"
+          />
 
           <!-- ===== OTHER NAV ITEMS ===== -->
           <NuxtLink
@@ -333,7 +364,10 @@ onUnmounted(() => {
             @mouseenter="($event.currentTarget as HTMLElement).style.background = route.path === item.to ? (isDark ? 'rgba(56, 189, 248, 0.1)' : 'rgba(37, 99, 235, 0.1)') : 'var(--argus-bg-hover)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background = route.path === item.to ? (isDark ? 'rgba(56, 189, 248, 0.1)' : 'rgba(37, 99, 235, 0.1)') : 'transparent'"
           >
-            <UIcon :name="item.icon" class="size-[18px] shrink-0" />
+            <UIcon
+              :name="item.icon"
+              class="size-[18px] shrink-0"
+            />
             <span
               class="sidebar-label"
               :class="store.leftSidebarOpen ? 'sidebar-label-visible' : 'sidebar-label-hidden'"
@@ -358,7 +392,10 @@ onUnmounted(() => {
         </nav>
 
         <!-- Bottom: Theme Toggle + User -->
-        <div class="px-2 py-3 border-t space-y-2" style="border-color: var(--argus-border);">
+        <div
+          class="px-2 py-3 border-t space-y-2"
+          style="border-color: var(--argus-border);"
+        >
           <!-- Theme Toggle -->
           <button
             class="flex items-center w-full rounded-lg transition-all duration-200"
@@ -394,15 +431,28 @@ onUnmounted(() => {
             class="flex items-center rounded-lg"
             :class="store.leftSidebarOpen ? 'gap-3 px-3 py-2' : 'justify-center py-2'"
           >
-            <div class="flex items-center justify-center size-8 rounded-full text-xs font-bold shrink-0" style="background: linear-gradient(135deg, var(--argus-accent), var(--argus-accent-muted)); color: white;">
+            <div
+              class="flex items-center justify-center size-8 rounded-full text-xs font-bold shrink-0"
+              style="background: linear-gradient(135deg, var(--argus-accent), var(--argus-accent-muted)); color: white;"
+            >
               {{ authStore.displayName?.charAt(0) || 'A' }}
             </div>
             <div
               class="flex-1 min-w-0 sidebar-label"
               :class="store.leftSidebarOpen ? 'sidebar-label-visible' : 'sidebar-label-hidden'"
             >
-              <p class="text-sm font-medium truncate" style="color: var(--argus-text);">{{ authStore.displayName }}</p>
-              <p class="text-xs truncate" style="color: var(--argus-text-dimmed);">{{ authStore.displayEmail }}</p>
+              <p
+                class="text-sm font-medium truncate"
+                style="color: var(--argus-text);"
+              >
+                {{ authStore.displayName }}
+              </p>
+              <p
+                class="text-xs truncate"
+                style="color: var(--argus-text-dimmed);"
+              >
+                {{ authStore.displayEmail }}
+              </p>
             </div>
           </div>
 
@@ -415,7 +465,10 @@ onUnmounted(() => {
             @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
             @click="handleLogout"
           >
-            <UIcon name="i-lucide-log-out" class="size-[18px] shrink-0" />
+            <UIcon
+              name="i-lucide-log-out"
+              class="size-[18px] shrink-0"
+            />
             <span
               class="text-sm font-medium sidebar-label"
               :class="store.leftSidebarOpen ? 'sidebar-label-visible' : 'sidebar-label-hidden'"
@@ -443,14 +496,23 @@ onUnmounted(() => {
       <!-- ===== MAIN + RIGHT PANEL ===== -->
       <div class="flex-1 flex flex-col overflow-hidden main-fluid">
         <!-- Top bar (mobile) -->
-        <header class="lg:hidden flex items-center justify-between px-4 h-14 border-b" style="border-color: var(--argus-border); background: var(--argus-bg-card);">
-          <ArgusLogo :size="26" :show-text="true" />
+        <header
+          class="lg:hidden flex items-center justify-between px-4 h-14 border-b"
+          style="border-color: var(--argus-border); background: var(--argus-bg-card);"
+        >
+          <ArgusLogo
+            :size="26"
+            :show-text="true"
+          />
           <button
             class="flex items-center justify-center size-8 rounded-lg"
             style="color: var(--argus-text-dimmed);"
             @click="toggleTheme()"
           >
-            <UIcon :name="isDark ? 'i-lucide-moon' : 'i-lucide-sun'" class="size-5" />
+            <UIcon
+              :name="isDark ? 'i-lucide-moon' : 'i-lucide-sun'"
+              class="size-5"
+            />
           </button>
         </header>
 
@@ -462,6 +524,9 @@ onUnmounted(() => {
     </div>
 
     <!-- Performance Debugger Overlay (Ctrl+Shift+D) -->
-    <PerformanceDebugger v-if="showDebugger" @close="showDebugger = false" />
+    <PerformanceDebugger
+      v-if="showDebugger"
+      @close="showDebugger = false"
+    />
   </UApp>
 </template>

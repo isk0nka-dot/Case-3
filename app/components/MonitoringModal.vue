@@ -29,7 +29,7 @@ const {
   connected: sseConnected,
   connect: sseConnect,
   disconnect: sseDisconnect,
-  reset: sseReset,
+  reset: sseReset
 } = useSessionStream(sseSessionId)
 
 // Connect SSE when session opens and is live
@@ -56,7 +56,7 @@ watch(sseTerminated, (terminated) => {
       title: 'Сессия автоматически завершена',
       description: sseTerminateReason.value,
       icon: 'i-lucide-shield-alert',
-      color: 'error' as const,
+      color: 'error' as const
     })
   }
 })
@@ -242,7 +242,7 @@ const sidecamPolicy = computed<'mandatory' | 'optional' | 'disabled'>(() => {
   const exception = store.getStudentExceptionInfo(
     props.session.studentName,
     props.session.iin,
-    props.session.examName,
+    props.session.examName
   )
   if (exception?.profile === 'no_side_camera') return 'disabled'
 
@@ -340,9 +340,11 @@ onUnmounted(() => {
 
 const noiseLevel = computed(() => {
   if (!props.session) return 0
-  const base = props.session.violationLevel === 'critical' ? 65
-    : props.session.violationLevel === 'warning' ? 45
-    : 25
+  const base = props.session.violationLevel === 'critical'
+    ? 65
+    : props.session.violationLevel === 'warning'
+      ? 45
+      : 25
   return base + Math.floor(Math.random() * 10)
 })
 
@@ -374,7 +376,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
           :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
         >
           <!-- Modal Header -->
-          <div class="flex items-center justify-between px-6 py-4 border-b shrink-0" style="border-color: var(--argus-border);">
+          <div
+            class="flex items-center justify-between px-6 py-4 border-b shrink-0"
+            style="border-color: var(--argus-border);"
+          >
             <div class="flex items-center gap-3">
               <div
                 class="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
@@ -398,18 +403,29 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
               </div>
               <div>
                 <div class="flex items-center gap-2">
-                  <h2 class="text-lg font-bold" style="color: var(--argus-text);">{{ session.studentName }}</h2>
+                  <h2
+                    class="text-lg font-bold"
+                    style="color: var(--argus-text);"
+                  >
+                    {{ session.studentName }}
+                  </h2>
                   <!-- Exception badge in modal -->
                   <span
                     v-if="hasException(session)"
                     class="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full"
                     :style="{ background: purpleBg(0.12), color: isDark ? '#a78bfa' : '#7c3aed', border: `1px solid ${purpleBg(0.2)}` }"
                   >
-                    <UIcon name="i-lucide-shield-check" class="size-3" />
+                    <UIcon
+                      name="i-lucide-shield-check"
+                      class="size-3"
+                    />
                     {{ getExceptionLabel(session) }}
                   </span>
                 </div>
-                <p class="text-xs" style="color: var(--argus-text-dimmed);">
+                <p
+                  class="text-xs"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   ИИН: {{ session.iin }} · {{ session.phone }} · {{ session.examName }}
                 </p>
               </div>
@@ -421,7 +437,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
               @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
               @click="closeSession"
             >
-              <UIcon name="i-lucide-x" class="size-5" />
+              <UIcon
+                name="i-lucide-x"
+                class="size-5"
+              />
             </button>
           </div>
 
@@ -431,7 +450,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
               <!-- Left: Video Feeds (5 cols) -->
               <div class="lg:col-span-5 p-6 space-y-4">
                 <!-- Dual Camera Layout -->
-                <div class="flex gap-3" :class="camerasSwapped ? 'flex-row-reverse' : ''">
+                <div
+                  class="flex gap-3"
+                  :class="camerasSwapped ? 'flex-row-reverse' : ''"
+                >
                   <!-- PRIMARY FEED (Webcam) -->
                   <div
                     ref="webcamRef"
@@ -451,8 +473,15 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                         class="flex items-center gap-1.5 px-2 py-1 rounded-lg ai-badge"
                         :style="{ background: isDark ? 'rgba(11, 15, 20, 0.8)' : 'rgba(255, 255, 255, 0.9)' }"
                       >
-                        <UIcon name="i-lucide-eye" class="size-3" :style="{ color: gazeColor(session.aiStatus.gazeTracking) }" />
-                        <span class="text-[9px] font-bold" :style="{ color: gazeColor(session.aiStatus.gazeTracking) }">
+                        <UIcon
+                          name="i-lucide-eye"
+                          class="size-3"
+                          :style="{ color: gazeColor(session.aiStatus.gazeTracking) }"
+                        />
+                        <span
+                          class="text-[9px] font-bold"
+                          :style="{ color: gazeColor(session.aiStatus.gazeTracking) }"
+                        >
                           Взгляд: {{ gazeLabel(session.aiStatus.gazeTracking) }}
                         </span>
                       </div>
@@ -460,8 +489,15 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                         class="flex items-center gap-1.5 px-2 py-1 rounded-lg ai-badge"
                         :style="{ background: isDark ? 'rgba(11, 15, 20, 0.8)' : 'rgba(255, 255, 255, 0.9)' }"
                       >
-                        <UIcon name="i-lucide-scan-face" class="size-3" :style="{ color: faceColor(session.aiStatus.faceIdMatch) }" />
-                        <span class="text-[9px] font-bold" :style="{ color: faceColor(session.aiStatus.faceIdMatch) }">
+                        <UIcon
+                          name="i-lucide-scan-face"
+                          class="size-3"
+                          :style="{ color: faceColor(session.aiStatus.faceIdMatch) }"
+                        />
+                        <span
+                          class="text-[9px] font-bold"
+                          :style="{ color: faceColor(session.aiStatus.faceIdMatch) }"
+                        >
                           Лицо: {{ faceLabel(session.aiStatus.faceIdMatch) }}
                         </span>
                       </div>
@@ -469,8 +505,15 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                         class="flex items-center gap-1.5 px-2 py-1 rounded-lg ai-badge"
                         :style="{ background: isDark ? 'rgba(11, 15, 20, 0.8)' : 'rgba(255, 255, 255, 0.9)' }"
                       >
-                        <UIcon :name="objectIcon(session.aiStatus.objectDetection)" class="size-3" :style="{ color: objectColor(session.aiStatus.objectDetection) }" />
-                        <span class="text-[9px] font-bold" :style="{ color: objectColor(session.aiStatus.objectDetection) }">
+                        <UIcon
+                          :name="objectIcon(session.aiStatus.objectDetection)"
+                          class="size-3"
+                          :style="{ color: objectColor(session.aiStatus.objectDetection) }"
+                        />
+                        <span
+                          class="text-[9px] font-bold"
+                          :style="{ color: objectColor(session.aiStatus.objectDetection) }"
+                        >
                           Предметы: {{ objectLabel(session.aiStatus.objectDetection) }}
                         </span>
                       </div>
@@ -482,7 +525,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                         class="px-2.5 py-1.5 rounded-lg ai-badge"
                         :style="{ background: isDark ? 'rgba(11, 15, 20, 0.8)' : 'rgba(255, 255, 255, 0.9)' }"
                       >
-                        <span class="text-base font-bold tabular-nums" :style="{ color: integrityColor(session.integrityScore) }">
+                        <span
+                          class="text-base font-bold tabular-nums"
+                          :style="{ color: integrityColor(session.integrityScore) }"
+                        >
                           {{ session.integrityScore }}%
                         </span>
                       </div>
@@ -494,7 +540,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                         @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--argus-text-muted)'"
                         @click.stop="toggleFullscreenWebcam"
                       >
-                        <UIcon :name="isFullscreen && fullscreenTarget === 'webcam' ? 'i-lucide-minimize' : 'i-lucide-maximize'" class="size-4" />
+                        <UIcon
+                          :name="isFullscreen && fullscreenTarget === 'webcam' ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+                          class="size-4"
+                        />
                       </button>
                     </div>
                   </div>
@@ -515,9 +564,19 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                         :org-id="session.orgId"
                         :policy="sidecamPolicy"
                       />
-                      <div v-else class="flex flex-col items-center gap-2 opacity-25">
-                        <UIcon name="i-lucide-camera" class="size-8" style="color: var(--argus-text-dimmed);" />
-                        <span class="text-[9px] font-medium text-center px-2" style="color: var(--argus-text-dimmed);">{{ camerasSwapped ? 'ВЕБ-КАМЕРА' : 'БОКОВАЯ КАМЕРА' }}</span>
+                      <div
+                        v-else
+                        class="flex flex-col items-center gap-2 opacity-25"
+                      >
+                        <UIcon
+                          name="i-lucide-camera"
+                          class="size-8"
+                          style="color: var(--argus-text-dimmed);"
+                        />
+                        <span
+                          class="text-[9px] font-medium text-center px-2"
+                          style="color: var(--argus-text-dimmed);"
+                        >{{ camerasSwapped ? 'ВЕБ-КАМЕРА' : 'БОКОВАЯ КАМЕРА' }}</span>
                       </div>
                     </div>
 
@@ -530,7 +589,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                         @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--argus-text-muted)'"
                         @click.stop="toggleFullscreenSide"
                       >
-                        <UIcon :name="isFullscreen && fullscreenTarget === 'side' ? 'i-lucide-minimize' : 'i-lucide-maximize'" class="size-3.5" />
+                        <UIcon
+                          :name="isFullscreen && fullscreenTarget === 'side' ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+                          class="size-3.5"
+                        />
                       </button>
                     </div>
 
@@ -544,11 +606,21 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                           <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
                           <span class="relative inline-flex size-1 rounded-full bg-red-500" />
                         </span>
-                        <span class="text-[7px] font-bold uppercase" style="color: var(--argus-error);">LIVE</span>
+                        <span
+                          class="text-[7px] font-bold uppercase"
+                          style="color: var(--argus-error);"
+                        >LIVE</span>
                       </template>
                       <template v-else>
-                        <UIcon name="i-lucide-circle-dot" class="size-2.5" style="color: var(--argus-text-dimmed);" />
-                        <span class="text-[7px] font-bold uppercase" style="color: var(--argus-text-dimmed);">REC</span>
+                        <UIcon
+                          name="i-lucide-circle-dot"
+                          class="size-2.5"
+                          style="color: var(--argus-text-dimmed);"
+                        />
+                        <span
+                          class="text-[7px] font-bold uppercase"
+                          style="color: var(--argus-text-dimmed);"
+                        >REC</span>
                       </template>
                     </div>
                   </div>
@@ -559,10 +631,20 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                   class="rounded-xl border overflow-hidden"
                   :style="{ background: 'var(--argus-bg-elevated)', borderColor: 'var(--argus-border)' }"
                 >
-                  <div class="flex items-center justify-between px-4 py-2.5 border-b" style="border-color: var(--argus-border);">
+                  <div
+                    class="flex items-center justify-between px-4 py-2.5 border-b"
+                    style="border-color: var(--argus-border);"
+                  >
                     <div class="flex items-center gap-2">
-                      <UIcon name="i-lucide-audio-waveform" class="size-4" style="color: var(--argus-accent);" />
-                      <span class="text-xs font-semibold" style="color: var(--argus-text);">Аудио аналитика</span>
+                      <UIcon
+                        name="i-lucide-audio-waveform"
+                        class="size-4"
+                        style="color: var(--argus-accent);"
+                      />
+                      <span
+                        class="text-xs font-semibold"
+                        style="color: var(--argus-text);"
+                      >Аудио аналитика</span>
                       <span
                         class="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                         :style="{ background: successBg(0.1), color: 'var(--argus-success)' }"
@@ -573,8 +655,14 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
 
                     <div class="flex items-center gap-3">
                       <div class="flex items-center gap-1.5">
-                        <span class="text-[9px] font-medium" style="color: var(--argus-text-dimmed);">Уровень шума:</span>
-                        <span class="text-[10px] font-bold tabular-nums" :style="{ color: noiseLevelColor(noiseLevel) }">
+                        <span
+                          class="text-[9px] font-medium"
+                          style="color: var(--argus-text-dimmed);"
+                        >Уровень шума:</span>
+                        <span
+                          class="text-[10px] font-bold tabular-nums"
+                          :style="{ color: noiseLevelColor(noiseLevel) }"
+                        >
                           {{ noiseLevel }} дБ
                         </span>
                         <span
@@ -623,7 +711,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                         @mouseleave="($event.currentTarget as HTMLElement).style.background = isMuted ? 'transparent' : accentBg(0.1)"
                         @click="isMuted = !isMuted"
                       >
-                        <UIcon :name="isMuted ? 'i-lucide-volume-x' : audioVolume > 50 ? 'i-lucide-volume-2' : 'i-lucide-volume-1'" class="size-4" />
+                        <UIcon
+                          :name="isMuted ? 'i-lucide-volume-x' : audioVolume > 50 ? 'i-lucide-volume-2' : 'i-lucide-volume-1'"
+                          class="size-4"
+                        />
                       </button>
 
                       <div class="flex items-center gap-2 w-24">
@@ -639,7 +730,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                           }"
                           :disabled="isMuted"
                         >
-                        <span class="text-[9px] font-bold tabular-nums w-7 text-right" :style="{ color: isMuted ? 'var(--argus-text-dimmed)' : 'var(--argus-text-muted)' }">
+                        <span
+                          class="text-[9px] font-bold tabular-nums w-7 text-right"
+                          :style="{ color: isMuted ? 'var(--argus-text-dimmed)' : 'var(--argus-text-muted)' }"
+                        >
                           {{ isMuted ? '—' : `${audioVolume}%` }}
                         </span>
                       </div>
@@ -658,7 +752,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                       @mouseleave="($event.currentTarget as HTMLElement).style.background = warningBg(0.1)"
                       @click="handleWarn"
                     >
-                      <UIcon name="i-lucide-alert-triangle" class="size-4" />
+                      <UIcon
+                        name="i-lucide-alert-triangle"
+                        class="size-4"
+                      />
                       Предупредить
                     </button>
                     <button
@@ -669,7 +766,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                       @mouseleave="($event.currentTarget as HTMLElement).style.background = errorBg(0.1)"
                       @click="handleTerminate"
                     >
-                      <UIcon name="i-lucide-ban" class="size-4" />
+                      <UIcon
+                        name="i-lucide-ban"
+                        class="size-4"
+                      />
                       Завершить экзамен
                     </button>
 
@@ -678,7 +778,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                       class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold"
                       :style="{ background: errorBg(0.1), color: 'var(--argus-error)', border: `1px solid ${errorBg(0.25)}` }"
                     >
-                      <UIcon name="i-lucide-octagon-x" class="size-4" />
+                      <UIcon
+                        name="i-lucide-octagon-x"
+                        class="size-4"
+                      />
                       Экзамен завершён
                     </span>
                   </div>
@@ -695,19 +798,37 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                     @mouseleave="($event.currentTarget as HTMLElement).style.background = camerasSwapped ? accentBg(0.1) : 'transparent'"
                     @click="swapCameras"
                   >
-                    <UIcon name="i-lucide-arrow-left-right" class="size-3.5" />
+                    <UIcon
+                      name="i-lucide-arrow-left-right"
+                      class="size-3.5"
+                    />
                     Поменять камеры
                   </button>
                 </div>
               </div>
 
               <!-- Right: AI Event Timeline (2 cols) -->
-              <div class="lg:col-span-2 border-l flex flex-col" style="border-color: var(--argus-border);">
-                <div class="px-5 py-4 border-b shrink-0" style="border-color: var(--argus-border);">
+              <div
+                class="lg:col-span-2 border-l flex flex-col"
+                style="border-color: var(--argus-border);"
+              >
+                <div
+                  class="px-5 py-4 border-b shrink-0"
+                  style="border-color: var(--argus-border);"
+                >
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                      <UIcon name="i-lucide-activity" class="size-4" style="color: var(--argus-text-dimmed);" />
-                      <h3 class="text-sm font-semibold" style="color: var(--argus-text);">AI Хронология</h3>
+                      <UIcon
+                        name="i-lucide-activity"
+                        class="size-4"
+                        style="color: var(--argus-text-dimmed);"
+                      />
+                      <h3
+                        class="text-sm font-semibold"
+                        style="color: var(--argus-text);"
+                      >
+                        AI Хронология
+                      </h3>
                       <!-- SSE connection badge -->
                       <span
                         v-if="sseEnabled"
@@ -718,13 +839,23 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                         }"
                       >
                         <span class="relative flex size-1">
-                          <span v-if="sseConnected" class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style="background: var(--argus-success);" />
-                          <span class="relative inline-flex size-1 rounded-full" :style="{ background: sseConnected ? 'var(--argus-success)' : 'var(--argus-error)' }" />
+                          <span
+                            v-if="sseConnected"
+                            class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                            style="background: var(--argus-success);"
+                          />
+                          <span
+                            class="relative inline-flex size-1 rounded-full"
+                            :style="{ background: sseConnected ? 'var(--argus-success)' : 'var(--argus-error)' }"
+                          />
                         </span>
                         {{ sseConnected ? 'SSE' : 'OFFLINE' }}
                       </span>
                     </div>
-                    <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }">
+                    <span
+                      class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                      :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }"
+                    >
                       {{ session.events.length }} событий
                     </span>
                   </div>
@@ -735,29 +866,79 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                     class="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg"
                     :style="{ background: errorBg(0.1), border: `1px solid ${errorBg(0.2)}` }"
                   >
-                    <UIcon name="i-lucide-shield-alert" class="size-4 shrink-0" style="color: var(--argus-error);" />
+                    <UIcon
+                      name="i-lucide-shield-alert"
+                      class="size-4 shrink-0"
+                      style="color: var(--argus-error);"
+                    />
                     <div>
-                      <p class="text-[10px] font-bold" style="color: var(--argus-error);">Сессия автоматически завершена</p>
-                      <p class="text-[9px] mt-0.5" style="color: var(--argus-text-dimmed);">{{ sseTerminateReason }}</p>
+                      <p
+                        class="text-[10px] font-bold"
+                        style="color: var(--argus-error);"
+                      >
+                        Сессия автоматически завершена
+                      </p>
+                      <p
+                        class="text-[9px] mt-0.5"
+                        style="color: var(--argus-text-dimmed);"
+                      >
+                        {{ sseTerminateReason }}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 <!-- Session Info Summary -->
-                <div class="px-5 py-3 border-b grid grid-cols-3 gap-3" style="border-color: var(--argus-border);">
+                <div
+                  class="px-5 py-3 border-b grid grid-cols-3 gap-3"
+                  style="border-color: var(--argus-border);"
+                >
                   <div>
-                    <p class="text-[9px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Начало</p>
-                    <p class="text-xs font-bold mt-0.5" style="color: var(--argus-text);">{{ formatTimeShort(session.startedAt) }}</p>
+                    <p
+                      class="text-[9px] font-medium uppercase tracking-wider"
+                      style="color: var(--argus-text-dimmed);"
+                    >
+                      Начало
+                    </p>
+                    <p
+                      class="text-xs font-bold mt-0.5"
+                      style="color: var(--argus-text);"
+                    >
+                      {{ formatTimeShort(session.startedAt) }}
+                    </p>
                   </div>
                   <div>
-                    <p class="text-[9px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Нарушения</p>
-                    <p class="text-xs font-bold mt-0.5" :style="{ color: session.violationCount > 3 ? 'var(--argus-error)' : 'var(--argus-text)' }">{{ session.violationCount }}</p>
+                    <p
+                      class="text-[9px] font-medium uppercase tracking-wider"
+                      style="color: var(--argus-text-dimmed);"
+                    >
+                      Нарушения
+                    </p>
+                    <p
+                      class="text-xs font-bold mt-0.5"
+                      :style="{ color: session.violationCount > 3 ? 'var(--argus-error)' : 'var(--argus-text)' }"
+                    >
+                      {{ session.violationCount }}
+                    </p>
                   </div>
                   <div>
-                    <p class="text-[9px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Честность</p>
+                    <p
+                      class="text-[9px] font-medium uppercase tracking-wider"
+                      style="color: var(--argus-text-dimmed);"
+                    >
+                      Честность
+                    </p>
                     <div class="flex items-center gap-1.5 mt-0.5">
-                      <p class="text-xs font-bold" :style="{ color: integrityColor(session.integrityScore) }">{{ session.integrityScore }}%</p>
-                      <div class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
+                      <p
+                        class="text-xs font-bold"
+                        :style="{ color: integrityColor(session.integrityScore) }"
+                      >
+                        {{ session.integrityScore }}%
+                      </p>
+                      <div
+                        class="flex-1 h-1 rounded-full overflow-hidden"
+                        style="background: var(--argus-bg-hover);"
+                      >
                         <div
                           class="h-full rounded-full transition-all duration-500"
                           :style="{ width: `${session.integrityScore}%`, background: integrityGradientLocal(session.integrityScore) }"
@@ -765,7 +946,11 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                       </div>
                     </div>
                     <!-- SSE verdict label -->
-                    <p v-if="sseConnected && sseVerdictLabel" class="text-[8px] font-bold mt-0.5" :style="{ color: sseVerdict === 'fraud' ? 'var(--argus-error)' : sseVerdict === 'warning' ? 'var(--argus-warning)' : 'var(--argus-success)' }">
+                    <p
+                      v-if="sseConnected && sseVerdictLabel"
+                      class="text-[8px] font-bold mt-0.5"
+                      :style="{ color: sseVerdict === 'fraud' ? 'var(--argus-error)' : sseVerdict === 'warning' ? 'var(--argus-warning)' : 'var(--argus-success)' }"
+                    >
                       {{ sseVerdictLabel }}
                     </p>
                   </div>
@@ -773,7 +958,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
 
                 <!-- Timeline -->
                 <div class="flex-1 overflow-y-auto">
-                  <div v-if="session.events.length > 0" class="px-5 py-3 space-y-0">
+                  <div
+                    v-if="session.events.length > 0"
+                    class="px-5 py-3 space-y-0"
+                  >
                     <div
                       v-for="(event, idx) in session.events"
                       :key="event.id"
@@ -788,7 +976,10 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                             color: severityColor(event.severity)
                           }"
                         >
-                          <UIcon :name="eventIcon(event.type)" class="size-3.5" />
+                          <UIcon
+                            :name="eventIcon(event.type)"
+                            class="size-3.5"
+                          />
                         </div>
                         <div
                           v-if="idx < session.events.length - 1"
@@ -798,7 +989,12 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                       </div>
                       <div class="flex-1 min-w-0 pt-0.5">
                         <div class="flex items-start justify-between gap-2">
-                          <p class="text-xs font-medium" style="color: var(--argus-text);">{{ event.label }}</p>
+                          <p
+                            class="text-xs font-medium"
+                            style="color: var(--argus-text);"
+                          >
+                            {{ event.label }}
+                          </p>
                           <span
                             class="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 uppercase"
                             :style="{ background: severityBgFn(event.severity, 0.1), color: severityColor(event.severity) }"
@@ -806,22 +1002,51 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                             {{ event.severity === 'critical' ? 'КРИТ' : event.severity === 'warning' ? 'ВНИМАНИЕ' : 'ИНФО' }}
                           </span>
                         </div>
-                        <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">{{ formatTime(event.timestamp) }}</p>
+                        <p
+                          class="text-[10px] mt-0.5"
+                          style="color: var(--argus-text-dimmed);"
+                        >
+                          {{ formatTime(event.timestamp) }}
+                        </p>
                         <div
                           v-if="event.type === 'audio_anomaly' || event.type === 'background_voices' || event.type === 'whispering'"
                           class="flex items-center gap-1 mt-1"
                         >
-                          <UIcon name="i-lucide-audio-waveform" class="size-2.5" style="color: var(--argus-accent);" />
-                          <span class="text-[8px] font-medium" style="color: var(--argus-accent);">Аудио событие</span>
+                          <UIcon
+                            name="i-lucide-audio-waveform"
+                            class="size-2.5"
+                            style="color: var(--argus-accent);"
+                          />
+                          <span
+                            class="text-[8px] font-medium"
+                            style="color: var(--argus-accent);"
+                          >Аудио событие</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div v-else class="flex flex-col items-center justify-center py-12 px-4">
-                    <UIcon name="i-lucide-check-circle" class="size-10 mb-3" style="color: var(--argus-success);" />
-                    <p class="text-sm font-medium" style="color: var(--argus-text);">Нет AI-событий</p>
-                    <p class="text-xs mt-1 text-center" style="color: var(--argus-text-dimmed);">Сессия проходит без нарушений</p>
+                  <div
+                    v-else
+                    class="flex flex-col items-center justify-center py-12 px-4"
+                  >
+                    <UIcon
+                      name="i-lucide-check-circle"
+                      class="size-10 mb-3"
+                      style="color: var(--argus-success);"
+                    />
+                    <p
+                      class="text-sm font-medium"
+                      style="color: var(--argus-text);"
+                    >
+                      Нет AI-событий
+                    </p>
+                    <p
+                      class="text-xs mt-1 text-center"
+                      style="color: var(--argus-text-dimmed);"
+                    >
+                      Сессия проходит без нарушений
+                    </p>
                   </div>
                 </div>
               </div>
@@ -852,17 +1077,33 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                 class="flex items-center justify-center size-10 rounded-full"
                 :style="{ background: errorBg(0.1) }"
               >
-                <UIcon name="i-lucide-octagon-x" class="size-5" style="color: var(--argus-error);" />
+                <UIcon
+                  name="i-lucide-octagon-x"
+                  class="size-5"
+                  style="color: var(--argus-error);"
+                />
               </div>
               <div>
-                <h3 class="text-base font-bold" style="color: var(--argus-text);">Завершить экзамен?</h3>
-                <p v-if="session" class="text-xs mt-0.5" style="color: var(--argus-text-dimmed);">
+                <h3
+                  class="text-base font-bold"
+                  style="color: var(--argus-text);"
+                >
+                  Завершить экзамен?
+                </h3>
+                <p
+                  v-if="session"
+                  class="text-xs mt-0.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Студент: {{ session.studentName }}
                 </p>
               </div>
             </div>
 
-            <p class="text-sm leading-relaxed" style="color: var(--argus-text-muted);">
+            <p
+              class="text-sm leading-relaxed"
+              style="color: var(--argus-text-muted);"
+            >
               Вы уверены, что хотите принудительно завершить экзамен для этого студента? Это действие нельзя отменить.
             </p>
           </div>
@@ -914,11 +1155,21 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
             class="flex items-center gap-2 px-6 py-3"
             :style="{ background: warningBg(0.15) }"
           >
-            <UIcon name="i-lucide-alert-triangle" class="size-5" style="color: var(--argus-warning);" />
-            <span class="text-sm font-bold uppercase tracking-wider" style="color: var(--argus-warning);">
+            <UIcon
+              name="i-lucide-alert-triangle"
+              class="size-5"
+              style="color: var(--argus-warning);"
+            />
+            <span
+              class="text-sm font-bold uppercase tracking-wider"
+              style="color: var(--argus-warning);"
+            >
               Предупреждение проктора
             </span>
-            <span class="text-[9px] font-medium ml-auto px-2 py-0.5 rounded-full" :style="{ background: warningBg(0.15), color: 'var(--argus-warning)' }">
+            <span
+              class="text-[9px] font-medium ml-auto px-2 py-0.5 rounded-full"
+              :style="{ background: warningBg(0.15), color: 'var(--argus-warning)' }"
+            >
               Вид студента
             </span>
           </div>
@@ -929,13 +1180,23 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                 class="flex items-center justify-center size-14 rounded-xl shrink-0"
                 :style="{ background: warningBg(0.1) }"
               >
-                <UIcon name="i-lucide-shield-alert" class="size-7" style="color: var(--argus-warning);" />
+                <UIcon
+                  name="i-lucide-shield-alert"
+                  class="size-7"
+                  style="color: var(--argus-warning);"
+                />
               </div>
               <div class="flex-1">
-                <h3 class="text-lg font-bold" style="color: var(--argus-text);">
+                <h3
+                  class="text-lg font-bold"
+                  style="color: var(--argus-text);"
+                >
                   ВНИМАНИЕ!
                 </h3>
-                <p class="text-sm mt-2 leading-relaxed" style="color: var(--argus-text-muted);">
+                <p
+                  class="text-sm mt-2 leading-relaxed"
+                  style="color: var(--argus-text-muted);"
+                >
                   Зафиксировано нарушение: <strong :style="{ color: 'var(--argus-warning)' }">{{ warningViolationType }}</strong>.
                   Пожалуйста, вернитесь к правилам экзамена.
                 </p>

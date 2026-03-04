@@ -96,8 +96,15 @@ watch(() => props.sessionId, () => {
   <div class="space-y-3">
     <!-- Header -->
     <div class="flex items-center gap-2">
-      <UIcon name="i-lucide-clipboard-check" class="size-4" style="color: var(--argus-accent);" />
-      <span class="text-xs font-semibold" style="color: var(--argus-text);">Рецензия проктора</span>
+      <UIcon
+        name="i-lucide-clipboard-check"
+        class="size-4"
+        style="color: var(--argus-accent);"
+      />
+      <span
+        class="text-xs font-semibold"
+        style="color: var(--argus-text);"
+      >Рецензия проктора</span>
       <span
         class="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
         :style="{
@@ -112,8 +119,14 @@ watch(() => props.sessionId, () => {
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex items-center justify-center py-4">
-      <div class="animate-spin rounded-full size-5 border-2 border-t-transparent" style="border-color: var(--argus-accent); border-top-color: transparent;" />
+    <div
+      v-if="loading"
+      class="flex items-center justify-center py-4"
+    >
+      <div
+        class="animate-spin rounded-full size-5 border-2 border-t-transparent"
+        style="border-color: var(--argus-accent); border-top-color: transparent;"
+      />
     </div>
 
     <!-- Existing Review Display -->
@@ -128,26 +141,52 @@ watch(() => props.sessionId, () => {
           class="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase"
           :style="{ background: reviewDecisionBg(existingReview.decision), color: reviewDecisionColor(existingReview.decision) }"
         >
-          <UIcon :name="reviewDecisionIcon(existingReview.decision)" class="size-3" />
+          <UIcon
+            :name="reviewDecisionIcon(existingReview.decision)"
+            class="size-3"
+          />
           {{ reviewDecisionLabel(existingReview.decision) }}
         </span>
-        <span class="text-[9px]" style="color: var(--argus-text-dimmed);">
+        <span
+          class="text-[9px]"
+          style="color: var(--argus-text-dimmed);"
+        >
           {{ formatDateTime(existingReview.reviewedAt) }}
         </span>
       </div>
 
       <!-- Reviewer info -->
       <div class="flex items-center gap-2">
-        <UIcon name="i-lucide-user" class="size-3" style="color: var(--argus-text-dimmed);" />
-        <span class="text-[10px] font-medium" style="color: var(--argus-text-muted);">
+        <UIcon
+          name="i-lucide-user"
+          class="size-3"
+          style="color: var(--argus-text-dimmed);"
+        />
+        <span
+          class="text-[10px] font-medium"
+          style="color: var(--argus-text-muted);"
+        >
           {{ existingReview.reviewerName }}
         </span>
       </div>
 
       <!-- Notes -->
-      <div v-if="existingReview.notes" class="mt-1">
-        <p class="text-[10px]" style="color: var(--argus-text-dimmed);">Комментарий:</p>
-        <p class="text-[10px] mt-0.5" style="color: var(--argus-text);">{{ existingReview.notes }}</p>
+      <div
+        v-if="existingReview.notes"
+        class="mt-1"
+      >
+        <p
+          class="text-[10px]"
+          style="color: var(--argus-text-dimmed);"
+        >
+          Комментарий:
+        </p>
+        <p
+          class="text-[10px] mt-0.5"
+          style="color: var(--argus-text);"
+        >
+          {{ existingReview.notes }}
+        </p>
       </div>
 
       <!-- Override button -->
@@ -161,10 +200,16 @@ watch(() => props.sessionId, () => {
     </div>
 
     <!-- Review Form (when pending) -->
-    <div v-else class="space-y-3">
+    <div
+      v-else
+      class="space-y-3"
+    >
       <!-- Notes textarea -->
       <div>
-        <label class="text-[9px] font-medium block mb-1" style="color: var(--argus-text-dimmed);">
+        <label
+          class="text-[9px] font-medium block mb-1"
+          style="color: var(--argus-text-dimmed);"
+        >
           Комментарий проктора
         </label>
         <textarea
@@ -195,7 +240,10 @@ watch(() => props.sessionId, () => {
           :disabled="submitting"
           @click="submitDecision('confirmed')"
         >
-          <UIcon name="i-lucide-alert-triangle" class="size-3" />
+          <UIcon
+            name="i-lucide-alert-triangle"
+            class="size-3"
+          />
           Подтвердить
         </button>
 
@@ -210,7 +258,10 @@ watch(() => props.sessionId, () => {
           :disabled="submitting"
           @click="submitDecision('dismissed')"
         >
-          <UIcon name="i-lucide-check-circle" class="size-3" />
+          <UIcon
+            name="i-lucide-check-circle"
+            class="size-3"
+          />
           Отклонить
         </button>
 
@@ -225,15 +276,27 @@ watch(() => props.sessionId, () => {
           :disabled="submitting"
           @click="submitDecision('escalated')"
         >
-          <UIcon name="i-lucide-arrow-up-circle" class="size-3" />
+          <UIcon
+            name="i-lucide-arrow-up-circle"
+            class="size-3"
+          />
           Эскалировать
         </button>
       </div>
 
       <!-- Submitting indicator -->
-      <div v-if="submitting" class="flex items-center justify-center gap-2 py-2">
-        <div class="animate-spin rounded-full size-4 border-2 border-t-transparent" style="border-color: var(--argus-accent); border-top-color: transparent;" />
-        <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Сохранение решения...</span>
+      <div
+        v-if="submitting"
+        class="flex items-center justify-center gap-2 py-2"
+      >
+        <div
+          class="animate-spin rounded-full size-4 border-2 border-t-transparent"
+          style="border-color: var(--argus-accent); border-top-color: transparent;"
+        />
+        <span
+          class="text-[10px]"
+          style="color: var(--argus-text-dimmed);"
+        >Сохранение решения...</span>
       </div>
 
       <!-- Error -->
@@ -242,7 +305,10 @@ watch(() => props.sessionId, () => {
         class="flex items-center gap-2 px-3 py-2 rounded-lg text-[10px]"
         :style="{ background: isDark ? 'rgba(248, 113, 113, 0.1)' : 'rgba(224, 62, 62, 0.08)', color: 'var(--argus-error)' }"
       >
-        <UIcon name="i-lucide-alert-circle" class="size-3 shrink-0" />
+        <UIcon
+          name="i-lucide-alert-circle"
+          class="size-3 shrink-0"
+        />
         {{ error }}
       </div>
 
@@ -252,7 +318,10 @@ watch(() => props.sessionId, () => {
         class="flex items-center gap-2 px-3 py-2 rounded-lg text-[10px]"
         :style="{ background: isDark ? 'rgba(52, 211, 153, 0.1)' : 'rgba(16, 163, 74, 0.08)', color: 'var(--argus-success)' }"
       >
-        <UIcon name="i-lucide-check-circle" class="size-3 shrink-0" />
+        <UIcon
+          name="i-lucide-check-circle"
+          class="size-3 shrink-0"
+        />
         {{ success }}
       </div>
     </div>

@@ -33,9 +33,9 @@ export interface FaceBBox {
 }
 
 export interface HeadPose {
-  yaw: number   // degrees
+  yaw: number // degrees
   pitch: number // degrees
-  roll: number  // degrees
+  roll: number // degrees
 }
 
 export interface GazeVector {
@@ -46,7 +46,7 @@ export interface GazeVector {
 }
 
 export interface BlinkState {
-  leftEAR: number  // Eye Aspect Ratio (0=closed, ~0.3=open)
+  leftEAR: number // Eye Aspect Ratio (0=closed, ~0.3=open)
   rightEAR: number
   isBlinking: boolean
   blinkCount: number
@@ -68,16 +68,16 @@ export interface VisionFrame {
 
 export interface VisionEngineConfig {
   videoElement: Ref<HTMLVideoElement | null>
-  maxFaces?: number          // default 1
-  inferenceHz?: number       // default 10 (Tier A)
+  maxFaces?: number // default 1
+  inferenceHz?: number // default 10 (Tier A)
   headPoseThresholds?: {
-    yaw: number              // degrees, default 25
-    pitch: number            // degrees, default 20
-    roll: number             // degrees, default 15
+    yaw: number // degrees, default 25
+    pitch: number // degrees, default 20
+    roll: number // degrees, default 15
   }
-  gazeThresholdDeg?: number  // default 15
+  gazeThresholdDeg?: number // default 15
   blinkEARThreshold?: number // default 0.21
-  livenessWindow?: number    // frames for liveness check, default 30
+  livenessWindow?: number // frames for liveness check, default 30
 
   // Callbacks for health governor integration
   /** Called after each inference with the latency in ms. */
@@ -113,12 +113,12 @@ export interface VisionStats {
 // chin, left/right eye corners, left/right mouth corners).
 // Coordinates in a normalized model space matching MediaPipe landmark indices.
 const MODEL_POINTS_3D = [
-  [0.0, 0.0, 0.0],       // Nose tip (landmark 1)
-  [0.0, -63.6, -12.5],   // Chin (landmark 152)
-  [-43.3, 32.7, -26.0],  // Left eye outer corner (landmark 263)
-  [43.3, 32.7, -26.0],   // Right eye outer corner (landmark 33)
+  [0.0, 0.0, 0.0], // Nose tip (landmark 1)
+  [0.0, -63.6, -12.5], // Chin (landmark 152)
+  [-43.3, 32.7, -26.0], // Left eye outer corner (landmark 263)
+  [43.3, 32.7, -26.0], // Right eye outer corner (landmark 33)
   [-28.9, -28.9, -24.1], // Left mouth corner (landmark 287)
-  [28.9, -28.9, -24.1]   // Right mouth corner (landmark 57)
+  [28.9, -28.9, -24.1] // Right mouth corner (landmark 57)
 ] as const
 
 // MediaPipe landmark indices for the 6-point PnP solve
@@ -126,8 +126,8 @@ const PNP_LANDMARK_IDS = [1, 152, 263, 33, 287, 57] as const
 
 // Eye landmarks for EAR (Eye Aspect Ratio) blink detection
 // Using the 6-point eye model from MediaPipe Face Mesh
-const LEFT_EYE_IDS = [362, 385, 387, 263, 373, 380] as const   // p1-p6
-const RIGHT_EYE_IDS = [33, 160, 158, 133, 153, 144] as const   // p1-p6
+const LEFT_EYE_IDS = [362, 385, 387, 263, 373, 380] as const // p1-p6
+const RIGHT_EYE_IDS = [33, 160, 158, 133, 153, 144] as const // p1-p6
 
 // Iris landmarks for gaze estimation (MediaPipe iris model)
 const LEFT_IRIS_CENTER = 468 as const
@@ -144,7 +144,7 @@ function eyeAspectRatio(landmarks: Float32Array, eyeIds: readonly number[]): num
     y: landmarks[idx * 3 + 1]!
   })
 
-  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+  const dist = (a: { x: number, y: number }, b: { x: number, y: number }) =>
     Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
 
   const p1 = p(eyeIds[0]!)
@@ -248,7 +248,7 @@ function estimateGaze(
 
   // Convert to angle (0.5 = center, deviation maps to degrees)
   const deviationX = (gazeX - 0.5) * 2 // -1 to +1
-  const deviationY = (gazeY - 0.3) * 2  // adjusted for typical eye position
+  const deviationY = (gazeY - 0.3) * 2 // adjusted for typical eye position
   const angle = Math.sqrt(deviationX ** 2 + deviationY ** 2) * 45 // approx degrees
 
   let direction: GazeVector['direction'] = 'center'
@@ -404,7 +404,7 @@ export function useVisionEngine(config: VisionEngineConfig) {
         minFaceDetectionConfidence: 0.5,
         minFacePresenceConfidence: 0.5,
         minTrackingConfidence: 0.5,
-        outputFaceBlendshapes: true,  // for blink detection
+        outputFaceBlendshapes: true, // for blink detection
         outputFacialTransformationMatrixes: false
       })
 
@@ -520,9 +520,9 @@ export function useVisionEngine(config: VisionEngineConfig) {
 
       // Head pose anomaly tracking
       if (
-        Math.abs(headPose.yaw) > headPoseThresholds.yaw ||
-        Math.abs(headPose.pitch) > headPoseThresholds.pitch ||
-        Math.abs(headPose.roll) > headPoseThresholds.roll
+        Math.abs(headPose.yaw) > headPoseThresholds.yaw
+        || Math.abs(headPose.pitch) > headPoseThresholds.pitch
+        || Math.abs(headPose.roll) > headPoseThresholds.roll
       ) {
         _stats.value.totalHeadPoseAnomalies++
       }

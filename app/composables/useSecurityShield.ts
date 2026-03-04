@@ -55,7 +55,7 @@ export interface SecurityShieldConfig {
     payload?: EventPayload,
     label?: string,
     confidence?: number,
-    source?: EventSource,
+    source?: EventSource
   ) => void
 
   /** Optional challenge configuration overrides. */
@@ -93,7 +93,7 @@ export function useSecurityShield(config: SecurityShieldConfig) {
   const virtualCam = useVirtualCameraDetector()
   const watermark = useStreamWatermark({
     sessionId,
-    ...watermarkConfig,
+    ...watermarkConfig
   })
   const fingerprint = useDeviceFingerprint()
   const antiSpoof = useAntiSpoofing()
@@ -156,12 +156,12 @@ export function useSecurityShield(config: SecurityShieldConfig) {
               hardwareIdHash: fingerprint.fingerprint.value?.deviceId,
               mismatchComponent: `baseline_sim=${similarity.toFixed(3)}`,
               monitorCount: 1,
-              virtualMonitor: false,
+              virtualMonitor: false
             }
           },
           `Устройство изменилось: сходство ${(similarity * 100).toFixed(0)}%`,
           1 - similarity,
-          EventSource.BROWSER,
+          EventSource.BROWSER
         )
       }
     }
@@ -246,9 +246,9 @@ export function useSecurityShield(config: SecurityShieldConfig) {
 
   const status: ComputedRef<ShieldStatus> = computed(() => {
     const bi = browser.state.value
-    const biIssues = (bi.tabSwitchCount > 3 ? 1 : 0) +
-      (bi.devToolsOpen ? 1 : 0) +
-      (bi.isSecondScreenDetected ? 1 : 0)
+    const biIssues = (bi.tabSwitchCount > 3 ? 1 : 0)
+      + (bi.devToolsOpen ? 1 : 0)
+      + (bi.isSecondScreenDetected ? 1 : 0)
 
     const spoof = antiSpoof.currentAnalysis.value
     const vc = virtualCam.report.value
@@ -258,26 +258,37 @@ export function useSecurityShield(config: SecurityShieldConfig) {
 
       browserIntegrity: biIssues >= 2 ? 'critical' : biIssues >= 1 ? 'warning' : 'ok',
 
-      antiSpoofing: !spoof ? 'inactive'
-        : spoof.isSpoof ? 'critical'
-        : spoof.confidence > 0.3 ? 'warning'
-        : 'ok',
+      antiSpoofing: !spoof
+        ? 'inactive'
+        : spoof.isSpoof
+          ? 'critical'
+          : spoof.confidence > 0.3
+            ? 'warning'
+            : 'ok',
 
-      virtualCamera: virtualCam.isChecking.value ? 'checking'
-        : !vc ? 'inactive'
-        : vc.isVirtual ? 'critical'
-        : 'ok',
+      virtualCamera: virtualCam.isChecking.value
+        ? 'checking'
+        : !vc
+            ? 'inactive'
+            : vc.isVirtual
+              ? 'critical'
+              : 'ok',
 
-      deviceFingerprint: fingerprint.isCapturing.value ? 'capturing'
-        : fingerprint.fingerprint.value?.isVirtualMachine ? 'critical'
-        : 'ok',
+      deviceFingerprint: fingerprint.isCapturing.value
+        ? 'capturing'
+        : fingerprint.fingerprint.value?.isVirtualMachine
+          ? 'critical'
+          : 'ok',
 
-      liveness: liveness.currentChallenge.value?.status === 'active' ? 'challenging'
-        : liveness.passRate.value < 0.5 ? 'critical'
-        : liveness.passRate.value < 0.8 ? 'warning'
-        : 'ok',
+      liveness: liveness.currentChallenge.value?.status === 'active'
+        ? 'challenging'
+        : liveness.passRate.value < 0.5
+          ? 'critical'
+          : liveness.passRate.value < 0.8
+            ? 'warning'
+            : 'ok',
 
-      watermark: watermark.state.value.isActive ? 'active' : 'inactive',
+      watermark: watermark.state.value.isActive ? 'active' : 'inactive'
     }
   })
 
@@ -309,6 +320,6 @@ export function useSecurityShield(config: SecurityShieldConfig) {
     livenessPassRate: liveness.passRate,
     watermarkActive: computed(() => watermark.state.value.isActive),
     challengeHistory: liveness.challengeHistory,
-    consecutiveFailures: liveness.consecutiveFailures,
+    consecutiveFailures: liveness.consecutiveFailures
   }
 }

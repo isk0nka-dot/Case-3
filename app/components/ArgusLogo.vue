@@ -19,15 +19,22 @@ const isDark = computed(() => colorMode.value === 'dark')
 </script>
 
 <template>
-  <div class="inline-flex items-center gap-2 shrink-0 argus-logo-wrapper" :class="{ 'argus-logo-animated': props.animated }" :data-size="props.size <= 40 ? 'sm' : undefined">
-    <div class="relative shrink-0" :style="{ width: `${props.size}px`, height: `${props.size}px` }">
+  <div
+    class="inline-flex items-center gap-2 shrink-0 argus-logo-wrapper"
+    :class="{ 'argus-logo-animated': props.animated }"
+    :data-size="props.size <= 40 ? 'sm' : undefined"
+  >
+    <div
+      class="relative shrink-0"
+      :style="{ width: `${props.size}px`, height: `${props.size}px` }"
+    >
       <!-- Animated glow ring behind the logo (only when animated) -->
       <div
         v-if="props.animated"
         class="absolute inset-0 glow-ring"
         :style="{
           borderRadius: '50%',
-          background: 'transparent',
+          background: 'transparent'
         }"
       />
 
@@ -42,28 +49,82 @@ const isDark = computed(() => colorMode.value === 'dark')
       >
         <defs>
           <!-- Filters for animated glow per segment -->
-          <filter id="glow-blue" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+          <filter
+            id="glow-blue"
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+          >
+            <feGaussianBlur
+              stdDeviation="4"
+              result="blur"
+            />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
-          <filter id="glow-pink" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+          <filter
+            id="glow-pink"
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+          >
+            <feGaussianBlur
+              stdDeviation="4"
+              result="blur"
+            />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
-          <filter id="glow-green" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+          <filter
+            id="glow-green"
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+          >
+            <feGaussianBlur
+              stdDeviation="4"
+              result="blur"
+            />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
-          <filter id="glow-orange" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+          <filter
+            id="glow-orange"
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+          >
+            <feGaussianBlur
+              stdDeviation="4"
+              result="blur"
+            />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
-          <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+          <filter
+            id="glow-red"
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+          >
+            <feGaussianBlur
+              stdDeviation="4"
+              result="blur"
+            />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
-          <filter id="glow-purple" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+          <filter
+            id="glow-purple"
+            x="-50%"
+            y="-50%"
+            width="200%"
+            height="200%"
+          >
+            <feGaussianBlur
+              stdDeviation="4"
+              result="blur"
+            />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
         </defs>

@@ -33,7 +33,7 @@ interface CheckResult {
   label: string
   detail: string
   icon: string
-  errorInfo?: { title: string; instructions: string[] }
+  errorInfo?: { title: string, instructions: string[] }
 }
 
 interface NetworkProbeResult {
@@ -101,10 +101,10 @@ const networkCheck = ref<CheckResult>({
 const checks = computed(() => [mediaCheck.value, faceCheck.value, storageCheck.value, networkCheck.value])
 
 const allPassed = computed(() =>
-  mediaCheck.value.status === 'passed' &&
-  faceCheck.value.status === 'passed' &&
-  storageCheck.value.status === 'passed' &&
-  (networkCheck.value.status === 'passed' || networkCheck.value.status === 'warning')
+  mediaCheck.value.status === 'passed'
+  && faceCheck.value.status === 'passed'
+  && storageCheck.value.status === 'passed'
+  && (networkCheck.value.status === 'passed' || networkCheck.value.status === 'warning')
 )
 
 const canStartExam = computed(() => allPassed.value && phase.value === 'ready')
@@ -283,8 +283,8 @@ watch(() => visionEngine.currentFrame.value, (frame: VisionFrame | null) => {
   const qualityOk = frame.frameQuality >= 0.7
   const bbox = frame.faceBBox
   const centered = bbox
-    ? Math.abs((bbox.x + bbox.w / 2) - 0.5) < 0.2 &&
-      Math.abs((bbox.y + bbox.h / 2) - 0.5) < 0.2
+    ? Math.abs((bbox.x + bbox.w / 2) - 0.5) < 0.2
+    && Math.abs((bbox.y + bbox.h / 2) - 0.5) < 0.2
     : false
 
   if (singleFace && qualityOk && centered) {
@@ -641,7 +641,6 @@ onUnmounted(() => {
 
           <!-- ========== CONTENT: 2-column ========== -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-0">
-
             <!-- LEFT: Check List -->
             <div
               class="p-5 space-y-2.5 md:border-r"
@@ -699,19 +698,31 @@ onUnmounted(() => {
 
             <!-- RIGHT: Live Preview / Context -->
             <div class="p-5 flex flex-col items-center justify-center min-h-[300px]">
-
               <!-- Phase: media — permission prompt -->
-              <div v-if="phase === 'media' && mediaCheck.status !== 'failed'" class="text-center">
+              <div
+                v-if="phase === 'media' && mediaCheck.status !== 'failed'"
+                class="text-center"
+              >
                 <div
                   class="size-20 mx-auto rounded-2xl flex items-center justify-center mb-4"
                   style="background: rgba(56, 189, 248, 0.08)"
                 >
-                  <UIcon name="i-lucide-video" class="size-10" style="color: var(--argus-accent)" />
+                  <UIcon
+                    name="i-lucide-video"
+                    class="size-10"
+                    style="color: var(--argus-accent)"
+                  />
                 </div>
-                <p class="text-sm" style="color: var(--argus-text-muted, #94A3B8)">
+                <p
+                  class="text-sm"
+                  style="color: var(--argus-text-muted, #94A3B8)"
+                >
                   Разрешите доступ к камере и микрофону
                 </p>
-                <p class="text-xs mt-2" style="color: var(--argus-text-dimmed)">
+                <p
+                  class="text-xs mt-2"
+                  style="color: var(--argus-text-dimmed)"
+                >
                   Браузер запросит разрешение
                 </p>
               </div>
@@ -738,17 +749,31 @@ onUnmounted(() => {
                 >
                   <defs>
                     <mask id="face-oval-mask">
-                      <rect width="400" height="300" fill="white" />
-                      <ellipse cx="200" cy="140" rx="80" ry="105" fill="black" />
+                      <rect
+                        width="400"
+                        height="300"
+                        fill="white"
+                      />
+                      <ellipse
+                        cx="200"
+                        cy="140"
+                        rx="80"
+                        ry="105"
+                        fill="black"
+                      />
                     </mask>
                   </defs>
                   <rect
-                    width="400" height="300"
+                    width="400"
+                    height="300"
                     fill="rgba(0,0,0,0.45)"
                     mask="url(#face-oval-mask)"
                   />
                   <ellipse
-                    cx="200" cy="140" rx="80" ry="105"
+                    cx="200"
+                    cy="140"
+                    rx="80"
+                    ry="105"
                     fill="none"
                     :stroke="faceOvalColor"
                     stroke-width="2.5"
@@ -786,14 +811,20 @@ onUnmounted(() => {
                     :style="{ borderColor: 'var(--argus-success)' }"
                     alt="Reference face"
                   >
-                  <span class="text-[10px] font-bold" style="color: var(--argus-success)">
+                  <span
+                    class="text-[10px] font-bold"
+                    style="color: var(--argus-success)"
+                  >
                     Сохранено
                   </span>
                 </div>
               </div>
 
               <!-- Phase: storage -->
-              <div v-else-if="phase === 'storage'" class="text-center w-full px-4">
+              <div
+                v-else-if="phase === 'storage'"
+                class="text-center w-full px-4"
+              >
                 <div
                   class="size-16 mx-auto rounded-2xl flex items-center justify-center mb-3"
                   style="background: rgba(56, 189, 248, 0.08)"
@@ -805,13 +836,19 @@ onUnmounted(() => {
                     style="color: var(--argus-accent)"
                   />
                 </div>
-                <p class="text-sm" style="color: var(--argus-text-muted)">
+                <p
+                  class="text-sm"
+                  style="color: var(--argus-text-muted)"
+                >
                   Проверка доступного хранилища
                 </p>
               </div>
 
               <!-- Phase: network -->
-              <div v-else-if="phase === 'network'" class="text-center">
+              <div
+                v-else-if="phase === 'network'"
+                class="text-center"
+              >
                 <div class="flex items-center justify-center gap-3 mb-4">
                   <div
                     v-for="i in 3"
@@ -825,14 +862,23 @@ onUnmounted(() => {
                     }"
                   />
                 </div>
-                <p class="text-sm" style="color: var(--argus-text-muted)">
+                <p
+                  class="text-sm"
+                  style="color: var(--argus-text-muted)"
+                >
                   Измерение задержки сети
                 </p>
               </div>
 
               <!-- Phase: ready — summary -->
-              <div v-else-if="phase === 'ready'" class="text-center">
-                <div v-if="faceCapture" class="mb-4">
+              <div
+                v-else-if="phase === 'ready'"
+                class="text-center"
+              >
+                <div
+                  v-if="faceCapture"
+                  class="mb-4"
+                >
                   <img
                     :src="faceCapture.dataUrl"
                     class="size-20 rounded-2xl mx-auto border-2"
@@ -840,14 +886,19 @@ onUnmounted(() => {
                     alt="Reference face"
                   >
                 </div>
-                <p class="text-sm font-semibold" style="color: var(--argus-success)">
+                <p
+                  class="text-sm font-semibold"
+                  style="color: var(--argus-success)"
+                >
                   Все проверки пройдены
                 </p>
-                <p class="text-xs mt-1" style="color: var(--argus-text-dimmed)">
+                <p
+                  class="text-xs mt-1"
+                  style="color: var(--argus-text-dimmed)"
+                >
                   Нажмите «Начать экзамен» для продолжения
                 </p>
               </div>
-
             </div>
           </div>
 
@@ -867,14 +918,20 @@ onUnmounted(() => {
                 style="color: var(--argus-error, #F87171)"
               />
               <div class="flex-1">
-                <p class="text-sm font-bold" style="color: var(--argus-error, #F87171)">
+                <p
+                  class="text-sm font-bold"
+                  style="color: var(--argus-error, #F87171)"
+                >
                   {{ currentError.title }}
                 </p>
                 <ol
                   class="list-decimal list-inside mt-2 space-y-1 text-xs"
                   style="color: var(--argus-text-muted, #94A3B8)"
                 >
-                  <li v-for="(instruction, idx) in currentError.instructions" :key="idx">
+                  <li
+                    v-for="(instruction, idx) in currentError.instructions"
+                    :key="idx"
+                  >
                     {{ instruction }}
                   </li>
                 </ol>
@@ -882,7 +939,10 @@ onUnmounted(() => {
                   class="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white scanner-btn"
                   @click="retryFailedCheck"
                 >
-                  <UIcon name="i-lucide-refresh-cw" class="size-3.5" />
+                  <UIcon
+                    name="i-lucide-refresh-cw"
+                    class="size-3.5"
+                  />
                   Повторить проверку
                 </button>
               </div>
@@ -907,7 +967,10 @@ onUnmounted(() => {
               }"
               @click="handleStartExam"
             >
-              <UIcon name="i-lucide-play" class="size-4" />
+              <UIcon
+                name="i-lucide-play"
+                class="size-4"
+              />
               Начать экзамен
             </button>
           </div>

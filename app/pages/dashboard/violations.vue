@@ -86,7 +86,7 @@ function criticalRateColor(rate: number): string {
 const peakHour = computed(() => {
   let max = 0
   let peakTime = '—'
-  store.hourlyViolations.forEach(h => {
+  store.hourlyViolations.forEach((h) => {
     const total = h.phone + h.gaze + h.persons + h.tabs + h.audio
     if (total > max) {
       max = total
@@ -149,10 +149,16 @@ const dateRangeLabel = computed(() => {
     <!-- ============================== -->
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold" style="color: var(--argus-text);">
+        <h1
+          class="text-2xl font-bold"
+          style="color: var(--argus-text);"
+        >
           Аналитика нарушений
         </h1>
-        <p class="text-sm mt-1" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-sm mt-1"
+          style="color: var(--argus-text-dimmed);"
+        >
           Глубокий анализ трендов AI-детекции, категорий нарушений и эффективности прокторов
         </p>
       </div>
@@ -169,7 +175,10 @@ const dateRangeLabel = computed(() => {
         />
 
         <!-- Date Range Picker -->
-        <div class="flex items-center rounded-lg overflow-hidden border" style="border-color: var(--argus-border);">
+        <div
+          class="flex items-center rounded-lg overflow-hidden border"
+          style="border-color: var(--argus-border);"
+        >
           <button
             v-for="opt in dateRangeOptions"
             :key="opt.value"
@@ -197,7 +206,11 @@ const dateRangeLabel = computed(() => {
           @mouseenter="($event.currentTarget as HTMLElement).style.background = accentBg(0.2)"
           @mouseleave="($event.currentTarget as HTMLElement).style.background = accentBg(0.1)"
         >
-          <UIcon :name="exportLoading ? 'i-lucide-loader-2' : 'i-lucide-download'" class="size-4" :class="{ 'animate-spin': exportLoading }" />
+          <UIcon
+            :name="exportLoading ? 'i-lucide-loader-2' : 'i-lucide-download'"
+            class="size-4"
+            :class="{ 'animate-spin': exportLoading }"
+          />
           {{ exportLoading ? 'Формирование...' : 'Скачать отчёт' }}
         </button>
       </div>
@@ -208,61 +221,106 @@ const dateRangeLabel = computed(() => {
     <!-- ============================== -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
       <div class="glass-card rounded-xl p-5">
-        <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-[11px] font-medium uppercase tracking-wider"
+          style="color: var(--argus-text-dimmed);"
+        >
           Всего нарушений
         </p>
-        <p class="text-3xl font-bold mt-2 tabular-nums" style="color: var(--argus-text);">
+        <p
+          class="text-3xl font-bold mt-2 tabular-nums"
+          style="color: var(--argus-text);"
+        >
           {{ (store.totalViolationsToday * dateMultiplier).toLocaleString() }}
         </p>
-        <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-xs mt-1.5"
+          style="color: var(--argus-text-dimmed);"
+        >
           {{ dateRangeLabel }} · {{ store.violationCategories.length }} категорий
         </p>
       </div>
 
       <div class="glass-card glow-error rounded-xl p-5">
-        <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-[11px] font-medium uppercase tracking-wider"
+          style="color: var(--argus-text-dimmed);"
+        >
           Критические
         </p>
-        <p class="text-3xl font-bold mt-2 tabular-nums" style="color: var(--argus-error);">
+        <p
+          class="text-3xl font-bold mt-2 tabular-nums"
+          style="color: var(--argus-error);"
+        >
           {{ (store.violationCategories.filter(c => c.severity === 'critical').reduce((s, c) => s + c.count, 0) * dateMultiplier).toLocaleString() }}
         </p>
-        <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-xs mt-1.5"
+          style="color: var(--argus-text-dimmed);"
+        >
           Телефоны + Посторонние
         </p>
       </div>
 
       <div class="glass-card rounded-xl p-5">
-        <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-[11px] font-medium uppercase tracking-wider"
+          style="color: var(--argus-text-dimmed);"
+        >
           Пиковый час
         </p>
-        <p class="text-3xl font-bold mt-2" style="color: var(--argus-text);">
+        <p
+          class="text-3xl font-bold mt-2"
+          style="color: var(--argus-text);"
+        >
           {{ peakHour.time }}
         </p>
-        <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-xs mt-1.5"
+          style="color: var(--argus-text-dimmed);"
+        >
           {{ peakHour.count }} нарушений в пик
         </p>
       </div>
 
       <div class="glass-card rounded-xl p-5">
-        <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-[11px] font-medium uppercase tracking-wider"
+          style="color: var(--argus-text-dimmed);"
+        >
           Средн. реакция прокторов
         </p>
-        <p class="text-3xl font-bold mt-2 tabular-nums" style="color: var(--argus-accent);">
+        <p
+          class="text-3xl font-bold mt-2 tabular-nums"
+          style="color: var(--argus-accent);"
+        >
           {{ store.proctorAvgReactionTime }}с
         </p>
-        <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-xs mt-1.5"
+          style="color: var(--argus-text-dimmed);"
+        >
           {{ store.proctorKPIs.length }} прокторов на смене
         </p>
       </div>
 
       <div class="glass-card rounded-xl p-5">
-        <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-[11px] font-medium uppercase tracking-wider"
+          style="color: var(--argus-text-dimmed);"
+        >
           Средняя точность AI
         </p>
-        <p class="text-3xl font-bold mt-2 tabular-nums" style="color: var(--argus-success);">
+        <p
+          class="text-3xl font-bold mt-2 tabular-nums"
+          style="color: var(--argus-success);"
+        >
           {{ (store.detectionAccuracy.reduce((s, d) => s + d.accuracy, 0) / store.detectionAccuracy.length).toFixed(1) }}%
         </p>
-        <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-xs mt-1.5"
+          style="color: var(--argus-text-dimmed);"
+        >
           По всем типам детекции
         </p>
       </div>
@@ -274,19 +332,35 @@ const dateRangeLabel = computed(() => {
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
       <!-- Category Cards -->
       <div class="glass-card rounded-xl overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+        <div
+          class="flex items-center justify-between px-5 py-4 border-b"
+          style="border-color: var(--argus-border);"
+        >
           <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-layers" class="size-4" style="color: var(--argus-text-dimmed);" />
-            <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+            <UIcon
+              name="i-lucide-layers"
+              class="size-4"
+              style="color: var(--argus-text-dimmed);"
+            />
+            <h2
+              class="text-sm font-semibold"
+              style="color: var(--argus-text);"
+            >
               Категории нарушений
             </h2>
           </div>
-          <span class="text-[10px] font-medium px-2 py-1 rounded-full" :style="{ background: 'var(--argus-bg-hover)', color: 'var(--argus-text-dimmed)' }">
+          <span
+            class="text-[10px] font-medium px-2 py-1 rounded-full"
+            :style="{ background: 'var(--argus-bg-hover)', color: 'var(--argus-text-dimmed)' }"
+          >
             {{ dateRangeLabel }}
           </span>
         </div>
 
-        <div class="divide-y" style="border-color: var(--argus-border-subtle);">
+        <div
+          class="divide-y"
+          style="border-color: var(--argus-border-subtle);"
+        >
           <div
             v-for="cat in store.violationCategories"
             :key="cat.type"
@@ -299,12 +373,19 @@ const dateRangeLabel = computed(() => {
               class="flex items-center justify-center size-10 rounded-lg shrink-0"
               :style="{ background: severityBg(cat.severity, 0.1), border: `1px solid ${severityBg(cat.severity, 0.15)}` }"
             >
-              <UIcon :name="cat.icon" class="size-5" :style="{ color: severityColor(cat.severity) }" />
+              <UIcon
+                :name="cat.icon"
+                class="size-5"
+                :style="{ color: severityColor(cat.severity) }"
+              />
             </div>
 
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="text-sm font-medium" style="color: var(--argus-text);">{{ cat.type }}</span>
+                <span
+                  class="text-sm font-medium"
+                  style="color: var(--argus-text);"
+                >{{ cat.type }}</span>
                 <span
                   class="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase"
                   :style="{ background: severityBg(cat.severity, 0.1), color: severityColor(cat.severity) }"
@@ -313,7 +394,10 @@ const dateRangeLabel = computed(() => {
                 </span>
               </div>
               <div class="mt-2 flex items-center gap-2">
-                <div class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
+                <div
+                  class="flex-1 h-1 rounded-full overflow-hidden"
+                  style="background: var(--argus-bg-hover);"
+                >
                   <div
                     class="h-full rounded-full transition-all duration-700"
                     :style="{
@@ -322,14 +406,22 @@ const dateRangeLabel = computed(() => {
                     }"
                   />
                 </div>
-                <span class="text-[10px] font-mono tabular-nums" style="color: var(--argus-text-dimmed);">
+                <span
+                  class="text-[10px] font-mono tabular-nums"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   {{ ((cat.count / store.totalViolationsToday) * 100).toFixed(1) }}%
                 </span>
               </div>
             </div>
 
             <div class="text-right shrink-0">
-              <p class="text-lg font-bold tabular-nums" style="color: var(--argus-text);">{{ (cat.count * dateMultiplier).toLocaleString() }}</p>
+              <p
+                class="text-lg font-bold tabular-nums"
+                style="color: var(--argus-text);"
+              >
+                {{ (cat.count * dateMultiplier).toLocaleString() }}
+              </p>
               <div class="flex items-center gap-1 justify-end mt-0.5">
                 <UIcon
                   :name="cat.trend === 'up' ? 'i-lucide-trending-up' : 'i-lucide-trending-down'"
@@ -350,14 +442,27 @@ const dateRangeLabel = computed(() => {
 
       <!-- Hourly Heatmap -->
       <div class="glass-card rounded-xl overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+        <div
+          class="flex items-center justify-between px-5 py-4 border-b"
+          style="border-color: var(--argus-border);"
+        >
           <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-clock" class="size-4" style="color: var(--argus-text-dimmed);" />
-            <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+            <UIcon
+              name="i-lucide-clock"
+              class="size-4"
+              style="color: var(--argus-text-dimmed);"
+            />
+            <h2
+              class="text-sm font-semibold"
+              style="color: var(--argus-text);"
+            >
               Почасовая активность
             </h2>
           </div>
-          <span class="text-[10px] font-medium px-2 py-1 rounded-full" :style="{ background: 'var(--argus-bg-hover)', color: 'var(--argus-text-dimmed)' }">
+          <span
+            class="text-[10px] font-medium px-2 py-1 rounded-full"
+            :style="{ background: 'var(--argus-bg-hover)', color: 'var(--argus-text-dimmed)' }"
+          >
             {{ dateRangeLabel }}
           </span>
         </div>
@@ -368,11 +473,17 @@ const dateRangeLabel = computed(() => {
             :key="hour.hour"
             class="flex items-center gap-3"
           >
-            <span class="text-xs font-mono tabular-nums w-12 text-right" style="color: var(--argus-text-dimmed);">
+            <span
+              class="text-xs font-mono tabular-nums w-12 text-right"
+              style="color: var(--argus-text-dimmed);"
+            >
               {{ hour.hour }}
             </span>
 
-            <div class="flex-1 flex h-5 rounded overflow-hidden gap-px" style="background: var(--argus-bg-hover);">
+            <div
+              class="flex-1 flex h-5 rounded overflow-hidden gap-px"
+              style="background: var(--argus-bg-hover);"
+            >
               <div
                 v-if="hour.phone > 0"
                 class="h-full transition-all duration-500"
@@ -420,33 +531,69 @@ const dateRangeLabel = computed(() => {
               />
             </div>
 
-            <span class="text-xs font-mono tabular-nums w-8 text-right" style="color: var(--argus-text-dimmed);">
+            <span
+              class="text-xs font-mono tabular-nums w-8 text-right"
+              style="color: var(--argus-text-dimmed);"
+            >
               {{ hour.total }}
             </span>
           </div>
         </div>
 
         <!-- Legend -->
-        <div class="px-5 py-3 border-t flex flex-wrap gap-4" style="border-color: var(--argus-border);">
+        <div
+          class="px-5 py-3 border-t flex flex-wrap gap-4"
+          style="border-color: var(--argus-border);"
+        >
           <div class="flex items-center gap-1.5">
-            <div class="size-2 rounded-sm" :style="{ background: isDark ? 'rgba(66, 133, 244, 0.8)' : 'rgba(26, 115, 232, 0.75)' }" />
-            <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Телефон</span>
+            <div
+              class="size-2 rounded-sm"
+              :style="{ background: isDark ? 'rgba(66, 133, 244, 0.8)' : 'rgba(26, 115, 232, 0.75)' }"
+            />
+            <span
+              class="text-[10px]"
+              style="color: var(--argus-text-dimmed);"
+            >Телефон</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <div class="size-2 rounded-sm" :style="{ background: isDark ? 'rgba(162, 89, 255, 0.7)' : 'rgba(123, 31, 162, 0.65)' }" />
-            <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Взгляд</span>
+            <div
+              class="size-2 rounded-sm"
+              :style="{ background: isDark ? 'rgba(162, 89, 255, 0.7)' : 'rgba(123, 31, 162, 0.65)' }"
+            />
+            <span
+              class="text-[10px]"
+              style="color: var(--argus-text-dimmed);"
+            >Взгляд</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <div class="size-2 rounded-sm" :style="{ background: isDark ? 'rgba(234, 67, 53, 0.7)' : 'rgba(217, 48, 37, 0.65)' }" />
-            <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Посторонние</span>
+            <div
+              class="size-2 rounded-sm"
+              :style="{ background: isDark ? 'rgba(234, 67, 53, 0.7)' : 'rgba(217, 48, 37, 0.65)' }"
+            />
+            <span
+              class="text-[10px]"
+              style="color: var(--argus-text-dimmed);"
+            >Посторонние</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <div class="size-2 rounded-sm" :style="{ background: isDark ? 'rgba(52, 168, 83, 0.7)' : 'rgba(24, 128, 56, 0.65)' }" />
-            <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Вкладки</span>
+            <div
+              class="size-2 rounded-sm"
+              :style="{ background: isDark ? 'rgba(52, 168, 83, 0.7)' : 'rgba(24, 128, 56, 0.65)' }"
+            />
+            <span
+              class="text-[10px]"
+              style="color: var(--argus-text-dimmed);"
+            >Вкладки</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <div class="size-2 rounded-sm" :style="{ background: isDark ? 'rgba(251, 188, 5, 0.65)' : 'rgba(227, 116, 0, 0.6)' }" />
-            <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Аудио</span>
+            <div
+              class="size-2 rounded-sm"
+              :style="{ background: isDark ? 'rgba(251, 188, 5, 0.65)' : 'rgba(227, 116, 0, 0.6)' }"
+            />
+            <span
+              class="text-[10px]"
+              style="color: var(--argus-text-dimmed);"
+            >Аудио</span>
           </div>
         </div>
       </div>
@@ -456,14 +603,27 @@ const dateRangeLabel = computed(() => {
     <!--  REGIONAL BREAKDOWN            -->
     <!-- ============================== -->
     <div class="glass-card rounded-xl overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+      <div
+        class="flex items-center justify-between px-5 py-4 border-b"
+        style="border-color: var(--argus-border);"
+      >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-map-pin" class="size-4" style="color: var(--argus-accent);" />
-          <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+          <UIcon
+            name="i-lucide-map-pin"
+            class="size-4"
+            style="color: var(--argus-accent);"
+          />
+          <h2
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
             Региональная разбивка нарушений
           </h2>
         </div>
-        <span class="text-[10px] font-medium px-2 py-1 rounded-full" :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }">
+        <span
+          class="text-[10px] font-medium px-2 py-1 rounded-full"
+          :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }"
+        >
           {{ store.sortedRegionalViolations.length }} регионов
         </span>
       </div>
@@ -472,11 +632,36 @@ const dateRangeLabel = computed(() => {
         <table class="w-full text-sm">
           <thead>
             <tr style="border-bottom: 1px solid var(--argus-border);">
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Регион</th>
-              <th class="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Всего</th>
-              <th class="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Распределение по типам</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Крит. %</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Реакция</th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Регион
+              </th>
+              <th
+                class="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Всего
+              </th>
+              <th
+                class="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Распределение по типам
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Крит. %
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Реакция
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -491,27 +676,42 @@ const dateRangeLabel = computed(() => {
               <!-- Region name -->
               <td class="px-5 py-3.5">
                 <div class="flex items-center gap-2">
-                  <div class="size-2 rounded-full shrink-0" :style="{ background: region.criticalRate >= 43 ? 'var(--argus-error)' : region.criticalRate >= 37 ? 'var(--argus-warning)' : 'var(--argus-success)' }" />
-                  <span class="font-medium" style="color: var(--argus-text);">{{ region.regionName }}</span>
+                  <div
+                    class="size-2 rounded-full shrink-0"
+                    :style="{ background: region.criticalRate >= 43 ? 'var(--argus-error)' : region.criticalRate >= 37 ? 'var(--argus-warning)' : 'var(--argus-success)' }"
+                  />
+                  <span
+                    class="font-medium"
+                    style="color: var(--argus-text);"
+                  >{{ region.regionName }}</span>
                 </div>
               </td>
 
               <!-- Total with bar -->
               <td class="px-4 py-3.5">
                 <div class="flex items-center gap-2 min-w-24">
-                  <div class="flex-1 h-1.5 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
+                  <div
+                    class="flex-1 h-1.5 rounded-full overflow-hidden"
+                    style="background: var(--argus-bg-hover);"
+                  >
                     <div
                       class="h-full rounded-full transition-all duration-700"
                       :style="{ width: `${(region.totalViolations / maxRegionalViolations) * 100}%`, background: 'var(--argus-accent)' }"
                     />
                   </div>
-                  <span class="text-xs font-mono font-bold tabular-nums" style="color: var(--argus-text);">{{ (region.totalViolations * dateMultiplier).toLocaleString() }}</span>
+                  <span
+                    class="text-xs font-mono font-bold tabular-nums"
+                    style="color: var(--argus-text);"
+                  >{{ (region.totalViolations * dateMultiplier).toLocaleString() }}</span>
                 </div>
               </td>
 
               <!-- Stacked type breakdown -->
               <td class="px-4 py-3.5">
-                <div class="flex h-4 rounded-sm overflow-hidden gap-px min-w-48" style="background: var(--argus-bg-hover);">
+                <div
+                  class="flex h-4 rounded-sm overflow-hidden gap-px min-w-48"
+                  style="background: var(--argus-bg-hover);"
+                >
                   <div
                     class="h-full"
                     :style="{ width: `${(region.phone / region.totalViolations) * 100}%`, background: isDark ? 'rgba(66, 133, 244, 0.8)' : 'rgba(26, 115, 232, 0.75)' }"
@@ -552,7 +752,10 @@ const dateRangeLabel = computed(() => {
 
               <!-- Avg reaction -->
               <td class="px-4 py-3.5 text-center">
-                <span class="text-xs font-mono font-bold tabular-nums" :style="{ color: reactionTimeColor(region.avgReactionSec) }">
+                <span
+                  class="text-xs font-mono font-bold tabular-nums"
+                  :style="{ color: reactionTimeColor(region.avgReactionSec) }"
+                >
                   {{ region.avgReactionSec }}с
                 </span>
               </td>
@@ -566,48 +769,121 @@ const dateRangeLabel = computed(() => {
     <!--  PROCTOR EFFICIENCY KPIs       -->
     <!-- ============================== -->
     <div class="glass-card rounded-xl overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+      <div
+        class="flex items-center justify-between px-5 py-4 border-b"
+        style="border-color: var(--argus-border);"
+      >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-shield-check" class="size-4" style="color: var(--argus-accent);" />
-          <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+          <UIcon
+            name="i-lucide-shield-check"
+            class="size-4"
+            style="color: var(--argus-accent);"
+          />
+          <h2
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
             Эффективность прокторов
           </h2>
         </div>
         <div class="flex items-center gap-3">
-          <span class="text-[10px] font-medium px-2 py-1 rounded-full" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
+          <span
+            class="text-[10px] font-medium px-2 py-1 rounded-full"
+            :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+          >
             Реакция: {{ store.proctorAvgReactionTime }}с
           </span>
-          <span class="text-[10px] font-medium px-2 py-1 rounded-full" :style="{ background: successBg(0.1), color: 'var(--argus-success)' }">
+          <span
+            class="text-[10px] font-medium px-2 py-1 rounded-full"
+            :style="{ background: successBg(0.1), color: 'var(--argus-success)' }"
+          >
             Точность: {{ store.proctorAvgWarningAccuracy }}%
           </span>
-          <span class="text-[10px] font-medium px-2 py-1 rounded-full" :style="{ background: 'var(--argus-bg-hover)', color: 'var(--argus-text-dimmed)' }">
+          <span
+            class="text-[10px] font-medium px-2 py-1 rounded-full"
+            :style="{ background: 'var(--argus-bg-hover)', color: 'var(--argus-text-dimmed)' }"
+          >
             {{ totalProctorSessions }} сессий
           </span>
         </div>
       </div>
 
       <!-- Summary KPI strip -->
-      <div class="grid grid-cols-4 gap-px" style="background: var(--argus-border-subtle);">
-        <div class="p-4 text-center" style="background: var(--argus-card-bg);">
-          <p class="text-[10px] uppercase tracking-wider font-medium" style="color: var(--argus-text-dimmed);">Лучший проктор</p>
-          <p class="text-sm font-bold mt-1" style="color: var(--argus-text);">{{ topProctor?.name }}</p>
-          <p class="text-[10px] mt-0.5" style="color: var(--argus-success);">{{ topProctor?.warningAccuracy }}% точность</p>
+      <div
+        class="grid grid-cols-4 gap-px"
+        style="background: var(--argus-border-subtle);"
+      >
+        <div
+          class="p-4 text-center"
+          style="background: var(--argus-card-bg);"
+        >
+          <p
+            class="text-[10px] uppercase tracking-wider font-medium"
+            style="color: var(--argus-text-dimmed);"
+          >
+            Лучший проктор
+          </p>
+          <p
+            class="text-sm font-bold mt-1"
+            style="color: var(--argus-text);"
+          >
+            {{ topProctor?.name }}
+          </p>
+          <p
+            class="text-[10px] mt-0.5"
+            style="color: var(--argus-success);"
+          >
+            {{ topProctor?.warningAccuracy }}% точность
+          </p>
         </div>
-        <div class="p-4 text-center" style="background: var(--argus-card-bg);">
-          <p class="text-[10px] uppercase tracking-wider font-medium" style="color: var(--argus-text-dimmed);">Сред. реакция</p>
-          <p class="text-2xl font-bold mt-1 tabular-nums" :style="{ color: reactionTimeColor(parseFloat(store.proctorAvgReactionTime)) }">
+        <div
+          class="p-4 text-center"
+          style="background: var(--argus-card-bg);"
+        >
+          <p
+            class="text-[10px] uppercase tracking-wider font-medium"
+            style="color: var(--argus-text-dimmed);"
+          >
+            Сред. реакция
+          </p>
+          <p
+            class="text-2xl font-bold mt-1 tabular-nums"
+            :style="{ color: reactionTimeColor(parseFloat(store.proctorAvgReactionTime)) }"
+          >
             {{ store.proctorAvgReactionTime }}с
           </p>
         </div>
-        <div class="p-4 text-center" style="background: var(--argus-card-bg);">
-          <p class="text-[10px] uppercase tracking-wider font-medium" style="color: var(--argus-text-dimmed);">Сред. точность предупр.</p>
-          <p class="text-2xl font-bold mt-1 tabular-nums" :style="{ color: warningAccuracyColor(parseFloat(store.proctorAvgWarningAccuracy)) }">
+        <div
+          class="p-4 text-center"
+          style="background: var(--argus-card-bg);"
+        >
+          <p
+            class="text-[10px] uppercase tracking-wider font-medium"
+            style="color: var(--argus-text-dimmed);"
+          >
+            Сред. точность предупр.
+          </p>
+          <p
+            class="text-2xl font-bold mt-1 tabular-nums"
+            :style="{ color: warningAccuracyColor(parseFloat(store.proctorAvgWarningAccuracy)) }"
+          >
             {{ store.proctorAvgWarningAccuracy }}%
           </p>
         </div>
-        <div class="p-4 text-center" style="background: var(--argus-card-bg);">
-          <p class="text-[10px] uppercase tracking-wider font-medium" style="color: var(--argus-text-dimmed);">Всего прерываний</p>
-          <p class="text-2xl font-bold mt-1 tabular-nums" style="color: var(--argus-error);">
+        <div
+          class="p-4 text-center"
+          style="background: var(--argus-card-bg);"
+        >
+          <p
+            class="text-[10px] uppercase tracking-wider font-medium"
+            style="color: var(--argus-text-dimmed);"
+          >
+            Всего прерываний
+          </p>
+          <p
+            class="text-2xl font-bold mt-1 tabular-nums"
+            style="color: var(--argus-error);"
+          >
             {{ store.proctorKPIs.reduce((s, p) => s + p.terminationsInitiated, 0) }}
           </p>
         </div>
@@ -618,14 +894,54 @@ const dateRangeLabel = computed(() => {
         <table class="w-full text-sm">
           <thead>
             <tr style="border-bottom: 1px solid var(--argus-border);">
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Проктор</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Смена</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Сессий</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Реакция</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Предупр.</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Точность</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Прерыв.</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Нарушений</th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Проктор
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Смена
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Сессий
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Реакция
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Предупр.
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Точность
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Прерыв.
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Нарушений
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -645,32 +961,53 @@ const dateRangeLabel = computed(() => {
                   >
                     {{ proctor.name.charAt(0) }}
                   </div>
-                  <span class="font-medium" style="color: var(--argus-text);">{{ proctor.name }}</span>
+                  <span
+                    class="font-medium"
+                    style="color: var(--argus-text);"
+                  >{{ proctor.name }}</span>
                 </div>
               </td>
               <td class="px-4 py-3.5 text-center">
-                <span class="text-xs font-mono" style="color: var(--argus-text-dimmed);">{{ proctor.shift }}</span>
+                <span
+                  class="text-xs font-mono"
+                  style="color: var(--argus-text-dimmed);"
+                >{{ proctor.shift }}</span>
               </td>
               <td class="px-4 py-3.5 text-center">
-                <span class="text-sm font-bold tabular-nums" style="color: var(--argus-text);">{{ proctor.sessionsReviewed }}</span>
+                <span
+                  class="text-sm font-bold tabular-nums"
+                  style="color: var(--argus-text);"
+                >{{ proctor.sessionsReviewed }}</span>
               </td>
               <td class="px-4 py-3.5 text-center">
-                <span class="text-sm font-mono font-bold tabular-nums" :style="{ color: reactionTimeColor(proctor.avgReactionTimeSec) }">
+                <span
+                  class="text-sm font-mono font-bold tabular-nums"
+                  :style="{ color: reactionTimeColor(proctor.avgReactionTimeSec) }"
+                >
                   {{ proctor.avgReactionTimeSec }}с
                 </span>
               </td>
               <td class="px-4 py-3.5 text-center">
-                <span class="text-sm tabular-nums" style="color: var(--argus-text);">{{ proctor.warningsIssued }}</span>
+                <span
+                  class="text-sm tabular-nums"
+                  style="color: var(--argus-text);"
+                >{{ proctor.warningsIssued }}</span>
               </td>
               <td class="px-4 py-3.5 text-center">
                 <div class="flex items-center gap-2 justify-center">
-                  <div class="w-16 h-1.5 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
+                  <div
+                    class="w-16 h-1.5 rounded-full overflow-hidden"
+                    style="background: var(--argus-bg-hover);"
+                  >
                     <div
                       class="h-full rounded-full transition-all duration-700"
                       :style="{ width: `${proctor.warningAccuracy}%`, background: accuracyGradient(proctor.warningAccuracy) }"
                     />
                   </div>
-                  <span class="text-xs font-bold font-mono tabular-nums" :style="{ color: warningAccuracyColor(proctor.warningAccuracy) }">
+                  <span
+                    class="text-xs font-bold font-mono tabular-nums"
+                    :style="{ color: warningAccuracyColor(proctor.warningAccuracy) }"
+                  >
                     {{ proctor.warningAccuracy }}%
                   </span>
                 </div>
@@ -684,7 +1021,10 @@ const dateRangeLabel = computed(() => {
                 </span>
               </td>
               <td class="px-4 py-3.5 text-center">
-                <span class="text-sm font-bold tabular-nums" style="color: var(--argus-text);">{{ proctor.violationsDetected }}</span>
+                <span
+                  class="text-sm font-bold tabular-nums"
+                  style="color: var(--argus-text);"
+                >{{ proctor.violationsDetected }}</span>
               </td>
             </tr>
           </tbody>
@@ -696,14 +1036,27 @@ const dateRangeLabel = computed(() => {
     <!--  AI DETECTION ACCURACY         -->
     <!-- ============================== -->
     <div class="glass-card rounded-xl overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+      <div
+        class="flex items-center justify-between px-5 py-4 border-b"
+        style="border-color: var(--argus-border);"
+      >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-brain" class="size-4" style="color: var(--argus-accent);" />
-          <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+          <UIcon
+            name="i-lucide-brain"
+            class="size-4"
+            style="color: var(--argus-accent);"
+          />
+          <h2
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
             Точность AI-детекции
           </h2>
         </div>
-        <span class="text-[10px] font-medium px-2 py-1 rounded-full" :style="{ background: successBg(0.1), color: 'var(--argus-success)' }">
+        <span
+          class="text-[10px] font-medium px-2 py-1 rounded-full"
+          :style="{ background: successBg(0.1), color: 'var(--argus-success)' }"
+        >
           Среднее {{ (store.detectionAccuracy.reduce((s, d) => s + d.accuracy, 0) / store.detectionAccuracy.length).toFixed(1) }}%
         </span>
       </div>
@@ -712,10 +1065,30 @@ const dateRangeLabel = computed(() => {
         <table class="w-full text-sm">
           <thead>
             <tr style="border-bottom: 1px solid var(--argus-border);">
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Тип детекции</th>
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">True Positive</th>
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">False Positive</th>
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Общая точность</th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Тип детекции
+              </th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                True Positive
+              </th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                False Positive
+              </th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Общая точность
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -727,9 +1100,17 @@ const dateRangeLabel = computed(() => {
               @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--argus-bg-hover)'"
               @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
             >
-              <td class="px-5 py-3.5 font-medium" style="color: var(--argus-text);">{{ det.type }}</td>
+              <td
+                class="px-5 py-3.5 font-medium"
+                style="color: var(--argus-text);"
+              >
+                {{ det.type }}
+              </td>
               <td class="px-5 py-3.5">
-                <span class="text-sm font-mono tabular-nums" style="color: var(--argus-success);">{{ det.truePositive }}%</span>
+                <span
+                  class="text-sm font-mono tabular-nums"
+                  style="color: var(--argus-success);"
+                >{{ det.truePositive }}%</span>
               </td>
               <td class="px-5 py-3.5">
                 <span
@@ -741,13 +1122,19 @@ const dateRangeLabel = computed(() => {
               </td>
               <td class="px-5 py-3.5">
                 <div class="flex items-center gap-3 min-w-36">
-                  <div class="flex-1 h-2 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
+                  <div
+                    class="flex-1 h-2 rounded-full overflow-hidden"
+                    style="background: var(--argus-bg-hover);"
+                  >
                     <div
                       class="h-full rounded-full transition-all duration-700"
                       :style="{ width: `${det.accuracy}%`, background: accuracyGradient(det.accuracy) }"
                     />
                   </div>
-                  <span class="text-sm font-bold font-mono tabular-nums" style="color: var(--argus-text);">{{ det.accuracy }}%</span>
+                  <span
+                    class="text-sm font-bold font-mono tabular-nums"
+                    style="color: var(--argus-text);"
+                  >{{ det.accuracy }}%</span>
                 </div>
               </td>
             </tr>

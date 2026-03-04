@@ -69,7 +69,7 @@ function tokenToPixels(token: string, blockSize: number): Uint8Array {
     modifications[i * 4 + 0] = (charVal >> 3) & 1 // R LSB
     modifications[i * 4 + 1] = (charVal >> 2) & 1 // G LSB
     modifications[i * 4 + 2] = (charVal >> 1) & 1 // B LSB
-    modifications[i * 4 + 3] = charVal & 1         // A LSB (only if non-zero alpha)
+    modifications[i * 4 + 3] = charVal & 1 // A LSB (only if non-zero alpha)
   }
 
   return modifications
@@ -83,14 +83,14 @@ export function useStreamWatermark(config: WatermarkConfig) {
   const {
     sessionId,
     rotationIntervalMs = 500,
-    blockSize = 4,
+    blockSize = 4
   } = config
 
   const state = ref<WatermarkState>({
     isActive: false,
     currentToken: '',
     framesWatermarked: 0,
-    lastRotationAt: 0,
+    lastRotationAt: 0
   })
 
   let canvas: HTMLCanvasElement | null = null
@@ -107,7 +107,7 @@ export function useStreamWatermark(config: WatermarkConfig) {
     state.value = {
       ...state.value,
       currentToken: token,
-      lastRotationAt: now,
+      lastRotationAt: now
     }
   }
 
@@ -148,7 +148,7 @@ export function useStreamWatermark(config: WatermarkConfig) {
 
       state.value = {
         ...state.value,
-        framesWatermarked: state.value.framesWatermarked + 1,
+        framesWatermarked: state.value.framesWatermarked + 1
       }
     } catch {
       // Canvas tainted by cross-origin — skip silently
@@ -246,6 +246,6 @@ export function useStreamWatermark(config: WatermarkConfig) {
     stop,
     applyToCanvas,
     watermarkVideoFrame,
-    extractFromCanvas,
+    extractFromCanvas
   }
 }

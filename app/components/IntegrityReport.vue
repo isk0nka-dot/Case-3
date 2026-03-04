@@ -116,8 +116,15 @@ watch(() => props.sessionId, () => {
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <UIcon name="i-lucide-shield-check" class="size-4" style="color: var(--argus-accent);" />
-        <span class="text-xs font-semibold" style="color: var(--argus-text);">Forensic Ledger</span>
+        <UIcon
+          name="i-lucide-shield-check"
+          class="size-4"
+          style="color: var(--argus-accent);"
+        />
+        <span
+          class="text-xs font-semibold"
+          style="color: var(--argus-text);"
+        >Forensic Ledger</span>
         <span
           v-if="report"
           class="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
@@ -146,14 +153,24 @@ watch(() => props.sessionId, () => {
           class="animate-spin rounded-full size-3 border border-t-transparent"
           style="border-color: var(--argus-accent); border-top-color: transparent;"
         />
-        <UIcon v-else name="i-lucide-scan" class="size-3" />
+        <UIcon
+          v-else
+          name="i-lucide-scan"
+          class="size-3"
+        />
         {{ verifying ? 'Проверка...' : 'Проверить целостность' }}
       </button>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex items-center justify-center py-4">
-      <div class="animate-spin rounded-full size-5 border-2 border-t-transparent" style="border-color: var(--argus-accent); border-top-color: transparent;" />
+    <div
+      v-if="loading"
+      class="flex items-center justify-center py-4"
+    >
+      <div
+        class="animate-spin rounded-full size-5 border-2 border-t-transparent"
+        style="border-color: var(--argus-accent); border-top-color: transparent;"
+      />
     </div>
 
     <!-- Error -->
@@ -162,7 +179,10 @@ watch(() => props.sessionId, () => {
       class="flex items-center gap-2 px-3 py-2 rounded-lg text-[10px]"
       :style="{ background: errorBg(0.08), color: 'var(--argus-error)' }"
     >
-      <UIcon name="i-lucide-alert-circle" class="size-3 shrink-0" />
+      <UIcon
+        name="i-lucide-alert-circle"
+        class="size-3 shrink-0"
+      />
       {{ error }}
     </div>
 
@@ -171,13 +191,30 @@ watch(() => props.sessionId, () => {
       v-else-if="!report"
       class="flex flex-col items-center justify-center py-6"
     >
-      <UIcon name="i-lucide-shield-question" class="size-8 mb-2" style="color: var(--argus-text-dimmed);" />
-      <p class="text-[10px] font-medium" style="color: var(--argus-text);">Верификация не проводилась</p>
-      <p class="text-[9px] mt-0.5" style="color: var(--argus-text-dimmed);">Нажмите "Проверить целостность" для анализа хеш-цепочки</p>
+      <UIcon
+        name="i-lucide-shield-question"
+        class="size-8 mb-2"
+        style="color: var(--argus-text-dimmed);"
+      />
+      <p
+        class="text-[10px] font-medium"
+        style="color: var(--argus-text);"
+      >
+        Верификация не проводилась
+      </p>
+      <p
+        class="text-[9px] mt-0.5"
+        style="color: var(--argus-text-dimmed);"
+      >
+        Нажмите "Проверить целостность" для анализа хеш-цепочки
+      </p>
     </div>
 
     <!-- Report Display -->
-    <div v-else class="space-y-3">
+    <div
+      v-else
+      class="space-y-3"
+    >
       <!-- Summary Cards -->
       <div class="grid grid-cols-2 gap-2">
         <!-- Chain Status -->
@@ -194,12 +231,21 @@ watch(() => props.sessionId, () => {
               class="size-3.5"
               :style="{ color: report.chainValid ? 'var(--argus-success)' : 'var(--argus-error)' }"
             />
-            <span class="text-[9px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Hash Chain</span>
+            <span
+              class="text-[9px] font-semibold uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >Hash Chain</span>
           </div>
-          <p class="text-sm font-bold" :style="{ color: report.chainValid ? 'var(--argus-success)' : 'var(--argus-error)' }">
+          <p
+            class="text-sm font-bold"
+            :style="{ color: report.chainValid ? 'var(--argus-success)' : 'var(--argus-error)' }"
+          >
             {{ report.chainValid ? 'VALID' : 'BROKEN' }}
           </p>
-          <p class="text-[8px] mt-0.5" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-[8px] mt-0.5"
+            style="color: var(--argus-text-dimmed);"
+          >
             SHA-256 linked chain
           </p>
         </div>
@@ -210,13 +256,26 @@ watch(() => props.sessionId, () => {
           :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }"
         >
           <div class="flex items-center gap-1.5 mb-1.5">
-            <UIcon name="i-lucide-layers" class="size-3.5" style="color: var(--argus-accent);" />
-            <span class="text-[9px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Fragments</span>
+            <UIcon
+              name="i-lucide-layers"
+              class="size-3.5"
+              style="color: var(--argus-accent);"
+            />
+            <span
+              class="text-[9px] font-semibold uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >Fragments</span>
           </div>
-          <p class="text-sm font-bold" style="color: var(--argus-text);">
+          <p
+            class="text-sm font-bold"
+            style="color: var(--argus-text);"
+          >
             {{ report.verifiedOk }} / {{ report.totalFragments }}
           </p>
-          <p class="text-[8px] mt-0.5" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-[8px] mt-0.5"
+            style="color: var(--argus-text-dimmed);"
+          >
             {{ integrityPercent }}% verified OK
           </p>
         </div>
@@ -230,13 +289,26 @@ watch(() => props.sessionId, () => {
           }"
         >
           <div class="flex items-center gap-1.5 mb-1.5">
-            <UIcon name="i-lucide-hard-drive" class="size-3.5" :style="{ color: report.s3Mismatches === 0 ? 'var(--argus-success)' : 'var(--argus-error)' }" />
-            <span class="text-[9px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">S3 / MinIO</span>
+            <UIcon
+              name="i-lucide-hard-drive"
+              class="size-3.5"
+              :style="{ color: report.s3Mismatches === 0 ? 'var(--argus-success)' : 'var(--argus-error)' }"
+            />
+            <span
+              class="text-[9px] font-semibold uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >S3 / MinIO</span>
           </div>
-          <p class="text-sm font-bold" :style="{ color: report.s3Mismatches === 0 ? 'var(--argus-success)' : 'var(--argus-error)' }">
+          <p
+            class="text-sm font-bold"
+            :style="{ color: report.s3Mismatches === 0 ? 'var(--argus-success)' : 'var(--argus-error)' }"
+          >
             {{ report.s3Verified }} OK
           </p>
-          <p class="text-[8px] mt-0.5" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-[8px] mt-0.5"
+            style="color: var(--argus-text-dimmed);"
+          >
             {{ report.s3Mismatches }} mismatches, {{ report.s3Errors }} errors
           </p>
         </div>
@@ -247,27 +319,52 @@ watch(() => props.sessionId, () => {
           :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }"
         >
           <div class="flex items-center gap-1.5 mb-1.5">
-            <UIcon name="i-lucide-timer" class="size-3.5" style="color: var(--argus-accent);" />
-            <span class="text-[9px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Duration</span>
+            <UIcon
+              name="i-lucide-timer"
+              class="size-3.5"
+              style="color: var(--argus-accent);"
+            />
+            <span
+              class="text-[9px] font-semibold uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >Duration</span>
           </div>
-          <p class="text-sm font-bold tabular-nums" style="color: var(--argus-text);">
+          <p
+            class="text-sm font-bold tabular-nums"
+            style="color: var(--argus-text);"
+          >
             {{ report.durationMs }}ms
           </p>
-          <p class="text-[8px] mt-0.5" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-[8px] mt-0.5"
+            style="color: var(--argus-text-dimmed);"
+          >
             {{ new Date(report.verifiedAt).toLocaleTimeString('ru-RU') }}
           </p>
         </div>
       </div>
 
       <!-- Integrity Progress Bar -->
-      <div class="rounded-lg border p-3" :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }">
+      <div
+        class="rounded-lg border p-3"
+        :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }"
+      >
         <div class="flex items-center justify-between mb-2">
-          <span class="text-[9px] font-semibold" style="color: var(--argus-text-dimmed);">Evidence Integrity</span>
-          <span class="text-[10px] font-bold tabular-nums" :style="{ color: integrityPercent === 100 ? 'var(--argus-success)' : integrityPercent >= 80 ? 'var(--argus-warning)' : 'var(--argus-error)' }">
+          <span
+            class="text-[9px] font-semibold"
+            style="color: var(--argus-text-dimmed);"
+          >Evidence Integrity</span>
+          <span
+            class="text-[10px] font-bold tabular-nums"
+            :style="{ color: integrityPercent === 100 ? 'var(--argus-success)' : integrityPercent >= 80 ? 'var(--argus-warning)' : 'var(--argus-error)' }"
+          >
             {{ integrityPercent }}%
           </span>
         </div>
-        <div class="w-full h-2 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
+        <div
+          class="w-full h-2 rounded-full overflow-hidden"
+          style="background: var(--argus-bg-hover);"
+        >
           <div
             class="h-full rounded-full transition-all duration-500"
             :style="{
@@ -289,8 +386,15 @@ watch(() => props.sessionId, () => {
         :style="{ borderColor: 'rgba(248, 113, 113, 0.2)', background: errorBg(0.04) }"
       >
         <div class="flex items-center gap-1.5">
-          <UIcon name="i-lucide-alert-triangle" class="size-3.5" style="color: var(--argus-error);" />
-          <span class="text-[10px] font-bold" style="color: var(--argus-error);">
+          <UIcon
+            name="i-lucide-alert-triangle"
+            class="size-3.5"
+            style="color: var(--argus-error);"
+          />
+          <span
+            class="text-[10px] font-bold"
+            style="color: var(--argus-error);"
+          >
             Tamper Detection: {{ report.brokenLinks.length }} broken links, {{ report.mismatches.length }} hash mismatches
           </span>
         </div>
@@ -306,7 +410,10 @@ watch(() => props.sessionId, () => {
             class="size-3 shrink-0"
             style="color: var(--argus-error);"
           />
-          <span class="font-mono" style="color: var(--argus-text-muted);">
+          <span
+            class="font-mono"
+            style="color: var(--argus-text-muted);"
+          >
             #{{ item.sequenceNum }}
           </span>
           <span style="color: var(--argus-text-dimmed);">{{ truncateHash(item.fragmentId) }}</span>
@@ -324,7 +431,10 @@ watch(() => props.sessionId, () => {
           >
             HASH MISMATCH
           </span>
-          <span v-if="item.errorMessage" style="color: var(--argus-text-dimmed);">{{ item.errorMessage }}</span>
+          <span
+            v-if="item.errorMessage"
+            style="color: var(--argus-text-dimmed);"
+          >{{ item.errorMessage }}</span>
         </div>
       </div>
 
@@ -343,7 +453,10 @@ watch(() => props.sessionId, () => {
           {{ expanded ? 'Скрыть цепочку' : `Показать цепочку (${report.fragments.length} фрагментов)` }}
         </button>
 
-        <div v-if="expanded" class="mt-2 space-y-1 max-h-[200px] overflow-y-auto">
+        <div
+          v-if="expanded"
+          class="mt-2 space-y-1 max-h-[200px] overflow-y-auto"
+        >
           <div
             v-for="(frag, idx) in report.fragments"
             :key="frag.fragmentId"
@@ -354,7 +467,10 @@ watch(() => props.sessionId, () => {
             }"
           >
             <!-- Sequence number -->
-            <span class="font-mono font-bold w-6 text-right shrink-0" style="color: var(--argus-text-dimmed);">
+            <span
+              class="font-mono font-bold w-6 text-right shrink-0"
+              style="color: var(--argus-text-dimmed);"
+            >
               {{ idx + 1 }}
             </span>
 
@@ -366,7 +482,10 @@ watch(() => props.sessionId, () => {
             />
 
             <!-- Hash -->
-            <span class="font-mono flex-1 truncate" style="color: var(--argus-text-muted);">
+            <span
+              class="font-mono flex-1 truncate"
+              style="color: var(--argus-text-muted);"
+            >
               {{ truncateHash(frag.recordHash) }}
             </span>
 
@@ -393,7 +512,11 @@ watch(() => props.sessionId, () => {
                 class="animate-spin rounded-full size-2 border border-t-transparent"
                 style="border-color: var(--argus-text-dimmed); border-top-color: transparent;"
               />
-              <UIcon v-else name="i-lucide-scan" class="size-2.5" />
+              <UIcon
+                v-else
+                name="i-lucide-scan"
+                class="size-2.5"
+              />
             </button>
           </div>
         </div>

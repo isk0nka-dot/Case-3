@@ -139,13 +139,26 @@ onMounted(() => fetchAppeals())
     <!-- Page Header -->
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <h1 class="text-2xl font-bold" style="color: var(--argus-text);">
+        <h1
+          class="text-2xl font-bold"
+          style="color: var(--argus-text);"
+        >
           Апелляции
         </h1>
-        <p class="text-sm mt-1" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-sm mt-1"
+          style="color: var(--argus-text-dimmed);"
+        >
           Управление апелляциями студентов — {{ appealStats.total }} заявок
-          <span v-if="loading" class="inline-flex items-center gap-1 ml-2 text-xs" style="color: var(--argus-accent);">
-            <span class="animate-spin inline-block size-3 border border-t-transparent rounded-full" style="border-color: var(--argus-accent); border-top-color: transparent;" />
+          <span
+            v-if="loading"
+            class="inline-flex items-center gap-1 ml-2 text-xs"
+            style="color: var(--argus-accent);"
+          >
+            <span
+              class="animate-spin inline-block size-3 border border-t-transparent rounded-full"
+              style="border-color: var(--argus-accent); border-top-color: transparent;"
+            />
             Загрузка...
           </span>
         </p>
@@ -153,20 +166,44 @@ onMounted(() => fetchAppeals())
 
       <!-- Stats Badges -->
       <div class="flex items-center gap-2 flex-wrap">
-        <div class="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
-          <UIcon name="i-lucide-inbox" class="size-3" />
+        <div
+          class="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full"
+          :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+        >
+          <UIcon
+            name="i-lucide-inbox"
+            class="size-3"
+          />
           {{ appealStats.submitted }} новых
         </div>
-        <div class="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full" :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }">
-          <UIcon name="i-lucide-search" class="size-3" />
+        <div
+          class="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full"
+          :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
+        >
+          <UIcon
+            name="i-lucide-search"
+            class="size-3"
+          />
           {{ appealStats.under_review }} на рассмотрении
         </div>
-        <div class="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full" :style="{ background: successBg(0.1), color: 'var(--argus-success)' }">
-          <UIcon name="i-lucide-check-circle" class="size-3" />
+        <div
+          class="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full"
+          :style="{ background: successBg(0.1), color: 'var(--argus-success)' }"
+        >
+          <UIcon
+            name="i-lucide-check-circle"
+            class="size-3"
+          />
           {{ appealStats.upheld }} удовлетворено
         </div>
-        <div class="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full" :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }">
-          <UIcon name="i-lucide-x-circle" class="size-3" />
+        <div
+          class="flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full"
+          :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }"
+        >
+          <UIcon
+            name="i-lucide-x-circle"
+            class="size-3"
+          />
           {{ appealStats.overturned }} отклонено
         </div>
       </div>
@@ -186,7 +223,10 @@ onMounted(() => fetchAppeals())
           }"
           @click="statusFilter = filter; fetchAppeals()"
         >
-          <UIcon :name="filter === 'all' ? 'i-lucide-layout-grid' : statusIcon(filter)" class="size-3.5" />
+          <UIcon
+            :name="filter === 'all' ? 'i-lucide-layout-grid' : statusIcon(filter)"
+            class="size-3.5"
+          />
           {{ filter === 'all' ? 'Все' : statusLabel(filter) }}
         </button>
       </div>
@@ -198,17 +238,35 @@ onMounted(() => fetchAppeals())
       class="flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
       :style="{ background: errorBg(0.08), color: 'var(--argus-error)' }"
     >
-      <UIcon name="i-lucide-alert-circle" class="size-4 shrink-0" />
+      <UIcon
+        name="i-lucide-alert-circle"
+        class="size-4 shrink-0"
+      />
       {{ error }}
     </div>
 
     <!-- Appeals Table -->
     <div class="glass-card rounded-xl overflow-hidden">
-      <div class="px-5 py-3.5 border-b flex items-center justify-between" style="border-color: var(--argus-border);">
+      <div
+        class="px-5 py-3.5 border-b flex items-center justify-between"
+        style="border-color: var(--argus-border);"
+      >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-scale" class="size-4" style="color: var(--argus-text-dimmed);" />
-          <h3 class="text-sm font-semibold" style="color: var(--argus-text);">Список апелляций</h3>
-          <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
+          <UIcon
+            name="i-lucide-scale"
+            class="size-4"
+            style="color: var(--argus-text-dimmed);"
+          />
+          <h3
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            Список апелляций
+          </h3>
+          <span
+            class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+            :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+          >
             {{ filteredAppeals.length }}
           </span>
         </div>
@@ -225,13 +283,48 @@ onMounted(() => fetchAppeals())
         <table class="w-full">
           <thead>
             <tr style="border-bottom: 1px solid var(--argus-border);">
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">ID</th>
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Студент</th>
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Сессия</th>
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Причина</th>
-              <th class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Статус</th>
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Дата</th>
-              <th class="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Действия</th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                ID
+              </th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Студент
+              </th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Сессия
+              </th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Причина
+              </th>
+              <th
+                class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Статус
+              </th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Дата
+              </th>
+              <th
+                class="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Действия
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -245,28 +338,48 @@ onMounted(() => fetchAppeals())
               @click="openAppeal(appeal)"
             >
               <td class="px-5 py-3.5">
-                <span class="text-[10px] font-mono" style="color: var(--argus-text-muted);">{{ appeal.id.slice(0, 12) }}...</span>
+                <span
+                  class="text-[10px] font-mono"
+                  style="color: var(--argus-text-muted);"
+                >{{ appeal.id.slice(0, 12) }}...</span>
               </td>
               <td class="px-5 py-3.5">
-                <span class="text-xs font-medium" style="color: var(--argus-text);">{{ appeal.studentId }}</span>
+                <span
+                  class="text-xs font-medium"
+                  style="color: var(--argus-text);"
+                >{{ appeal.studentId }}</span>
               </td>
               <td class="px-5 py-3.5">
-                <span class="text-[10px] font-mono" style="color: var(--argus-text-muted);">{{ appeal.sessionId.slice(0, 12) }}...</span>
+                <span
+                  class="text-[10px] font-mono"
+                  style="color: var(--argus-text-muted);"
+                >{{ appeal.sessionId.slice(0, 12) }}...</span>
               </td>
               <td class="px-5 py-3.5">
-                <p class="text-xs truncate max-w-xs" style="color: var(--argus-text-muted);">{{ appeal.reason }}</p>
+                <p
+                  class="text-xs truncate max-w-xs"
+                  style="color: var(--argus-text-muted);"
+                >
+                  {{ appeal.reason }}
+                </p>
               </td>
               <td class="px-5 py-3.5 text-center">
                 <span
                   class="inline-flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full uppercase"
                   :style="{ background: statusBgColor(appeal.status, 0.1), color: statusColor(appeal.status) }"
                 >
-                  <UIcon :name="statusIcon(appeal.status)" class="size-3" />
+                  <UIcon
+                    :name="statusIcon(appeal.status)"
+                    class="size-3"
+                  />
                   {{ statusLabel(appeal.status) }}
                 </span>
               </td>
               <td class="px-5 py-3.5">
-                <span class="text-xs" style="color: var(--argus-text-muted);">{{ formatDate(appeal.createdAt) }}</span>
+                <span
+                  class="text-xs"
+                  style="color: var(--argus-text-muted);"
+                >{{ formatDate(appeal.createdAt) }}</span>
               </td>
               <td class="px-5 py-3.5 text-right">
                 <button
@@ -274,7 +387,10 @@ onMounted(() => fetchAppeals())
                   :style="{ background: accentBg(0.08), color: 'var(--argus-accent)' }"
                   @click.stop="openAppeal(appeal)"
                 >
-                  <UIcon name="i-lucide-eye" class="size-3" />
+                  <UIcon
+                    name="i-lucide-eye"
+                    class="size-3"
+                  />
                   Подробнее
                 </button>
               </td>
@@ -288,9 +404,21 @@ onMounted(() => fetchAppeals())
         v-if="!loading && filteredAppeals.length === 0"
         class="flex flex-col items-center justify-center py-16"
       >
-        <UIcon name="i-lucide-inbox" class="size-12 mb-3" style="color: var(--argus-text-dimmed);" />
-        <p class="text-sm font-medium" style="color: var(--argus-text);">Нет апелляций</p>
-        <p class="text-xs mt-1" style="color: var(--argus-text-dimmed);">
+        <UIcon
+          name="i-lucide-inbox"
+          class="size-12 mb-3"
+          style="color: var(--argus-text-dimmed);"
+        />
+        <p
+          class="text-sm font-medium"
+          style="color: var(--argus-text);"
+        >
+          Нет апелляций
+        </p>
+        <p
+          class="text-xs mt-1"
+          style="color: var(--argus-text-dimmed);"
+        >
           {{ statusFilter === 'all' ? 'Апелляции ещё не были поданы' : 'Нет апелляций с данным статусом' }}
         </p>
       </div>
@@ -316,18 +444,34 @@ onMounted(() => fetchAppeals())
             :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
           >
             <!-- Header -->
-            <div class="flex items-center justify-between px-6 py-4 border-b shrink-0" style="border-color: var(--argus-border);">
+            <div
+              class="flex items-center justify-between px-6 py-4 border-b shrink-0"
+              style="border-color: var(--argus-border);"
+            >
               <div class="flex items-center gap-3">
                 <span
                   class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
                   :style="{ background: statusBgColor(selectedAppeal.status, 0.1), color: statusColor(selectedAppeal.status) }"
                 >
-                  <UIcon :name="statusIcon(selectedAppeal.status)" class="size-3.5" />
+                  <UIcon
+                    :name="statusIcon(selectedAppeal.status)"
+                    class="size-3.5"
+                  />
                   <span class="text-[10px] font-bold uppercase">{{ statusLabel(selectedAppeal.status) }}</span>
                 </span>
                 <div>
-                  <h2 class="text-lg font-bold" style="color: var(--argus-text);">Апелляция</h2>
-                  <p class="text-[10px] font-mono" style="color: var(--argus-text-dimmed);">{{ selectedAppeal.id }}</p>
+                  <h2
+                    class="text-lg font-bold"
+                    style="color: var(--argus-text);"
+                  >
+                    Апелляция
+                  </h2>
+                  <p
+                    class="text-[10px] font-mono"
+                    style="color: var(--argus-text-dimmed);"
+                  >
+                    {{ selectedAppeal.id }}
+                  </p>
                 </div>
               </div>
               <button
@@ -335,45 +479,113 @@ onMounted(() => fetchAppeals())
                 style="color: var(--argus-text-dimmed);"
                 @click="closeDetail"
               >
-                <UIcon name="i-lucide-x" class="size-5" />
+                <UIcon
+                  name="i-lucide-x"
+                  class="size-5"
+                />
               </button>
             </div>
 
             <!-- Body -->
             <div class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
               <!-- Loading -->
-              <div v-if="detailLoading" class="flex items-center justify-center py-8">
-                <div class="animate-spin rounded-full size-6 border-2 border-t-transparent" style="border-color: var(--argus-accent); border-top-color: transparent;" />
+              <div
+                v-if="detailLoading"
+                class="flex items-center justify-center py-8"
+              >
+                <div
+                  class="animate-spin rounded-full size-6 border-2 border-t-transparent"
+                  style="border-color: var(--argus-accent); border-top-color: transparent;"
+                />
               </div>
 
               <template v-else>
                 <!-- Appeal Info Cards -->
                 <div class="grid grid-cols-2 gap-3">
-                  <div class="rounded-lg border p-3" :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }">
-                    <span class="text-[9px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Студент</span>
-                    <p class="text-sm font-bold mt-1" style="color: var(--argus-text);">{{ selectedAppeal.studentId }}</p>
+                  <div
+                    class="rounded-lg border p-3"
+                    :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }"
+                  >
+                    <span
+                      class="text-[9px] font-semibold uppercase tracking-wider"
+                      style="color: var(--argus-text-dimmed);"
+                    >Студент</span>
+                    <p
+                      class="text-sm font-bold mt-1"
+                      style="color: var(--argus-text);"
+                    >
+                      {{ selectedAppeal.studentId }}
+                    </p>
                   </div>
-                  <div class="rounded-lg border p-3" :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }">
-                    <span class="text-[9px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Экзамен</span>
-                    <p class="text-sm font-bold mt-1" style="color: var(--argus-text);">{{ selectedAppeal.examId }}</p>
+                  <div
+                    class="rounded-lg border p-3"
+                    :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }"
+                  >
+                    <span
+                      class="text-[9px] font-semibold uppercase tracking-wider"
+                      style="color: var(--argus-text-dimmed);"
+                    >Экзамен</span>
+                    <p
+                      class="text-sm font-bold mt-1"
+                      style="color: var(--argus-text);"
+                    >
+                      {{ selectedAppeal.examId }}
+                    </p>
                   </div>
-                  <div class="rounded-lg border p-3" :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }">
-                    <span class="text-[9px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Сессия</span>
-                    <p class="text-xs font-mono mt-1" style="color: var(--argus-text-muted);">{{ selectedAppeal.sessionId }}</p>
+                  <div
+                    class="rounded-lg border p-3"
+                    :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }"
+                  >
+                    <span
+                      class="text-[9px] font-semibold uppercase tracking-wider"
+                      style="color: var(--argus-text-dimmed);"
+                    >Сессия</span>
+                    <p
+                      class="text-xs font-mono mt-1"
+                      style="color: var(--argus-text-muted);"
+                    >
+                      {{ selectedAppeal.sessionId }}
+                    </p>
                   </div>
-                  <div class="rounded-lg border p-3" :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }">
-                    <span class="text-[9px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Подана</span>
-                    <p class="text-xs font-medium mt-1" style="color: var(--argus-text);">{{ formatDateTime(selectedAppeal.createdAt) }}</p>
+                  <div
+                    class="rounded-lg border p-3"
+                    :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }"
+                  >
+                    <span
+                      class="text-[9px] font-semibold uppercase tracking-wider"
+                      style="color: var(--argus-text-dimmed);"
+                    >Подана</span>
+                    <p
+                      class="text-xs font-medium mt-1"
+                      style="color: var(--argus-text);"
+                    >
+                      {{ formatDateTime(selectedAppeal.createdAt) }}
+                    </p>
                   </div>
                 </div>
 
                 <!-- Reason -->
-                <div class="rounded-lg border p-4" :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }">
+                <div
+                  class="rounded-lg border p-4"
+                  :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }"
+                >
                   <div class="flex items-center gap-2 mb-2">
-                    <UIcon name="i-lucide-message-square" class="size-3.5" style="color: var(--argus-accent);" />
-                    <span class="text-[10px] font-semibold" style="color: var(--argus-text-dimmed);">Причина апелляции</span>
+                    <UIcon
+                      name="i-lucide-message-square"
+                      class="size-3.5"
+                      style="color: var(--argus-accent);"
+                    />
+                    <span
+                      class="text-[10px] font-semibold"
+                      style="color: var(--argus-text-dimmed);"
+                    >Причина апелляции</span>
                   </div>
-                  <p class="text-sm leading-relaxed" style="color: var(--argus-text);">{{ selectedAppeal.reason }}</p>
+                  <p
+                    class="text-sm leading-relaxed"
+                    style="color: var(--argus-text);"
+                  >
+                    {{ selectedAppeal.reason }}
+                  </p>
                 </div>
 
                 <!-- Existing Review (if reviewed) -->
@@ -386,21 +598,54 @@ onMounted(() => fetchAppeals())
                   }"
                 >
                   <div class="flex items-center gap-2 mb-2">
-                    <UIcon name="i-lucide-clipboard-check" class="size-3.5" :style="{ color: statusColor(selectedAppeal.status) }" />
-                    <span class="text-[10px] font-semibold" :style="{ color: statusColor(selectedAppeal.status) }">Решение рецензента</span>
+                    <UIcon
+                      name="i-lucide-clipboard-check"
+                      class="size-3.5"
+                      :style="{ color: statusColor(selectedAppeal.status) }"
+                    />
+                    <span
+                      class="text-[10px] font-semibold"
+                      :style="{ color: statusColor(selectedAppeal.status) }"
+                    >Решение рецензента</span>
                   </div>
                   <div class="space-y-1.5">
-                    <div v-if="selectedAppeal.reviewedBy" class="flex items-center gap-2">
-                      <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Рецензент:</span>
-                      <span class="text-[10px] font-medium" style="color: var(--argus-text);">{{ selectedAppeal.reviewedBy }}</span>
+                    <div
+                      v-if="selectedAppeal.reviewedBy"
+                      class="flex items-center gap-2"
+                    >
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >Рецензент:</span>
+                      <span
+                        class="text-[10px] font-medium"
+                        style="color: var(--argus-text);"
+                      >{{ selectedAppeal.reviewedBy }}</span>
                     </div>
-                    <div v-if="selectedAppeal.reviewedAt" class="flex items-center gap-2">
-                      <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Дата:</span>
-                      <span class="text-[10px] font-medium" style="color: var(--argus-text);">{{ formatDateTime(selectedAppeal.reviewedAt) }}</span>
+                    <div
+                      v-if="selectedAppeal.reviewedAt"
+                      class="flex items-center gap-2"
+                    >
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >Дата:</span>
+                      <span
+                        class="text-[10px] font-medium"
+                        style="color: var(--argus-text);"
+                      >{{ formatDateTime(selectedAppeal.reviewedAt) }}</span>
                     </div>
                     <div v-if="selectedAppeal.reviewNotes">
-                      <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Комментарий:</span>
-                      <p class="text-xs mt-0.5 leading-relaxed" style="color: var(--argus-text);">{{ selectedAppeal.reviewNotes }}</p>
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >Комментарий:</span>
+                      <p
+                        class="text-xs mt-0.5 leading-relaxed"
+                        style="color: var(--argus-text);"
+                      >
+                        {{ selectedAppeal.reviewNotes }}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -412,8 +657,15 @@ onMounted(() => fetchAppeals())
                   :style="{ borderColor: accentBg(0.2), background: accentBg(0.03) }"
                 >
                   <div class="flex items-center gap-2">
-                    <UIcon name="i-lucide-gavel" class="size-3.5" style="color: var(--argus-accent);" />
-                    <span class="text-xs font-semibold" style="color: var(--argus-text);">Вынести решение</span>
+                    <UIcon
+                      name="i-lucide-gavel"
+                      class="size-3.5"
+                      style="color: var(--argus-accent);"
+                    />
+                    <span
+                      class="text-xs font-semibold"
+                      style="color: var(--argus-text);"
+                    >Вынести решение</span>
                   </div>
 
                   <!-- Decision selector -->
@@ -429,7 +681,10 @@ onMounted(() => fetchAppeals())
                       }"
                       @click="reviewStatus = option"
                     >
-                      <UIcon :name="statusIcon(option)" class="size-3" />
+                      <UIcon
+                        :name="statusIcon(option)"
+                        class="size-3"
+                      />
                       {{ statusLabel(option) }}
                     </button>
                   </div>
@@ -464,7 +719,11 @@ onMounted(() => fetchAppeals())
                         class="animate-spin rounded-full size-3 border border-t-transparent"
                         :style="{ borderColor: statusColor(reviewStatus), borderTopColor: 'transparent' }"
                       />
-                      <UIcon v-else name="i-lucide-send" class="size-3.5" />
+                      <UIcon
+                        v-else
+                        name="i-lucide-send"
+                        class="size-3.5"
+                      />
                       {{ reviewSubmitting ? 'Сохранение...' : 'Сохранить решение' }}
                     </button>
                   </div>
@@ -475,7 +734,10 @@ onMounted(() => fetchAppeals())
                     class="flex items-center gap-2 px-3 py-2 rounded-lg text-[10px]"
                     :style="{ background: errorBg(0.08), color: 'var(--argus-error)' }"
                   >
-                    <UIcon name="i-lucide-alert-circle" class="size-3 shrink-0" />
+                    <UIcon
+                      name="i-lucide-alert-circle"
+                      class="size-3 shrink-0"
+                    />
                     {{ reviewError }}
                   </div>
                   <div
@@ -483,7 +745,10 @@ onMounted(() => fetchAppeals())
                     class="flex items-center gap-2 px-3 py-2 rounded-lg text-[10px]"
                     :style="{ background: successBg(0.08), color: 'var(--argus-success)' }"
                   >
-                    <UIcon name="i-lucide-check-circle" class="size-3 shrink-0" />
+                    <UIcon
+                      name="i-lucide-check-circle"
+                      class="size-3 shrink-0"
+                    />
                     {{ reviewSuccess }}
                   </div>
                 </div>
@@ -494,8 +759,15 @@ onMounted(() => fetchAppeals())
                   class="flex items-center gap-2 px-4 py-3 rounded-lg border"
                   :style="{ borderColor: 'var(--argus-border)', background: 'var(--argus-bg-elevated)' }"
                 >
-                  <UIcon name="i-lucide-lock" class="size-3.5" style="color: var(--argus-text-dimmed);" />
-                  <span class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">
+                  <UIcon
+                    name="i-lucide-lock"
+                    class="size-3.5"
+                    style="color: var(--argus-text-dimmed);"
+                  />
+                  <span
+                    class="text-[10px] font-medium"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     Решение по апелляции является окончательным и не может быть изменено
                   </span>
                 </div>

@@ -156,6 +156,10 @@ const chartOptions = computed(() => ({
 
 <template>
   <div class="w-full h-56">
-    <Bar :key="chartKey" :data="chartData" :options="chartOptions" />
+    <Bar
+      :key="chartKey"
+      :data="chartData"
+      :options="chartOptions"
+    />
   </div>
 </template>

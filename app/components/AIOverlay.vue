@@ -46,7 +46,7 @@ const props = withDefaults(defineProps<{
   isVisionActive: boolean
   isAudioActive: boolean
   thresholds?: {
-    headPose: { yaw: number; pitch: number; roll: number }
+    headPose: { yaw: number, pitch: number, roll: number }
     gaze: number
     blinkEAR: number
   }
@@ -221,27 +221,48 @@ const inferenceMs = computed(() => props.visionFrame?.inferenceMs?.toFixed(1) ??
       }"
     >
       <!-- Corner markers (tactical HUD style) -->
-      <span class="ai-corner ai-corner-tl" :style="{ borderColor: bboxBorderColor }" />
-      <span class="ai-corner ai-corner-tr" :style="{ borderColor: bboxBorderColor }" />
-      <span class="ai-corner ai-corner-bl" :style="{ borderColor: bboxBorderColor }" />
-      <span class="ai-corner ai-corner-br" :style="{ borderColor: bboxBorderColor }" />
+      <span
+        class="ai-corner ai-corner-tl"
+        :style="{ borderColor: bboxBorderColor }"
+      />
+      <span
+        class="ai-corner ai-corner-tr"
+        :style="{ borderColor: bboxBorderColor }"
+      />
+      <span
+        class="ai-corner ai-corner-bl"
+        :style="{ borderColor: bboxBorderColor }"
+      />
+      <span
+        class="ai-corner ai-corner-br"
+        :style="{ borderColor: bboxBorderColor }"
+      />
 
       <!-- Face ID Badge (top-left) -->
       <div class="ai-badge ai-badge-tl">
-        <span class="ai-badge-dot" :style="{ background: bboxBorderColor }" />
+        <span
+          class="ai-badge-dot"
+          :style="{ background: bboxBorderColor }"
+        />
         <span class="ai-badge-text">
           {{ multiFace ? `${visionFrame?.faceCount} ЛИЦА` : 'ЛИЦО' }}
         </span>
       </div>
 
       <!-- Liveness Badge (top-right) -->
-      <div class="ai-badge ai-badge-tr" :style="{ color: livenessColor }">
+      <div
+        class="ai-badge ai-badge-tr"
+        :style="{ color: livenessColor }"
+      >
         {{ (livenessScore * 100).toFixed(0) }}%
       </div>
     </div>
 
     <!-- No face warning -->
-    <div v-if="isVisionActive && !faceDetected && visionFrame" class="ai-no-face">
+    <div
+      v-if="isVisionActive && !faceDetected && visionFrame"
+      class="ai-no-face"
+    >
       <div class="ai-no-face-icon">
         <span class="i-lucide-user-x" />
       </div>
@@ -249,7 +270,10 @@ const inferenceMs = computed(() => props.visionFrame?.inferenceMs?.toFixed(1) ??
     </div>
 
     <!-- Multi-face warning -->
-    <div v-if="multiFace" class="ai-multi-face-warning">
+    <div
+      v-if="multiFace"
+      class="ai-multi-face-warning"
+    >
       <span class="i-lucide-users" />
       <span>{{ visionFrame?.faceCount }} ЛИЦА ОБНАРУЖЕНЫ</span>
     </div>
@@ -270,9 +294,15 @@ const inferenceMs = computed(() => props.visionFrame?.inferenceMs?.toFixed(1) ??
     <!-- =================================================================
       HEAD-UP DISPLAY (bottom-left)
     ================================================================== -->
-    <div v-if="isVisionActive && visionFrame" class="ai-hud ai-hud-bl">
+    <div
+      v-if="isVisionActive && visionFrame"
+      class="ai-hud ai-hud-bl"
+    >
       <!-- Head Pose -->
-      <div class="ai-hud-row" :style="{ color: headPoseColor }">
+      <div
+        class="ai-hud-row"
+        :style="{ color: headPoseColor }"
+      >
         <span class="i-lucide-rotate-3d ai-hud-icon" />
         <span class="ai-hud-label">HPE</span>
         <span class="ai-hud-value">
@@ -283,12 +313,18 @@ const inferenceMs = computed(() => props.visionFrame?.inferenceMs?.toFixed(1) ??
       </div>
 
       <!-- Gaze Direction -->
-      <div class="ai-hud-row" :style="{ color: gazeDeviation ? 'var(--argus-warning)' : 'var(--argus-success)' }">
+      <div
+        class="ai-hud-row"
+        :style="{ color: gazeDeviation ? 'var(--argus-warning)' : 'var(--argus-success)' }"
+      >
         <span class="i-lucide-eye ai-hud-icon" />
         <span class="ai-hud-label">GAZE</span>
         <span class="ai-hud-value">
           {{ gazeStatus.toUpperCase() }}
-          <span v-if="visionFrame.gaze.angleDegrees > 0" class="ai-hud-dim">
+          <span
+            v-if="visionFrame.gaze.angleDegrees > 0"
+            class="ai-hud-dim"
+          >
             {{ visionFrame.gaze.angleDegrees.toFixed(0) }}°
           </span>
         </span>
@@ -298,7 +334,10 @@ const inferenceMs = computed(() => props.visionFrame?.inferenceMs?.toFixed(1) ??
       <div class="ai-hud-row">
         <span class="i-lucide-scan-face ai-hud-icon" />
         <span class="ai-hud-label">EAR</span>
-        <span class="ai-hud-value" :class="{ 'ai-blink-flash': blinkActive }">
+        <span
+          class="ai-hud-value"
+          :class="{ 'ai-blink-flash': blinkActive }"
+        >
           {{ ((visionFrame.blink.leftEAR + visionFrame.blink.rightEAR) / 2).toFixed(2) }}
           <span class="ai-hud-dim">
             {{ visionFrame.blink.blinkRatePerMin.toFixed(0) }}/мин
@@ -307,7 +346,10 @@ const inferenceMs = computed(() => props.visionFrame?.inferenceMs?.toFixed(1) ??
       </div>
 
       <!-- Liveness -->
-      <div class="ai-hud-row" :style="{ color: livenessColor }">
+      <div
+        class="ai-hud-row"
+        :style="{ color: livenessColor }"
+      >
         <span class="i-lucide-shield-check ai-hud-icon" />
         <span class="ai-hud-label">LIVE</span>
         <div class="ai-liveness-bar">
@@ -323,10 +365,16 @@ const inferenceMs = computed(() => props.visionFrame?.inferenceMs?.toFixed(1) ??
     <!-- =================================================================
       AUDIO HUD (bottom-right)
     ================================================================== -->
-    <div v-if="isAudioActive && audioFrame" class="ai-hud ai-hud-br">
+    <div
+      v-if="isAudioActive && audioFrame"
+      class="ai-hud ai-hud-br"
+    >
       <!-- Audio Level Meter -->
       <div class="ai-hud-row">
-        <span class="i-lucide-volume-2 ai-hud-icon" :style="{ color: audioColor }" />
+        <span
+          class="i-lucide-volume-2 ai-hud-icon"
+          :style="{ color: audioColor }"
+        />
         <span class="ai-hud-label">RMS</span>
         <div class="ai-audio-meter">
           <div
@@ -334,7 +382,10 @@ const inferenceMs = computed(() => props.visionFrame?.inferenceMs?.toFixed(1) ??
             :style="{ width: `${audioLevel}%`, background: audioColor }"
           />
         </div>
-        <span class="ai-hud-value" :style="{ color: audioColor }">
+        <span
+          class="ai-hud-value"
+          :style="{ color: audioColor }"
+        >
           {{ audioFrame.rmsDb.toFixed(0) }}dB
         </span>
       </div>
@@ -347,26 +398,42 @@ const inferenceMs = computed(() => props.visionFrame?.inferenceMs?.toFixed(1) ??
           :style="{ color: vadActive ? 'var(--argus-success)' : 'var(--argus-text-dimmed)' }"
         />
         <span class="ai-hud-label">VAD</span>
-        <span class="ai-hud-value" :style="{ color: vadActive ? 'var(--argus-success)' : 'var(--argus-text-dimmed)' }">
+        <span
+          class="ai-hud-value"
+          :style="{ color: vadActive ? 'var(--argus-success)' : 'var(--argus-text-dimmed)' }"
+        >
           {{ vadActive ? 'АКТИВНО' : 'ТИХО' }}
         </span>
       </div>
 
       <!-- Classification -->
       <div class="ai-hud-row">
-        <span class="i-lucide-audio-waveform ai-hud-icon" :style="{ color: audioColor }" />
+        <span
+          class="i-lucide-audio-waveform ai-hud-icon"
+          :style="{ color: audioColor }"
+        />
         <span class="ai-hud-label">CLS</span>
-        <span class="ai-hud-value ai-classification-badge" :style="{ color: audioColor }">
+        <span
+          class="ai-hud-value ai-classification-badge"
+          :style="{ color: audioColor }"
+        >
           {{ audioFrame.classification.toUpperCase() }}
         </span>
-        <span v-if="audioFrame.speakerCount > 1" class="ai-speaker-count">
+        <span
+          v-if="audioFrame.speakerCount > 1"
+          class="ai-speaker-count"
+        >
           ×{{ audioFrame.speakerCount }}
         </span>
       </div>
 
       <!-- Waveform -->
       <div class="ai-waveform-container">
-        <svg viewBox="0 0 120 32" preserveAspectRatio="none" class="ai-waveform-svg">
+        <svg
+          viewBox="0 0 120 32"
+          preserveAspectRatio="none"
+          class="ai-waveform-svg"
+        >
           <path
             :d="waveformPath"
             fill="none"
@@ -381,7 +448,10 @@ const inferenceMs = computed(() => props.visionFrame?.inferenceMs?.toFixed(1) ??
     <!-- =================================================================
       DEBUG HUD (top-right, optional)
     ================================================================== -->
-    <div v-if="showDebug && visionFrame" class="ai-hud ai-hud-debug">
+    <div
+      v-if="showDebug && visionFrame"
+      class="ai-hud ai-hud-debug"
+    >
       <div class="ai-hud-row">
         <span class="ai-hud-label">INF</span>
         <span class="ai-hud-value">{{ inferenceMs }}ms</span>

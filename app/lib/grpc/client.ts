@@ -312,7 +312,7 @@ export class EventCollectorClient {
   /**
    * Get current buffer sizes for monitoring.
    */
-  getBufferStats(): { telemetry: number; violations: number; batchConfig: BatchConfig } {
+  getBufferStats(): { telemetry: number, violations: number, batchConfig: BatchConfig } {
     return {
       telemetry: this.telemetryBuffer.length,
       violations: this.violationBuffer.length,
@@ -333,17 +333,17 @@ export class EventCollectorClient {
    */
   reconfigureBatch(tier: 'A' | 'B' | 'C'): void {
     const TIER_BATCH_CONFIGS: Record<string, Partial<BatchConfig>> = {
-      A: { maxBatchSize: 100, flushIntervalMs: 500 },   // Low latency, small batches
-      B: { maxBatchSize: 200, flushIntervalMs: 2000 },   // Reduced RPS, larger batches
-      C: { maxBatchSize: 500, flushIntervalMs: 5000 }    // Store-and-forward, max batching
+      A: { maxBatchSize: 100, flushIntervalMs: 500 }, // Low latency, small batches
+      B: { maxBatchSize: 200, flushIntervalMs: 2000 }, // Reduced RPS, larger batches
+      C: { maxBatchSize: 500, flushIntervalMs: 5000 } // Store-and-forward, max batching
     }
 
     const tierConfig = TIER_BATCH_CONFIGS[tier]
     if (!tierConfig) return
 
-    const changed =
-      this.batchConfig.maxBatchSize !== tierConfig.maxBatchSize
-      || this.batchConfig.flushIntervalMs !== tierConfig.flushIntervalMs
+    const changed
+      = this.batchConfig.maxBatchSize !== tierConfig.maxBatchSize
+        || this.batchConfig.flushIntervalMs !== tierConfig.flushIntervalMs
 
     if (!changed) return
 

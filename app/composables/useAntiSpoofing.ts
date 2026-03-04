@@ -46,7 +46,7 @@ export interface SpoofAnalysis {
 
 export interface SpoofSignal {
   name: string
-  score: number       // 0-1 (1 = strong spoof indicator)
+  score: number // 0-1 (1 = strong spoof indicator)
   detail: string
 }
 
@@ -60,8 +60,8 @@ export function useAntiSpoofing() {
   const consecutiveDetections = ref(0)
 
   // Rolling windows for temporal analysis
-  const headPoseHistory: { yaw: number; pitch: number; roll: number; ts: number }[] = []
-  const blinkHistory: { count: number; ts: number }[] = []
+  const headPoseHistory: { yaw: number, pitch: number, roll: number, ts: number }[] = []
+  const blinkHistory: { count: number, ts: number }[] = []
   const livenessHistory: number[] = []
   const frameQualityHistory: number[] = []
 
@@ -95,7 +95,7 @@ export function useAntiSpoofing() {
       yaw: frame.headPose.yaw,
       pitch: frame.headPose.pitch,
       roll: frame.headPose.roll,
-      ts: now,
+      ts: now
     })
     if (headPoseHistory.length > WINDOW_SIZE) headPoseHistory.shift()
 
@@ -136,7 +136,7 @@ export function useAntiSpoofing() {
       head_pose_variance: 0.3,
       blink_pattern: 0.3,
       liveness_consistency: 0.25,
-      quality_variance: 0.15,
+      quality_variance: 0.15
     }
 
     let compositeScore = 0
@@ -162,7 +162,7 @@ export function useAntiSpoofing() {
       confidence: Math.min(1, compositeScore),
       spoofType,
       signals,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     }
 
     currentAnalysis.value = result
@@ -183,7 +183,7 @@ export function useAntiSpoofing() {
               similarity: 0,
               faceCount: 1,
               isSpoof: true,
-              spoofType,
+              spoofType
             }
           },
           `Критическая угроза: обнаружена ${spoofType === 'photo' ? 'фотография' : spoofType === 'screen' ? 'экран' : 'видеозапись'} (${(compositeScore * 100).toFixed(0)}%)`,
@@ -347,6 +347,6 @@ export function useAntiSpoofing() {
     analyze,
     start,
     stop,
-    onEvent,
+    onEvent
   }
 }

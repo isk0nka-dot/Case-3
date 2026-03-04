@@ -72,7 +72,10 @@ const statusConfig = computed(() => {
   <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--argus-bg-elevated)] border border-[var(--argus-border-subtle)]">
     <!-- Status dot -->
     <div class="relative">
-      <div class="w-2 h-2 rounded-full" :class="statusConfig.color" />
+      <div
+        class="w-2 h-2 rounded-full"
+        :class="statusConfig.color"
+      />
       <div
         v-if="health === 'connected'"
         class="absolute inset-0 w-2 h-2 rounded-full animate-ping opacity-75"
@@ -81,7 +84,10 @@ const statusConfig = computed(() => {
     </div>
 
     <!-- Status label -->
-    <span class="text-[11px] font-medium" :class="statusConfig.textColor">
+    <span
+      class="text-[11px] font-medium"
+      :class="statusConfig.textColor"
+    >
       {{ statusConfig.label }}
     </span>
 

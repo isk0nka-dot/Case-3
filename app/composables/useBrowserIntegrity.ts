@@ -57,7 +57,7 @@ export function useBrowserIntegrity() {
     printScreenAttempts: 0,
     contextMenuAttempts: 0,
     lastBlurAt: 0,
-    isSecondScreenDetected: false,
+    isSecondScreenDetected: false
   })
 
   let devToolsTimer: ReturnType<typeof setInterval> | null = null
@@ -439,6 +439,6 @@ export function useBrowserIntegrity() {
     state,
     start,
     stop,
-    onEvent,
+    onEvent
   }
 }

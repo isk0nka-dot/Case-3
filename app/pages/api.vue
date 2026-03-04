@@ -378,13 +378,23 @@ function copyToClipboard(text: string) {
             class="flex items-center justify-center size-8 rounded-lg"
             :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }"
           >
-            <UIcon name="i-lucide-building-2" class="size-4" style="color: var(--argus-accent);" />
+            <UIcon
+              name="i-lucide-building-2"
+              class="size-4"
+              style="color: var(--argus-accent);"
+            />
           </div>
           <div>
-            <p class="text-[10px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+            <p
+              class="text-[10px] font-medium uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
               Контекст организации
             </p>
-            <p class="text-xs font-semibold" style="color: var(--argus-text);">
+            <p
+              class="text-xs font-semibold"
+              style="color: var(--argus-text);"
+            >
               Super Admin — мультитенантный режим
             </p>
           </div>
@@ -439,11 +449,25 @@ function copyToClipboard(text: string) {
                   class="flex items-center justify-center size-7 rounded-md shrink-0"
                   :style="{ background: accentBg(0.1) }"
                 >
-                  <UIcon name="i-lucide-globe" class="size-3.5" style="color: var(--argus-accent);" />
+                  <UIcon
+                    name="i-lucide-globe"
+                    class="size-3.5"
+                    style="color: var(--argus-accent);"
+                  />
                 </div>
                 <div class="flex-1 min-w-0">
-                  <p class="text-xs font-semibold" style="color: var(--argus-text);">Все организации</p>
-                  <p class="text-[10px]" style="color: var(--argus-text-dimmed);">Агрегированные данные по всем орг.</p>
+                  <p
+                    class="text-xs font-semibold"
+                    style="color: var(--argus-text);"
+                  >
+                    Все организации
+                  </p>
+                  <p
+                    class="text-[10px]"
+                    style="color: var(--argus-text-dimmed);"
+                  >
+                    Агрегированные данные по всем орг.
+                  </p>
                 </div>
                 <UIcon
                   v-if="selectedOrgFilter === null"
@@ -455,9 +479,19 @@ function copyToClipboard(text: string) {
 
               <!-- Org list -->
               <div class="max-h-[280px] overflow-y-auto">
-                <div v-if="orgsLoading" class="flex items-center justify-center py-6">
-                  <UIcon name="i-lucide-loader-2" class="size-4 animate-spin" style="color: var(--argus-text-dimmed);" />
-                  <span class="text-xs ml-2" style="color: var(--argus-text-dimmed);">Загрузка...</span>
+                <div
+                  v-if="orgsLoading"
+                  class="flex items-center justify-center py-6"
+                >
+                  <UIcon
+                    name="i-lucide-loader-2"
+                    class="size-4 animate-spin"
+                    style="color: var(--argus-text-dimmed);"
+                  />
+                  <span
+                    class="text-xs ml-2"
+                    style="color: var(--argus-text-dimmed);"
+                  >Загрузка...</span>
                 </div>
                 <button
                   v-for="org in orgs"
@@ -483,9 +517,17 @@ function copyToClipboard(text: string) {
                     />
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-xs font-medium truncate" style="color: var(--argus-text);">{{ org.name }}</p>
+                    <p
+                      class="text-xs font-medium truncate"
+                      style="color: var(--argus-text);"
+                    >
+                      {{ org.name }}
+                    </p>
                     <div class="flex items-center gap-2 mt-0.5">
-                      <span class="text-[9px]" style="color: var(--argus-text-dimmed);">{{ org.slug }}</span>
+                      <span
+                        class="text-[9px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >{{ org.slug }}</span>
                       <span
                         class="text-[8px] font-bold px-1 py-0.5 rounded uppercase"
                         :style="{
@@ -538,7 +580,10 @@ function copyToClipboard(text: string) {
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <p class="text-sm font-semibold" style="color: var(--argus-text);">
+              <p
+                class="text-sm font-semibold"
+                style="color: var(--argus-text);"
+              >
                 Глобальная доставка вебхуков
               </p>
               <span
@@ -551,7 +596,10 @@ function copyToClipboard(text: string) {
                 {{ globalWebhookHealth.status === 'healthy' ? 'Здоровый' : globalWebhookHealth.status === 'degraded' ? 'Деградация' : globalWebhookHealth.status === 'critical' ? 'Критический' : 'Неизвестно' }}
               </span>
             </div>
-            <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">
+            <p
+              class="text-[10px] mt-0.5"
+              style="color: var(--argus-text-dimmed);"
+            >
               Кросс-организационный мониторинг webhook доставки
             </p>
           </div>
@@ -567,16 +615,35 @@ function copyToClipboard(text: string) {
             >
               {{ globalWebhookHealth.rate }}%
             </p>
-            <p class="text-[9px] font-medium" style="color: var(--argus-text-dimmed);">Успех доставки</p>
+            <p
+              class="text-[9px] font-medium"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Успех доставки
+            </p>
           </div>
-          <div class="h-8 w-px" style="background: var(--argus-border);" />
+          <div
+            class="h-8 w-px"
+            style="background: var(--argus-border);"
+          />
           <div class="text-center">
-            <p class="text-lg font-bold tabular-nums" style="color: var(--argus-text);">
+            <p
+              class="text-lg font-bold tabular-nums"
+              style="color: var(--argus-text);"
+            >
               {{ globalWebhookHealth.totalDeliveries }}
             </p>
-            <p class="text-[9px] font-medium" style="color: var(--argus-text-dimmed);">Всего попыток</p>
+            <p
+              class="text-[9px] font-medium"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Всего попыток
+            </p>
           </div>
-          <div class="h-8 w-px" style="background: var(--argus-border);" />
+          <div
+            class="h-8 w-px"
+            style="background: var(--argus-border);"
+          />
           <div class="text-center">
             <p
               class="text-lg font-bold tabular-nums"
@@ -584,14 +651,30 @@ function copyToClipboard(text: string) {
             >
               {{ globalWebhookHealth.failedCount }}
             </p>
-            <p class="text-[9px] font-medium" style="color: var(--argus-text-dimmed);">Ошибки</p>
+            <p
+              class="text-[9px] font-medium"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Ошибки
+            </p>
           </div>
-          <div class="h-8 w-px" style="background: var(--argus-border);" />
+          <div
+            class="h-8 w-px"
+            style="background: var(--argus-border);"
+          />
           <div class="text-center">
-            <p class="text-lg font-bold tabular-nums" style="color: var(--argus-text);">
+            <p
+              class="text-lg font-bold tabular-nums"
+              style="color: var(--argus-text);"
+            >
               {{ globalWebhookHealth.avgLatency }}мс
             </p>
-            <p class="text-[9px] font-medium" style="color: var(--argus-text-dimmed);">Сред. задержка</p>
+            <p
+              class="text-[9px] font-medium"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Сред. задержка
+            </p>
           </div>
         </div>
       </div>
@@ -602,10 +685,16 @@ function copyToClipboard(text: string) {
     <!-- ============================== -->
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold" style="color: var(--argus-text);">
+        <h1
+          class="text-2xl font-bold"
+          style="color: var(--argus-text);"
+        >
           API и Интеграции
         </h1>
-        <p class="text-sm mt-1" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-sm mt-1"
+          style="color: var(--argus-text-dimmed);"
+        >
           Управление API-ключами, вебхуками и интеграциями с внешними системами
         </p>
       </div>
@@ -630,19 +719,50 @@ function copyToClipboard(text: string) {
           >
             {{ store.apiSystemStatus === 'operational' ? 'Система защищена' : store.apiSystemStatus === 'degraded' ? 'Частичная деградация' : 'Система недоступна' }}
           </span>
-          <UIcon name="i-lucide-shield-check" class="size-4" :style="{ color: store.apiSystemStatus === 'operational' ? 'var(--argus-success)' : 'var(--argus-warning)' }" />
+          <UIcon
+            name="i-lucide-shield-check"
+            class="size-4"
+            :style="{ color: store.apiSystemStatus === 'operational' ? 'var(--argus-success)' : 'var(--argus-warning)' }"
+          />
         </div>
 
         <!-- Quick stats -->
-        <div class="flex items-center gap-2 px-3 py-2 rounded-lg" :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)' }">
-          <span class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">Ключей:</span>
-          <span class="text-xs font-bold" style="color: var(--argus-text);">{{ activeKeysCount }}</span>
-          <span class="text-[10px] mx-1" style="color: var(--argus-border);">·</span>
-          <span class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">Хуков:</span>
-          <span class="text-xs font-bold" style="color: var(--argus-text);">{{ activeWebhooksCount }}</span>
-          <span class="text-[10px] mx-1" style="color: var(--argus-border);">·</span>
-          <span class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">Доставка:</span>
-          <span class="text-xs font-bold" style="color: var(--argus-success);">{{ deliverySuccessRate }}%</span>
+        <div
+          class="flex items-center gap-2 px-3 py-2 rounded-lg"
+          :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)' }"
+        >
+          <span
+            class="text-[10px] font-medium"
+            style="color: var(--argus-text-dimmed);"
+          >Ключей:</span>
+          <span
+            class="text-xs font-bold"
+            style="color: var(--argus-text);"
+          >{{ activeKeysCount }}</span>
+          <span
+            class="text-[10px] mx-1"
+            style="color: var(--argus-border);"
+          >·</span>
+          <span
+            class="text-[10px] font-medium"
+            style="color: var(--argus-text-dimmed);"
+          >Хуков:</span>
+          <span
+            class="text-xs font-bold"
+            style="color: var(--argus-text);"
+          >{{ activeWebhooksCount }}</span>
+          <span
+            class="text-[10px] mx-1"
+            style="color: var(--argus-border);"
+          >·</span>
+          <span
+            class="text-[10px] font-medium"
+            style="color: var(--argus-text-dimmed);"
+          >Доставка:</span>
+          <span
+            class="text-xs font-bold"
+            style="color: var(--argus-success);"
+          >{{ deliverySuccessRate }}%</span>
         </div>
       </div>
     </div>
@@ -660,11 +780,25 @@ function copyToClipboard(text: string) {
             class="flex items-center justify-center size-10 rounded-lg"
             :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }"
           >
-            <UIcon name="i-lucide-key-round" class="size-5" style="color: var(--argus-accent);" />
+            <UIcon
+              name="i-lucide-key-round"
+              class="size-5"
+              style="color: var(--argus-accent);"
+            />
           </div>
           <div>
-            <p class="text-2xl font-bold tabular-nums" style="color: var(--argus-text);">{{ keyQuotas.totalActive }}</p>
-            <p class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">Активных ключей{{ selectedOrgFilter ? '' : ' (все орг.)' }}</p>
+            <p
+              class="text-2xl font-bold tabular-nums"
+              style="color: var(--argus-text);"
+            >
+              {{ keyQuotas.totalActive }}
+            </p>
+            <p
+              class="text-[10px] font-medium"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Активных ключей{{ selectedOrgFilter ? '' : ' (все орг.)' }}
+            </p>
           </div>
         </div>
       </div>
@@ -674,11 +808,25 @@ function copyToClipboard(text: string) {
             class="flex items-center justify-center size-10 rounded-lg"
             :style="{ background: successBg(0.1), border: `1px solid ${successBg(0.15)}` }"
           >
-            <UIcon name="i-lucide-gauge" class="size-5" style="color: var(--argus-success);" />
+            <UIcon
+              name="i-lucide-gauge"
+              class="size-5"
+              style="color: var(--argus-success);"
+            />
           </div>
           <div>
-            <p class="text-2xl font-bold tabular-nums" style="color: var(--argus-text);">{{ keyQuotas.totalRps }}</p>
-            <p class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">Общий лимит RPS</p>
+            <p
+              class="text-2xl font-bold tabular-nums"
+              style="color: var(--argus-text);"
+            >
+              {{ keyQuotas.totalRps }}
+            </p>
+            <p
+              class="text-[10px] font-medium"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Общий лимит RPS
+            </p>
           </div>
         </div>
       </div>
@@ -688,11 +836,25 @@ function copyToClipboard(text: string) {
             class="flex items-center justify-center size-10 rounded-lg"
             :style="{ background: warningBg(0.1), border: `1px solid ${warningBg(0.15)}` }"
           >
-            <UIcon name="i-lucide-zap" class="size-5" style="color: var(--argus-warning);" />
+            <UIcon
+              name="i-lucide-zap"
+              class="size-5"
+              style="color: var(--argus-warning);"
+            />
           </div>
           <div>
-            <p class="text-2xl font-bold tabular-nums" style="color: var(--argus-text);">{{ keyQuotas.avgRps }}</p>
-            <p class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">Средний RPS / ключ</p>
+            <p
+              class="text-2xl font-bold tabular-nums"
+              style="color: var(--argus-text);"
+            >
+              {{ keyQuotas.avgRps }}
+            </p>
+            <p
+              class="text-[10px] font-medium"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Средний RPS / ключ
+            </p>
           </div>
         </div>
       </div>
@@ -702,11 +864,26 @@ function copyToClipboard(text: string) {
     <!--  API KEYS MANAGEMENT           -->
     <!-- ============================== -->
     <div class="glass-card rounded-xl overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+      <div
+        class="flex items-center justify-between px-5 py-4 border-b"
+        style="border-color: var(--argus-border);"
+      >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-key-round" class="size-4" style="color: var(--argus-accent);" />
-          <h2 class="text-sm font-semibold" style="color: var(--argus-text);">API Ключи</h2>
-          <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
+          <UIcon
+            name="i-lucide-key-round"
+            class="size-4"
+            style="color: var(--argus-accent);"
+          />
+          <h2
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            API Ключи
+          </h2>
+          <span
+            class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+            :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+          >
             {{ activeKeysCount }} активных
           </span>
           <span
@@ -714,7 +891,10 @@ function copyToClipboard(text: string) {
             class="text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1"
             :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
           >
-            <UIcon name="i-lucide-loader-2" class="size-3 animate-spin" />
+            <UIcon
+              name="i-lucide-loader-2"
+              class="size-3 animate-spin"
+            />
             Загрузка...
           </span>
         </div>
@@ -725,24 +905,43 @@ function copyToClipboard(text: string) {
           @mouseleave="($event.currentTarget as HTMLElement).style.background = accentBg(0.1)"
           @click="showNewKeyForm = !showNewKeyForm; createdSecretKey = null"
         >
-          <UIcon name="i-lucide-plus" class="size-3.5" />
+          <UIcon
+            name="i-lucide-plus"
+            class="size-3.5"
+          />
           Создать новый ключ
         </button>
       </div>
 
       <!-- New key form -->
       <Transition name="modal">
-        <div v-if="showNewKeyForm" class="px-5 py-4 border-b space-y-3" style="border-color: var(--argus-border); background: var(--argus-bg-elevated);">
+        <div
+          v-if="showNewKeyForm"
+          class="px-5 py-4 border-b space-y-3"
+          style="border-color: var(--argus-border); background: var(--argus-bg-elevated);"
+        >
           <!-- Created secret banner -->
           <div
             v-if="createdSecretKey"
             class="flex items-start gap-3 px-4 py-3 rounded-lg border"
             :style="{ background: successBg(0.06), borderColor: successBg(0.2) }"
           >
-            <UIcon name="i-lucide-shield-alert" class="size-5 shrink-0 mt-0.5" style="color: var(--argus-success);" />
+            <UIcon
+              name="i-lucide-shield-alert"
+              class="size-5 shrink-0 mt-0.5"
+              style="color: var(--argus-success);"
+            />
             <div class="flex-1 min-w-0">
-              <p class="text-xs font-bold" style="color: var(--argus-success);">Ключ успешно создан!</p>
-              <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-xs font-bold"
+                style="color: var(--argus-success);"
+              >
+                Ключ успешно создан!
+              </p>
+              <p
+                class="text-[10px] mt-0.5"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Скопируйте секрет сейчас. Он больше не будет показан.
               </p>
               <div class="flex items-center gap-2 mt-2">
@@ -757,7 +956,10 @@ function copyToClipboard(text: string) {
                   :style="{ background: 'var(--argus-accent)', color: '#fff' }"
                   @click="copyToClipboard(createdSecretKey!)"
                 >
-                  <UIcon name="i-lucide-copy" class="size-3" />
+                  <UIcon
+                    name="i-lucide-copy"
+                    class="size-3"
+                  />
                   Копировать
                 </button>
               </div>
@@ -767,7 +969,10 @@ function copyToClipboard(text: string) {
               style="color: var(--argus-text-dimmed);"
               @click="createdSecretKey = null"
             >
-              <UIcon name="i-lucide-x" class="size-3.5" />
+              <UIcon
+                name="i-lucide-x"
+                class="size-3.5"
+              />
             </button>
           </div>
 
@@ -777,7 +982,11 @@ function copyToClipboard(text: string) {
               class="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border flex-1 min-w-[200px]"
               :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
             >
-              <UIcon name="i-lucide-tag" class="size-4 shrink-0" style="color: var(--argus-text-dimmed);" />
+              <UIcon
+                name="i-lucide-tag"
+                class="size-4 shrink-0"
+                style="color: var(--argus-text-dimmed);"
+              />
               <input
                 v-model="newKeyName"
                 type="text"
@@ -794,14 +1003,27 @@ function copyToClipboard(text: string) {
               class="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border min-w-[200px]"
               :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
             >
-              <UIcon name="i-lucide-building" class="size-4 shrink-0" style="color: var(--argus-text-dimmed);" />
+              <UIcon
+                name="i-lucide-building"
+                class="size-4 shrink-0"
+                style="color: var(--argus-text-dimmed);"
+              />
               <select
                 v-model="newKeyOrgId"
                 class="w-full bg-transparent text-sm outline-none cursor-pointer appearance-none"
                 :style="{ color: 'var(--argus-text)' }"
               >
-                <option :value="null" disabled>Организация</option>
-                <option v-for="org in orgs" :key="org.orgId" :value="org.orgId">
+                <option
+                  :value="null"
+                  disabled
+                >
+                  Организация
+                </option>
+                <option
+                  v-for="org in orgs"
+                  :key="org.orgId"
+                  :value="org.orgId"
+                >
                   {{ org.name }}
                 </option>
               </select>
@@ -836,7 +1058,10 @@ function copyToClipboard(text: string) {
 
           <!-- Permissions selector -->
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-xs font-medium" style="color: var(--argus-text-dimmed);">Разрешения:</span>
+            <span
+              class="text-xs font-medium"
+              style="color: var(--argus-text-dimmed);"
+            >Разрешения:</span>
             <button
               v-for="perm in availablePermissions"
               :key="perm"
@@ -850,7 +1075,10 @@ function copyToClipboard(text: string) {
                 ? newKeyPermissions.splice(newKeyPermissions.indexOf(perm), 1)
                 : newKeyPermissions.push(perm)"
             >
-              <UIcon :name="newKeyPermissions.includes(perm) ? 'i-lucide-check' : 'i-lucide-circle'" class="size-2.5" />
+              <UIcon
+                :name="newKeyPermissions.includes(perm) ? 'i-lucide-check' : 'i-lucide-circle'"
+                class="size-2.5"
+              />
               {{ perm }}
             </button>
           </div>
@@ -863,7 +1091,11 @@ function copyToClipboard(text: string) {
               :disabled="createKeyLoading"
               @click="generateNewKey"
             >
-              <UIcon :name="createKeyLoading ? 'i-lucide-loader-2' : 'i-lucide-plus-circle'" class="size-3.5" :class="createKeyLoading ? 'animate-spin' : ''" />
+              <UIcon
+                :name="createKeyLoading ? 'i-lucide-loader-2' : 'i-lucide-plus-circle'"
+                class="size-3.5"
+                :class="createKeyLoading ? 'animate-spin' : ''"
+              />
               {{ createKeyLoading ? 'Генерация...' : 'Сгенерировать' }}
             </button>
             <button
@@ -873,7 +1105,10 @@ function copyToClipboard(text: string) {
               @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
               @click="closeNewKeyForm"
             >
-              <UIcon name="i-lucide-x" class="size-4" />
+              <UIcon
+                name="i-lucide-x"
+                class="size-4"
+              />
             </button>
           </div>
         </div>
@@ -884,7 +1119,12 @@ function copyToClipboard(text: string) {
         <table class="w-full text-sm">
           <thead>
             <tr style="border-bottom: 1px solid var(--argus-border);">
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Название</th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Название
+              </th>
               <th
                 v-if="authStore.isSuperAdmin"
                 class="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
@@ -892,11 +1132,36 @@ function copyToClipboard(text: string) {
               >
                 Организация
               </th>
-              <th class="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Ключ</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Создан</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Посл. использование</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Статус</th>
-              <th class="text-right px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Действия</th>
+              <th
+                class="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Ключ
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Создан
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Посл. использование
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Статус
+              </th>
+              <th
+                class="text-right px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Действия
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -910,7 +1175,12 @@ function copyToClipboard(text: string) {
             >
               <td class="px-5 py-3.5">
                 <div>
-                  <p class="text-sm font-medium" style="color: var(--argus-text);">{{ key.name }}</p>
+                  <p
+                    class="text-sm font-medium"
+                    style="color: var(--argus-text);"
+                  >
+                    {{ key.name }}
+                  </p>
                   <div class="flex items-center gap-1 mt-0.5">
                     <span
                       v-for="perm in key.permissions"
@@ -924,17 +1194,30 @@ function copyToClipboard(text: string) {
                 </div>
               </td>
               <!-- Super Admin: Org column -->
-              <td v-if="authStore.isSuperAdmin" class="px-4 py-3.5">
+              <td
+                v-if="authStore.isSuperAdmin"
+                class="px-4 py-3.5"
+              >
                 <div class="flex items-center gap-1.5">
-                  <UIcon name="i-lucide-building" class="size-3 shrink-0" style="color: var(--argus-text-dimmed);" />
-                  <span class="text-xs font-medium truncate max-w-[140px]" style="color: var(--argus-text-muted);">
+                  <UIcon
+                    name="i-lucide-building"
+                    class="size-3 shrink-0"
+                    style="color: var(--argus-text-dimmed);"
+                  />
+                  <span
+                    class="text-xs font-medium truncate max-w-[140px]"
+                    style="color: var(--argus-text-muted);"
+                  >
                     {{ orgName(key.orgId) }}
                   </span>
                 </div>
               </td>
               <td class="px-4 py-3.5">
                 <div class="flex items-center gap-2">
-                  <code class="text-xs font-mono px-2 py-1 rounded" :style="{ background: 'var(--argus-bg-hover)', color: 'var(--argus-text-muted)' }">
+                  <code
+                    class="text-xs font-mono px-2 py-1 rounded"
+                    :style="{ background: 'var(--argus-bg-hover)', color: 'var(--argus-text-muted)' }"
+                  >
                     {{ revealedKeyId === key.id ? key.key : maskKey(key.key) }}
                   </code>
                   <button
@@ -945,15 +1228,24 @@ function copyToClipboard(text: string) {
                     @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--argus-text-dimmed)'"
                     @click="revealedKeyId = revealedKeyId === key.id ? null : key.id"
                   >
-                    <UIcon :name="revealedKeyId === key.id ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-3.5" />
+                    <UIcon
+                      :name="revealedKeyId === key.id ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+                      class="size-3.5"
+                    />
                   </button>
                 </div>
               </td>
               <td class="px-4 py-3.5 text-center">
-                <span class="text-xs" style="color: var(--argus-text-muted);">{{ formatDate(key.created) }}</span>
+                <span
+                  class="text-xs"
+                  style="color: var(--argus-text-muted);"
+                >{{ formatDate(key.created) }}</span>
               </td>
               <td class="px-4 py-3.5 text-center">
-                <span class="text-xs font-mono" style="color: var(--argus-text-muted);">{{ formatDatetime(key.lastUsed) }}</span>
+                <span
+                  class="text-xs font-mono"
+                  style="color: var(--argus-text-muted);"
+                >{{ formatDatetime(key.lastUsed) }}</span>
               </td>
               <td class="px-4 py-3.5 text-center">
                 <span
@@ -963,7 +1255,10 @@ function copyToClipboard(text: string) {
                     color: key.status === 'active' ? 'var(--argus-success)' : 'var(--argus-error)'
                   }"
                 >
-                  <div class="size-1.5 rounded-full" :style="{ background: key.status === 'active' ? 'var(--argus-success)' : 'var(--argus-error)' }" />
+                  <div
+                    class="size-1.5 rounded-full"
+                    :style="{ background: key.status === 'active' ? 'var(--argus-success)' : 'var(--argus-error)' }"
+                  />
                   {{ key.status === 'active' ? 'Активен' : 'Отозван' }}
                 </span>
               </td>
@@ -977,7 +1272,10 @@ function copyToClipboard(text: string) {
                     }"
                     @click="copyKey(key.key, key.id)"
                   >
-                    <UIcon :name="copiedKeyId === key.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3" />
+                    <UIcon
+                      :name="copiedKeyId === key.id ? 'i-lucide-check' : 'i-lucide-copy'"
+                      class="size-3"
+                    />
                     {{ copiedKeyId === key.id ? 'Скопировано!' : 'Копировать' }}
                   </button>
                   <button
@@ -988,7 +1286,10 @@ function copyToClipboard(text: string) {
                     @mouseleave="($event.currentTarget as HTMLElement).style.background = errorBg(0.08)"
                     @click="revokeKey(key.id)"
                   >
-                    <UIcon name="i-lucide-ban" class="size-3" />
+                    <UIcon
+                      name="i-lucide-ban"
+                      class="size-3"
+                    />
                     Отозвать
                   </button>
                 </div>
@@ -997,10 +1298,20 @@ function copyToClipboard(text: string) {
 
             <!-- Empty state -->
             <tr v-if="filteredKeys.length === 0 && !backendKeysLoading">
-              <td :colspan="authStore.isSuperAdmin ? 7 : 6" class="px-5 py-8 text-center">
+              <td
+                :colspan="authStore.isSuperAdmin ? 7 : 6"
+                class="px-5 py-8 text-center"
+              >
                 <div class="flex flex-col items-center gap-2">
-                  <UIcon name="i-lucide-key-round" class="size-8" style="color: var(--argus-text-dimmed); opacity: 0.4;" />
-                  <p class="text-sm" style="color: var(--argus-text-dimmed);">
+                  <UIcon
+                    name="i-lucide-key-round"
+                    class="size-8"
+                    style="color: var(--argus-text-dimmed); opacity: 0.4;"
+                  />
+                  <p
+                    class="text-sm"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     {{ selectedOrgFilter ? 'Нет API-ключей для выбранной организации' : 'API-ключи не найдены' }}
                   </p>
                 </div>
@@ -1015,11 +1326,26 @@ function copyToClipboard(text: string) {
     <!--  WEBHOOKS SETUP                -->
     <!-- ============================== -->
     <div class="glass-card rounded-xl overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+      <div
+        class="flex items-center justify-between px-5 py-4 border-b"
+        style="border-color: var(--argus-border);"
+      >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-webhook" class="size-4" style="color: var(--argus-accent);" />
-          <h2 class="text-sm font-semibold" style="color: var(--argus-text);">Вебхуки</h2>
-          <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
+          <UIcon
+            name="i-lucide-webhook"
+            class="size-4"
+            style="color: var(--argus-accent);"
+          />
+          <h2
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            Вебхуки
+          </h2>
+          <span
+            class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+            :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+          >
             {{ activeWebhooksCount }} активных
           </span>
         </div>
@@ -1030,19 +1356,30 @@ function copyToClipboard(text: string) {
           @mouseleave="($event.currentTarget as HTMLElement).style.background = accentBg(0.1)"
           @click="showWebhookForm = !showWebhookForm"
         >
-          <UIcon name="i-lucide-plus" class="size-3.5" />
+          <UIcon
+            name="i-lucide-plus"
+            class="size-3.5"
+          />
           Добавить вебхук
         </button>
       </div>
 
       <!-- New webhook form -->
       <Transition name="modal">
-        <div v-if="showWebhookForm" class="px-5 py-4 border-b space-y-3" style="border-color: var(--argus-border); background: var(--argus-bg-elevated);">
+        <div
+          v-if="showWebhookForm"
+          class="px-5 py-4 border-b space-y-3"
+          style="border-color: var(--argus-border); background: var(--argus-bg-elevated);"
+        >
           <div
             class="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border"
             :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
           >
-            <UIcon name="i-lucide-link" class="size-4 shrink-0" style="color: var(--argus-text-dimmed);" />
+            <UIcon
+              name="i-lucide-link"
+              class="size-4 shrink-0"
+              style="color: var(--argus-text-dimmed);"
+            />
             <input
               v-model="newWebhookUrl"
               type="url"
@@ -1053,7 +1390,10 @@ function copyToClipboard(text: string) {
           </div>
 
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-xs font-medium" style="color: var(--argus-text-dimmed);">Подписка на события:</span>
+            <span
+              class="text-xs font-medium"
+              style="color: var(--argus-text-dimmed);"
+            >Подписка на события:</span>
             <button
               v-for="event in availableEvents"
               :key="event.value"
@@ -1067,7 +1407,10 @@ function copyToClipboard(text: string) {
                 ? selectedWebhookEvents.splice(selectedWebhookEvents.indexOf(event.value), 1)
                 : selectedWebhookEvents.push(event.value)"
             >
-              <UIcon :name="selectedWebhookEvents.includes(event.value) ? 'i-lucide-check' : 'i-lucide-circle'" class="size-3" />
+              <UIcon
+                :name="selectedWebhookEvents.includes(event.value) ? 'i-lucide-check' : 'i-lucide-circle'"
+                class="size-3"
+              />
               {{ event.label }}
             </button>
           </div>
@@ -1078,7 +1421,10 @@ function copyToClipboard(text: string) {
               :style="{ background: 'var(--argus-accent)', color: '#fff' }"
               @click="addWebhook"
             >
-              <UIcon name="i-lucide-check" class="size-3.5" />
+              <UIcon
+                name="i-lucide-check"
+                class="size-3.5"
+              />
               Сохранить
             </button>
             <button
@@ -1093,7 +1439,10 @@ function copyToClipboard(text: string) {
       </Transition>
 
       <!-- Webhooks list -->
-      <div class="divide-y" style="border-color: var(--argus-border-subtle);">
+      <div
+        class="divide-y"
+        style="border-color: var(--argus-border-subtle);"
+      >
         <div
           v-for="wh in store.webhooks"
           :key="wh.id"
@@ -1104,7 +1453,10 @@ function copyToClipboard(text: string) {
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
-                <code class="text-xs font-mono truncate max-w-lg" style="color: var(--argus-text);">{{ wh.url }}</code>
+                <code
+                  class="text-xs font-mono truncate max-w-lg"
+                  style="color: var(--argus-text);"
+                >{{ wh.url }}</code>
                 <span
                   class="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                   :style="{
@@ -1126,8 +1478,14 @@ function copyToClipboard(text: string) {
                 </span>
               </div>
               <div class="flex items-center gap-4 mt-2">
-                <span class="text-[10px]" style="color: var(--argus-text-dimmed);">Последняя доставка: {{ formatDatetime(wh.lastDelivery) }}</span>
-                <span class="text-[10px] font-bold" :style="{ color: wh.successRate >= 95 ? 'var(--argus-success)' : wh.successRate >= 85 ? 'var(--argus-warning)' : 'var(--argus-error)' }">
+                <span
+                  class="text-[10px]"
+                  style="color: var(--argus-text-dimmed);"
+                >Последняя доставка: {{ formatDatetime(wh.lastDelivery) }}</span>
+                <span
+                  class="text-[10px] font-bold"
+                  :style="{ color: wh.successRate >= 95 ? 'var(--argus-success)' : wh.successRate >= 85 ? 'var(--argus-warning)' : 'var(--argus-error)' }"
+                >
                   {{ wh.successRate }}% успешных
                 </span>
               </div>
@@ -1142,7 +1500,10 @@ function copyToClipboard(text: string) {
                 }"
                 @click="toggleWebhookStatus(wh.id)"
               >
-                <UIcon :name="wh.status === 'active' ? 'i-lucide-pause' : 'i-lucide-play'" class="size-3" />
+                <UIcon
+                  :name="wh.status === 'active' ? 'i-lucide-pause' : 'i-lucide-play'"
+                  class="size-3"
+                />
                 {{ wh.status === 'active' ? 'Пауза' : 'Возобновить' }}
               </button>
             </div>
@@ -1155,12 +1516,27 @@ function copyToClipboard(text: string) {
     <!--  DELIVERY LOGS (API Status)    -->
     <!-- ============================== -->
     <div class="glass-card rounded-xl overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+      <div
+        class="flex items-center justify-between px-5 py-4 border-b"
+        style="border-color: var(--argus-border);"
+      >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-activity" class="size-4" style="color: var(--argus-text-dimmed);" />
-          <h2 class="text-sm font-semibold" style="color: var(--argus-text);">Статус API — Последние доставки</h2>
+          <UIcon
+            name="i-lucide-activity"
+            class="size-4"
+            style="color: var(--argus-text-dimmed);"
+          />
+          <h2
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            Статус API — Последние доставки
+          </h2>
         </div>
-        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" :style="{ background: successBg(0.1), color: 'var(--argus-success)' }">
+        <span
+          class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+          :style="{ background: successBg(0.1), color: 'var(--argus-success)' }"
+        >
           {{ deliverySuccessRate }}% доставка
         </span>
       </div>
@@ -1169,12 +1545,42 @@ function copyToClipboard(text: string) {
         <table class="w-full text-sm">
           <thead>
             <tr style="border-bottom: 1px solid var(--argus-border);">
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Событие</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Статус</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Код</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Время</th>
-              <th class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Задержка</th>
-              <th class="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Получатель</th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Событие
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Статус
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Код
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Время
+              </th>
+              <th
+                class="text-center px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Задержка
+              </th>
+              <th
+                class="text-left px-4 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Получатель
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1193,7 +1599,10 @@ function copyToClipboard(text: string) {
                     class="size-3.5"
                     style="color: var(--argus-text-dimmed);"
                   />
-                  <span class="text-xs font-medium" style="color: var(--argus-text);">{{ eventLabel(log.event) }}</span>
+                  <span
+                    class="text-xs font-medium"
+                    style="color: var(--argus-text);"
+                  >{{ eventLabel(log.event) }}</span>
                 </div>
               </td>
               <td class="px-4 py-3 text-center">
@@ -1204,7 +1613,10 @@ function copyToClipboard(text: string) {
                     color: log.status === 'success' ? 'var(--argus-success)' : 'var(--argus-error)'
                   }"
                 >
-                  <UIcon :name="log.status === 'success' ? 'i-lucide-check' : 'i-lucide-x'" class="size-2.5" />
+                  <UIcon
+                    :name="log.status === 'success' ? 'i-lucide-check' : 'i-lucide-x'"
+                    class="size-2.5"
+                  />
                   {{ log.status === 'success' ? 'Успешно' : 'Ошибка' }}
                 </span>
               </td>
@@ -1217,7 +1629,10 @@ function copyToClipboard(text: string) {
                 </span>
               </td>
               <td class="px-4 py-3 text-center">
-                <span class="text-xs font-mono" style="color: var(--argus-text-muted);">{{ formatDatetime(log.timestamp) }}</span>
+                <span
+                  class="text-xs font-mono"
+                  style="color: var(--argus-text-muted);"
+                >{{ formatDatetime(log.timestamp) }}</span>
               </td>
               <td class="px-4 py-3 text-center">
                 <span
@@ -1228,7 +1643,10 @@ function copyToClipboard(text: string) {
                 </span>
               </td>
               <td class="px-4 py-3">
-                <span class="text-[10px] font-mono truncate max-w-44 block" style="color: var(--argus-text-dimmed);">
+                <span
+                  class="text-[10px] font-mono truncate max-w-44 block"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   {{ store.webhooks.find(w => w.id === log.webhookId)?.url || '\u2014' }}
                 </span>
               </td>
@@ -1242,10 +1660,22 @@ function copyToClipboard(text: string) {
     <!--  LMS INTEGRATIONS              -->
     <!-- ============================== -->
     <div class="glass-card rounded-xl overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+      <div
+        class="flex items-center justify-between px-5 py-4 border-b"
+        style="border-color: var(--argus-border);"
+      >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-puzzle" class="size-4" style="color: var(--argus-accent);" />
-          <h2 class="text-sm font-semibold" style="color: var(--argus-text);">Интеграции с LMS</h2>
+          <UIcon
+            name="i-lucide-puzzle"
+            class="size-4"
+            style="color: var(--argus-accent);"
+          />
+          <h2
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            Интеграции с LMS
+          </h2>
         </div>
         <a
           class="text-[10px] font-medium px-2 py-1 rounded-full cursor-pointer"
@@ -1255,7 +1685,10 @@ function copyToClipboard(text: string) {
         </a>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-px" style="background: var(--argus-border-subtle);">
+      <div
+        class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-px"
+        style="background: var(--argus-border-subtle);"
+      >
         <div
           v-for="lms in lmsIntegrations"
           :key="lms.id"
@@ -1270,11 +1703,20 @@ function copyToClipboard(text: string) {
                 border: `1px solid ${lms.status === 'connected' ? successBg(0.2) : 'var(--argus-border)'}`
               }"
             >
-              <UIcon :name="lms.icon" class="size-5" :style="{ color: lms.status === 'connected' ? 'var(--argus-success)' : 'var(--argus-text-dimmed)' }" />
+              <UIcon
+                :name="lms.icon"
+                class="size-5"
+                :style="{ color: lms.status === 'connected' ? 'var(--argus-success)' : 'var(--argus-text-dimmed)' }"
+              />
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <p class="text-sm font-semibold" style="color: var(--argus-text);">{{ lms.name }}</p>
+                <p
+                  class="text-sm font-semibold"
+                  style="color: var(--argus-text);"
+                >
+                  {{ lms.name }}
+                </p>
                 <span
                   v-if="lms.status === 'connected'"
                   class="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
@@ -1283,7 +1725,12 @@ function copyToClipboard(text: string) {
                   Подключено
                 </span>
               </div>
-              <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">{{ lms.description }}</p>
+              <p
+                class="text-[10px] mt-0.5"
+                style="color: var(--argus-text-dimmed);"
+              >
+                {{ lms.description }}
+              </p>
             </div>
           </div>
 
@@ -1297,7 +1744,10 @@ function copyToClipboard(text: string) {
             @mouseenter="($event.currentTarget as HTMLElement).style.background = lms.status === 'connected' ? successBg(0.1) : 'var(--argus-bg-hover)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background = lms.status === 'connected' ? successBg(0.05) : 'transparent'"
           >
-            <UIcon :name="lms.status === 'connected' ? 'i-lucide-settings' : 'i-lucide-plug'" class="size-3.5" />
+            <UIcon
+              :name="lms.status === 'connected' ? 'i-lucide-settings' : 'i-lucide-plug'"
+              class="size-3.5"
+            />
             {{ lms.status === 'connected' ? 'Настроить' : 'Подключить' }}
           </button>
         </div>
@@ -1318,11 +1768,25 @@ function copyToClipboard(text: string) {
             class="flex items-center justify-center size-10 rounded-lg"
             :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }"
           >
-            <UIcon name="i-lucide-book-open" class="size-5" style="color: var(--argus-accent);" />
+            <UIcon
+              name="i-lucide-book-open"
+              class="size-5"
+              style="color: var(--argus-accent);"
+            />
           </div>
           <div>
-            <p class="text-sm font-semibold" style="color: var(--argus-text);">Документация API</p>
-            <p class="text-[10px]" style="color: var(--argus-text-dimmed);">REST API, WebSocket, Batch операции</p>
+            <p
+              class="text-sm font-semibold"
+              style="color: var(--argus-text);"
+            >
+              Документация API
+            </p>
+            <p
+              class="text-[10px]"
+              style="color: var(--argus-text-dimmed);"
+            >
+              REST API, WebSocket, Batch операции
+            </p>
           </div>
         </div>
       </div>
@@ -1337,11 +1801,25 @@ function copyToClipboard(text: string) {
             class="flex items-center justify-center size-10 rounded-lg"
             :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }"
           >
-            <UIcon name="i-lucide-code-xml" class="size-5" style="color: var(--argus-accent);" />
+            <UIcon
+              name="i-lucide-code-xml"
+              class="size-5"
+              style="color: var(--argus-accent);"
+            />
           </div>
           <div>
-            <p class="text-sm font-semibold" style="color: var(--argus-text);">Примеры кода</p>
-            <p class="text-[10px]" style="color: var(--argus-text-dimmed);">Python, Node.js, PHP SDK</p>
+            <p
+              class="text-sm font-semibold"
+              style="color: var(--argus-text);"
+            >
+              Примеры кода
+            </p>
+            <p
+              class="text-[10px]"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Python, Node.js, PHP SDK
+            </p>
           </div>
         </div>
       </div>
@@ -1356,11 +1834,25 @@ function copyToClipboard(text: string) {
             class="flex items-center justify-center size-10 rounded-lg"
             :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }"
           >
-            <UIcon name="i-lucide-message-square-text" class="size-5" style="color: var(--argus-accent);" />
+            <UIcon
+              name="i-lucide-message-square-text"
+              class="size-5"
+              style="color: var(--argus-accent);"
+            />
           </div>
           <div>
-            <p class="text-sm font-semibold" style="color: var(--argus-text);">Поддержка</p>
-            <p class="text-[10px]" style="color: var(--argus-text-dimmed);">Чат с разработчиками, статус-страница</p>
+            <p
+              class="text-sm font-semibold"
+              style="color: var(--argus-text);"
+            >
+              Поддержка
+            </p>
+            <p
+              class="text-[10px]"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Чат с разработчиками, статус-страница
+            </p>
           </div>
         </div>
       </div>

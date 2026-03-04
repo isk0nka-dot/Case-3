@@ -93,9 +93,9 @@ const filteredSessions = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
     result = result.filter(s =>
-      s.studentId.toLowerCase().includes(q) ||
-      s.sessionId.toLowerCase().includes(q) ||
-      s.examId.toLowerCase().includes(q)
+      s.studentId.toLowerCase().includes(q)
+      || s.sessionId.toLowerCase().includes(q)
+      || s.examId.toLowerCase().includes(q)
     )
   }
 
@@ -128,11 +128,11 @@ const focusedSession = computed(() => {
 // Grid Density
 // ---------------------------------------------------------------------------
 
-const densityOptions: { label: string; value: GridDensity; icon: string }[] = [
+const densityOptions: { label: string, value: GridDensity, icon: string }[] = [
   { label: '2×2', value: '2x2', icon: 'i-lucide-grid-2x2' },
   { label: '3×3', value: '3x3', icon: 'i-lucide-grid-3x3' },
   { label: '4×4', value: '4x4', icon: 'i-lucide-layout-grid' },
-  { label: '5×5', value: '5x5', icon: 'i-lucide-grip' },
+  { label: '5×5', value: '5x5', icon: 'i-lucide-grip' }
 ]
 
 // ---------------------------------------------------------------------------
@@ -163,33 +163,54 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col h-[calc(100vh-64px)]">
     <!-- ===== HEADER BAR ===== -->
-    <div class="shrink-0 px-5 py-3 border-b border-[var(--argus-border)]" style="background: var(--argus-bg-card);">
+    <div
+      class="shrink-0 px-5 py-3 border-b border-[var(--argus-border)]"
+      style="background: var(--argus-bg-card);"
+    >
       <div class="flex items-center justify-between gap-4">
         <!-- Title + stats -->
         <div class="flex items-center gap-4">
           <div>
-            <h1 class="text-lg font-bold" style="color: var(--argus-text);">
+            <h1
+              class="text-lg font-bold"
+              style="color: var(--argus-text);"
+            >
               Инспектор
             </h1>
-            <p class="text-[10px]" style="color: var(--argus-text-dimmed);">
+            <p
+              class="text-[10px]"
+              style="color: var(--argus-text-dimmed);"
+            >
               {{ stats.totalActive }} активных сессий
-              <span v-if="lastUpdated" class="ml-2 font-mono">обн. {{ lastUpdated }}</span>
+              <span
+                v-if="lastUpdated"
+                class="ml-2 font-mono"
+              >обн. {{ lastUpdated }}</span>
             </p>
           </div>
 
           <!-- Status badges -->
           <div class="flex items-center gap-2">
-            <div class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full" :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }">
+            <div
+              class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+              :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }"
+            >
               <span class="relative flex size-1.5">
                 <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
                 <span class="relative inline-flex size-1.5 rounded-full bg-red-500" />
               </span>
               {{ stats.totalCritical }}
             </div>
-            <div class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full" :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }">
+            <div
+              class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+              :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
+            >
               {{ stats.totalWarning }}
             </div>
-            <div class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full" :style="{ background: successBg(0.1), color: 'var(--argus-success)' }">
+            <div
+              class="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+              :style="{ background: successBg(0.1), color: 'var(--argus-success)' }"
+            >
               {{ stats.totalClean }}
             </div>
           </div>
@@ -220,7 +241,11 @@ onUnmounted(() => {
               boxShadow: searchFocused ? `0 0 0 2px ${accentBg(0.1)}` : 'none'
             }"
           >
-            <UIcon name="i-heroicons-magnifying-glass" class="size-3.5 shrink-0" :style="{ color: searchFocused ? 'var(--argus-accent)' : 'var(--argus-text-dimmed)' }" />
+            <UIcon
+              name="i-heroicons-magnifying-glass"
+              class="size-3.5 shrink-0"
+              :style="{ color: searchFocused ? 'var(--argus-accent)' : 'var(--argus-text-dimmed)' }"
+            />
             <input
               v-model="searchQuery"
               type="text"
@@ -256,7 +281,10 @@ onUnmounted(() => {
           </div>
 
           <!-- Grid density toggle -->
-          <div class="flex items-center gap-0.5 p-0.5 rounded-lg" style="background: var(--argus-bg-elevated);">
+          <div
+            class="flex items-center gap-0.5 p-0.5 rounded-lg"
+            style="background: var(--argus-bg-elevated);"
+          >
             <button
               v-for="opt in densityOptions"
               :key="opt.value"
@@ -268,7 +296,10 @@ onUnmounted(() => {
               :title="opt.label"
               @click="inspectorStore.setGridDensity(opt.value)"
             >
-              <UIcon :name="opt.icon" class="size-3.5" />
+              <UIcon
+                :name="opt.icon"
+                class="size-3.5"
+              />
             </button>
           </div>
 
@@ -282,7 +313,10 @@ onUnmounted(() => {
             }"
             @click="inspectorStore.toggleSilence()"
           >
-            <UIcon :name="inspectorStore.silenceMode ? 'i-lucide-bell-off' : 'i-lucide-bell'" class="size-3" />
+            <UIcon
+              :name="inspectorStore.silenceMode ? 'i-lucide-bell-off' : 'i-lucide-bell'"
+              class="size-3"
+            />
           </button>
         </div>
       </div>
@@ -291,15 +325,38 @@ onUnmounted(() => {
     <!-- ===== MAIN CONTENT ===== -->
     <div class="flex-1 flex overflow-hidden">
       <!-- Loading -->
-      <div v-if="loading" class="flex-1 flex flex-col items-center justify-center">
-        <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 mb-4" style="border-color: var(--argus-accent);" />
-        <p class="text-sm" style="color: var(--argus-text-dimmed);">Загрузка сессий...</p>
+      <div
+        v-if="loading"
+        class="flex-1 flex flex-col items-center justify-center"
+      >
+        <div
+          class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 mb-4"
+          style="border-color: var(--argus-accent);"
+        />
+        <p
+          class="text-sm"
+          style="color: var(--argus-text-dimmed);"
+        >
+          Загрузка сессий...
+        </p>
       </div>
 
       <!-- Error -->
-      <div v-else-if="error" class="flex-1 flex flex-col items-center justify-center">
-        <UIcon name="i-lucide-alert-circle" class="size-12 mb-3" style="color: var(--argus-error);" />
-        <p class="text-sm font-medium" style="color: var(--argus-text);">{{ error }}</p>
+      <div
+        v-else-if="error"
+        class="flex-1 flex flex-col items-center justify-center"
+      >
+        <UIcon
+          name="i-lucide-alert-circle"
+          class="size-12 mb-3"
+          style="color: var(--argus-error);"
+        />
+        <p
+          class="text-sm font-medium"
+          style="color: var(--argus-text);"
+        >
+          {{ error }}
+        </p>
         <button
           class="mt-4 px-4 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer"
           :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
@@ -320,7 +377,10 @@ onUnmounted(() => {
         />
 
         <!-- Inspector Grid (default view) -->
-        <div v-else class="flex-1 overflow-y-auto p-4">
+        <div
+          v-else
+          class="flex-1 overflow-y-auto p-4"
+        >
           <InspectorGrid
             :sessions="filteredSessions"
             @focus="(id: string) => inspectorStore.setFocus(id)"

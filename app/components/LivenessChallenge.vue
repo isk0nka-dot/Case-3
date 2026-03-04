@@ -35,7 +35,7 @@ const challengeIcons: Record<string, string> = {
   look_up: 'i-lucide-arrow-up',
   look_down: 'i-lucide-arrow-down',
   blink_twice: 'i-lucide-eye',
-  nod_yes: 'i-lucide-arrow-down-up',
+  nod_yes: 'i-lucide-arrow-down-up'
 }
 
 // Track whether a challenge was active before it was cleared
@@ -115,7 +115,7 @@ onUnmounted(() => {
         class="pointer-events-auto rounded-2xl px-6 py-4 shadow-2xl border backdrop-blur-xl max-w-sm w-full mx-4"
         :style="{
           background: isDark ? 'rgba(11, 15, 20, 0.92)' : 'rgba(255, 255, 255, 0.95)',
-          borderColor: isUrgent ? 'var(--argus-error)' : 'var(--argus-accent)',
+          borderColor: isUrgent ? 'var(--argus-error)' : 'var(--argus-accent)'
         }"
       >
         <!-- Header -->
@@ -131,7 +131,10 @@ onUnmounted(() => {
             />
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--argus-accent);">
+            <p
+              class="text-[10px] font-bold uppercase tracking-wider"
+              style="color: var(--argus-accent);"
+            >
               Проверка живости
             </p>
           </div>
@@ -144,7 +147,10 @@ onUnmounted(() => {
         </div>
 
         <!-- Instruction -->
-        <p class="text-base font-semibold mb-3" style="color: var(--argus-text);">
+        <p
+          class="text-base font-semibold mb-3"
+          style="color: var(--argus-text);"
+        >
           {{ challenge.instruction }}
         </p>
 
@@ -159,7 +165,7 @@ onUnmounted(() => {
               width: `${progress * 100}%`,
               background: isUrgent
                 ? 'var(--argus-error)'
-                : 'var(--argus-accent)',
+                : 'var(--argus-accent)'
             }"
           />
         </div>
@@ -177,7 +183,7 @@ onUnmounted(() => {
         class="pointer-events-auto rounded-2xl px-6 py-4 shadow-2xl border backdrop-blur-xl max-w-sm w-full mx-4 flex items-center gap-3"
         :style="{
           background: isDark ? 'rgba(11, 15, 20, 0.92)' : 'rgba(255, 255, 255, 0.95)',
-          borderColor: lastResult === 'passed' ? 'var(--argus-success)' : 'var(--argus-error)',
+          borderColor: lastResult === 'passed' ? 'var(--argus-success)' : 'var(--argus-error)'
         }"
       >
         <div
@@ -191,10 +197,16 @@ onUnmounted(() => {
           />
         </div>
         <div>
-          <p class="text-sm font-semibold" style="color: var(--argus-text);">
+          <p
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
             {{ lastResult === 'passed' ? 'Проверка пройдена' : lastResult === 'timeout' ? 'Время истекло' : 'Проверка не пройдена' }}
           </p>
-          <p class="text-xs mt-0.5" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-xs mt-0.5"
+            style="color: var(--argus-text-dimmed);"
+          >
             {{ lastResult === 'passed' ? 'Продолжайте работу' : 'Следующая проверка будет позже' }}
           </p>
         </div>

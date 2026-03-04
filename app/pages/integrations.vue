@@ -319,13 +319,23 @@ onUnmounted(() => {
             class="flex items-center justify-center size-8 rounded-lg"
             :style="{ background: accentBg(0.1), border: `1px solid ${accentBg(0.15)}` }"
           >
-            <UIcon name="i-lucide-building-2" class="size-4" style="color: var(--argus-accent);" />
+            <UIcon
+              name="i-lucide-building-2"
+              class="size-4"
+              style="color: var(--argus-accent);"
+            />
           </div>
           <div>
-            <p class="text-[10px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+            <p
+              class="text-[10px] font-medium uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
               Контекст организации
             </p>
-            <p class="text-xs font-semibold" style="color: var(--argus-text);">
+            <p
+              class="text-xs font-semibold"
+              style="color: var(--argus-text);"
+            >
               Super Admin — мультитенантный режим
             </p>
           </div>
@@ -372,8 +382,15 @@ onUnmounted(() => {
                 }"
                 @click="selectOrg(null)"
               >
-                <UIcon name="i-lucide-globe" class="size-3.5" style="color: var(--argus-accent);" />
-                <span class="text-xs font-semibold" style="color: var(--argus-text);">Все организации</span>
+                <UIcon
+                  name="i-lucide-globe"
+                  class="size-3.5"
+                  style="color: var(--argus-accent);"
+                />
+                <span
+                  class="text-xs font-semibold"
+                  style="color: var(--argus-text);"
+                >Все организации</span>
               </button>
               <div class="max-h-[280px] overflow-y-auto">
                 <button
@@ -386,9 +403,21 @@ onUnmounted(() => {
                   }"
                   @click="selectOrg(org.orgId)"
                 >
-                  <UIcon name="i-lucide-building" class="size-3.5" :style="{ color: org.isActive ? 'var(--argus-success)' : 'var(--argus-text-dimmed)' }" />
-                  <span class="text-xs font-medium truncate" style="color: var(--argus-text);">{{ org.name }}</span>
-                  <UIcon v-if="selectedOrgFilter === org.orgId" name="i-lucide-check" class="size-3.5 ml-auto shrink-0" style="color: var(--argus-accent);" />
+                  <UIcon
+                    name="i-lucide-building"
+                    class="size-3.5"
+                    :style="{ color: org.isActive ? 'var(--argus-success)' : 'var(--argus-text-dimmed)' }"
+                  />
+                  <span
+                    class="text-xs font-medium truncate"
+                    style="color: var(--argus-text);"
+                  >{{ org.name }}</span>
+                  <UIcon
+                    v-if="selectedOrgFilter === org.orgId"
+                    name="i-lucide-check"
+                    class="size-3.5 ml-auto shrink-0"
+                    style="color: var(--argus-accent);"
+                  />
                 </button>
               </div>
             </div>
@@ -402,10 +431,16 @@ onUnmounted(() => {
     <!-- ============================== -->
     <div class="flex items-center justify-between gap-4 flex-wrap">
       <div>
-        <h1 class="text-xl font-bold" style="color: var(--argus-text);">
+        <h1
+          class="text-xl font-bold"
+          style="color: var(--argus-text);"
+        >
           Интеграции и Настройка API
         </h1>
-        <p class="text-xs mt-1" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-xs mt-1"
+          style="color: var(--argus-text-dimmed);"
+        >
           Управление ключами, вебхуками и безопасностью интеграций
         </p>
       </div>
@@ -415,7 +450,10 @@ onUnmounted(() => {
         class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all"
         :style="{ background: accentBg(0.08), color: 'var(--argus-accent)' }"
       >
-        <UIcon name="i-lucide-external-link" class="size-3.5" />
+        <UIcon
+          name="i-lucide-external-link"
+          class="size-3.5"
+        />
         Документация для разработчиков
       </NuxtLink>
     </div>
@@ -427,33 +465,84 @@ onUnmounted(() => {
       <div class="glass-card rounded-xl px-5 py-4">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-[10px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Активные ключи</p>
-            <p class="text-2xl font-bold tabular-nums mt-1" style="color: var(--argus-text);">{{ activeKeysCount }}</p>
+            <p
+              class="text-[10px] font-medium uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Активные ключи
+            </p>
+            <p
+              class="text-2xl font-bold tabular-nums mt-1"
+              style="color: var(--argus-text);"
+            >
+              {{ activeKeysCount }}
+            </p>
           </div>
-          <div class="flex items-center justify-center size-10 rounded-lg" :style="{ background: accentBg(0.1) }">
-            <UIcon name="i-lucide-key" class="size-5" style="color: var(--argus-accent);" />
+          <div
+            class="flex items-center justify-center size-10 rounded-lg"
+            :style="{ background: accentBg(0.1) }"
+          >
+            <UIcon
+              name="i-lucide-key"
+              class="size-5"
+              style="color: var(--argus-accent);"
+            />
           </div>
         </div>
       </div>
       <div class="glass-card rounded-xl px-5 py-4">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-[10px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Активные вебхуки</p>
-            <p class="text-2xl font-bold tabular-nums mt-1" style="color: var(--argus-text);">{{ activeWebhooksCount }}</p>
+            <p
+              class="text-[10px] font-medium uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Активные вебхуки
+            </p>
+            <p
+              class="text-2xl font-bold tabular-nums mt-1"
+              style="color: var(--argus-text);"
+            >
+              {{ activeWebhooksCount }}
+            </p>
           </div>
-          <div class="flex items-center justify-center size-10 rounded-lg" :style="{ background: successBg(0.1) }">
-            <UIcon name="i-lucide-webhook" class="size-5" style="color: var(--argus-success);" />
+          <div
+            class="flex items-center justify-center size-10 rounded-lg"
+            :style="{ background: successBg(0.1) }"
+          >
+            <UIcon
+              name="i-lucide-webhook"
+              class="size-5"
+              style="color: var(--argus-success);"
+            />
           </div>
         </div>
       </div>
       <div class="glass-card rounded-xl px-5 py-4">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-[10px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">IP в белом списке</p>
-            <p class="text-2xl font-bold tabular-nums mt-1" style="color: var(--argus-text);">{{ orgIPWhitelist.length }}</p>
+            <p
+              class="text-[10px] font-medium uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
+              IP в белом списке
+            </p>
+            <p
+              class="text-2xl font-bold tabular-nums mt-1"
+              style="color: var(--argus-text);"
+            >
+              {{ orgIPWhitelist.length }}
+            </p>
           </div>
-          <div class="flex items-center justify-center size-10 rounded-lg" :style="{ background: warningBg(0.1) }">
-            <UIcon name="i-lucide-shield" class="size-5" style="color: var(--argus-warning);" />
+          <div
+            class="flex items-center justify-center size-10 rounded-lg"
+            :style="{ background: warningBg(0.1) }"
+          >
+            <UIcon
+              name="i-lucide-shield"
+              class="size-5"
+              style="color: var(--argus-warning);"
+            />
           </div>
         </div>
       </div>
@@ -462,7 +551,10 @@ onUnmounted(() => {
     <!-- ============================== -->
     <!--  SECTION TABS                  -->
     <!-- ============================== -->
-    <div class="flex items-center gap-1 border-b pb-px" :style="{ borderColor: 'var(--argus-border)' }">
+    <div
+      class="flex items-center gap-1 border-b pb-px"
+      :style="{ borderColor: 'var(--argus-border)' }"
+    >
       <button
         v-for="tab in [
           { id: 'keys' as const, label: 'API Ключи', icon: 'i-lucide-key' },
@@ -480,7 +572,10 @@ onUnmounted(() => {
         }"
         @click="activeTab = tab.id"
       >
-        <UIcon :name="tab.icon" class="size-3.5" />
+        <UIcon
+          :name="tab.icon"
+          class="size-3.5"
+        />
         {{ tab.label }}
       </button>
     </div>
@@ -488,31 +583,64 @@ onUnmounted(() => {
     <!-- ============================== -->
     <!--  TAB: API KEYS                 -->
     <!-- ============================== -->
-    <div v-if="activeTab === 'keys'" class="space-y-4">
+    <div
+      v-if="activeTab === 'keys'"
+      class="space-y-4"
+    >
       <div class="flex items-center justify-between">
-        <h2 class="text-sm font-semibold" style="color: var(--argus-text);">Управление API ключами</h2>
+        <h2
+          class="text-sm font-semibold"
+          style="color: var(--argus-text);"
+        >
+          Управление API ключами
+        </h2>
         <button
           class="scanner-btn flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium cursor-pointer"
           @click="showNewKeyForm = !showNewKeyForm"
         >
-          <UIcon name="i-lucide-plus" class="size-3.5" />
+          <UIcon
+            name="i-lucide-plus"
+            class="size-3.5"
+          />
           {{ showNewKeyForm ? 'Закрыть' : 'Создать ключ' }}
         </button>
       </div>
 
       <!-- Create key form -->
       <Transition name="modal">
-        <div v-if="showNewKeyForm" class="glass-card rounded-xl p-5 space-y-4">
-          <h3 class="text-sm font-semibold" style="color: var(--argus-text);">Новый API ключ</h3>
+        <div
+          v-if="showNewKeyForm"
+          class="glass-card rounded-xl p-5 space-y-4"
+        >
+          <h3
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            Новый API ключ
+          </h3>
 
           <!-- Secret key display (shown once after creation) -->
-          <div v-if="createdSecretKey" class="rounded-lg p-4 border" :style="{ background: successBg(0.05), borderColor: successBg(0.2) }">
+          <div
+            v-if="createdSecretKey"
+            class="rounded-lg p-4 border"
+            :style="{ background: successBg(0.05), borderColor: successBg(0.2) }"
+          >
             <div class="flex items-center gap-2 mb-2">
-              <UIcon name="i-lucide-alert-triangle" class="size-4" style="color: var(--argus-warning);" />
-              <span class="text-xs font-semibold" style="color: var(--argus-warning);">Секретный ключ показывается только один раз!</span>
+              <UIcon
+                name="i-lucide-alert-triangle"
+                class="size-4"
+                style="color: var(--argus-warning);"
+              />
+              <span
+                class="text-xs font-semibold"
+                style="color: var(--argus-warning);"
+              >Секретный ключ показывается только один раз!</span>
             </div>
             <div class="flex items-center gap-2">
-              <code class="flex-1 text-xs p-2 rounded" style="background: var(--argus-bg-deep); color: var(--argus-success); font-family: monospace; word-break: break-all;">
+              <code
+                class="flex-1 text-xs p-2 rounded"
+                style="background: var(--argus-bg-deep); color: var(--argus-success); font-family: monospace; word-break: break-all;"
+              >
                 {{ createdSecretKey }}
               </code>
               <button
@@ -527,17 +655,23 @@ onUnmounted(() => {
 
           <div class="grid sm:grid-cols-2 gap-4">
             <div>
-              <label class="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style="color: var(--argus-text-dimmed);">Название</label>
+              <label
+                class="text-[10px] font-medium uppercase tracking-wider block mb-1.5"
+                style="color: var(--argus-text-dimmed);"
+              >Название</label>
               <input
                 v-model="newKeyName"
                 type="text"
                 placeholder="Production API Key"
                 class="w-full px-3 py-2 rounded-lg border text-sm outline-none"
                 :style="{ background: 'var(--argus-bg-deep)', borderColor: 'var(--argus-border)', color: 'var(--argus-text)' }"
-              />
+              >
             </div>
             <div>
-              <label class="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style="color: var(--argus-text-dimmed);">Среда</label>
+              <label
+                class="text-[10px] font-medium uppercase tracking-wider block mb-1.5"
+                style="color: var(--argus-text-dimmed);"
+              >Среда</label>
               <div class="flex gap-2">
                 <button
                   v-for="env in (['live', 'test'] as const)"
@@ -557,7 +691,10 @@ onUnmounted(() => {
           </div>
 
           <div>
-            <label class="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style="color: var(--argus-text-dimmed);">Разрешения</label>
+            <label
+              class="text-[10px] font-medium uppercase tracking-wider block mb-1.5"
+              style="color: var(--argus-text-dimmed);"
+            >Разрешения</label>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="perm in availablePermissions"
@@ -598,16 +735,46 @@ onUnmounted(() => {
 
       <!-- Keys table -->
       <div class="glass-card rounded-xl overflow-hidden">
-        <div v-if="backendKeysLoading" class="flex items-center justify-center py-12">
-          <UIcon name="i-lucide-loader-2" class="size-5 animate-spin" style="color: var(--argus-text-dimmed);" />
+        <div
+          v-if="backendKeysLoading"
+          class="flex items-center justify-center py-12"
+        >
+          <UIcon
+            name="i-lucide-loader-2"
+            class="size-5 animate-spin"
+            style="color: var(--argus-text-dimmed);"
+          />
         </div>
-        <table v-else class="w-full text-sm">
+        <table
+          v-else
+          class="w-full text-sm"
+        >
           <thead>
             <tr :style="{ background: 'var(--argus-bg-elevated)' }">
-              <th class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Название</th>
-              <th class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Ключ</th>
-              <th class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider hidden sm:table-cell" style="color: var(--argus-text-dimmed);">Статус</th>
-              <th class="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Действия</th>
+              <th
+                class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Название
+              </th>
+              <th
+                class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Ключ
+              </th>
+              <th
+                class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider hidden sm:table-cell"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Статус
+              </th>
+              <th
+                class="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Действия
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -618,11 +785,24 @@ onUnmounted(() => {
               :style="{ borderColor: 'var(--argus-border-subtle)' }"
             >
               <td class="px-4 py-3">
-                <p class="text-xs font-medium" style="color: var(--argus-text);">{{ key.name }}</p>
-                <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">{{ key.createdAt?.split('T')[0] }}</p>
+                <p
+                  class="text-xs font-medium"
+                  style="color: var(--argus-text);"
+                >
+                  {{ key.name }}
+                </p>
+                <p
+                  class="text-[10px] mt-0.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
+                  {{ key.createdAt?.split('T')[0] }}
+                </p>
               </td>
               <td class="px-4 py-3">
-                <code class="text-[11px] px-1.5 py-0.5 rounded" style="background: var(--argus-bg-deep); color: var(--argus-text-muted); font-family: monospace;">
+                <code
+                  class="text-[11px] px-1.5 py-0.5 rounded"
+                  style="background: var(--argus-bg-deep); color: var(--argus-text-muted); font-family: monospace;"
+                >
                   {{ revealedKeyId === key.id ? key.keyId + '_' + key.secretPrefix : maskKey(key.keyId, key.secretPrefix) }}
                 </code>
               </td>
@@ -645,7 +825,10 @@ onUnmounted(() => {
                     :title="revealedKeyId === key.id ? 'Скрыть' : 'Показать'"
                     @click="revealedKeyId = revealedKeyId === key.id ? null : key.id"
                   >
-                    <UIcon :name="revealedKeyId === key.id ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-3.5" />
+                    <UIcon
+                      :name="revealedKeyId === key.id ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+                      class="size-3.5"
+                    />
                   </button>
                   <button
                     class="p-1.5 rounded-md transition-all cursor-pointer"
@@ -653,7 +836,10 @@ onUnmounted(() => {
                     title="Копировать"
                     @click="copyKey(key.keyId, key.id)"
                   >
-                    <UIcon :name="copiedKeyId === key.id ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
+                    <UIcon
+                      :name="copiedKeyId === key.id ? 'i-lucide-check' : 'i-lucide-copy'"
+                      class="size-3.5"
+                    />
                   </button>
                   <button
                     v-if="key.isActive"
@@ -662,13 +848,20 @@ onUnmounted(() => {
                     title="Отозвать"
                     @click="revokeKey(key.keyId)"
                   >
-                    <UIcon name="i-lucide-trash-2" class="size-3.5" />
+                    <UIcon
+                      name="i-lucide-trash-2"
+                      class="size-3.5"
+                    />
                   </button>
                 </div>
               </td>
             </tr>
             <tr v-if="filteredKeys.length === 0">
-              <td colspan="4" class="px-4 py-8 text-center text-xs" style="color: var(--argus-text-dimmed);">
+              <td
+                colspan="4"
+                class="px-4 py-8 text-center text-xs"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Нет API ключей. Создайте первый ключ для начала интеграции.
               </td>
             </tr>
@@ -680,34 +873,59 @@ onUnmounted(() => {
     <!-- ============================== -->
     <!--  TAB: WEBHOOKS                 -->
     <!-- ============================== -->
-    <div v-if="activeTab === 'webhooks'" class="space-y-4">
+    <div
+      v-if="activeTab === 'webhooks'"
+      class="space-y-4"
+    >
       <div class="flex items-center justify-between">
-        <h2 class="text-sm font-semibold" style="color: var(--argus-text);">Конфигурация вебхуков</h2>
+        <h2
+          class="text-sm font-semibold"
+          style="color: var(--argus-text);"
+        >
+          Конфигурация вебхуков
+        </h2>
         <button
           class="scanner-btn flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium cursor-pointer"
           @click="showWebhookForm = !showWebhookForm"
         >
-          <UIcon name="i-lucide-plus" class="size-3.5" />
+          <UIcon
+            name="i-lucide-plus"
+            class="size-3.5"
+          />
           {{ showWebhookForm ? 'Закрыть' : 'Добавить вебхук' }}
         </button>
       </div>
 
       <!-- Add webhook form -->
       <Transition name="modal">
-        <div v-if="showWebhookForm" class="glass-card rounded-xl p-5 space-y-4">
-          <h3 class="text-sm font-semibold" style="color: var(--argus-text);">Новый вебхук</h3>
+        <div
+          v-if="showWebhookForm"
+          class="glass-card rounded-xl p-5 space-y-4"
+        >
+          <h3
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            Новый вебхук
+          </h3>
           <div>
-            <label class="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style="color: var(--argus-text-dimmed);">URL</label>
+            <label
+              class="text-[10px] font-medium uppercase tracking-wider block mb-1.5"
+              style="color: var(--argus-text-dimmed);"
+            >URL</label>
             <input
               v-model="newWebhookUrl"
               type="url"
               placeholder="https://your-app.com/webhooks/argus"
               class="w-full px-3 py-2 rounded-lg border text-sm outline-none"
               :style="{ background: 'var(--argus-bg-deep)', borderColor: 'var(--argus-border)', color: 'var(--argus-text)' }"
-            />
+            >
           </div>
           <div>
-            <label class="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style="color: var(--argus-text-dimmed);">События</label>
+            <label
+              class="text-[10px] font-medium uppercase tracking-wider block mb-1.5"
+              style="color: var(--argus-text-dimmed);"
+            >События</label>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="evt in availableEvents"
@@ -727,8 +945,20 @@ onUnmounted(() => {
             </div>
           </div>
           <div class="flex justify-end gap-2">
-            <button class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" style="color: var(--argus-text-dimmed);" @click="showWebhookForm = false">Отмена</button>
-            <button class="scanner-btn px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" :disabled="!newWebhookUrl.trim() || selectedWebhookEvents.length === 0" @click="addWebhook">Добавить</button>
+            <button
+              class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer"
+              style="color: var(--argus-text-dimmed);"
+              @click="showWebhookForm = false"
+            >
+              Отмена
+            </button>
+            <button
+              class="scanner-btn px-4 py-2 rounded-lg text-xs font-medium cursor-pointer"
+              :disabled="!newWebhookUrl.trim() || selectedWebhookEvents.length === 0"
+              @click="addWebhook"
+            >
+              Добавить
+            </button>
           </div>
         </div>
       </Transition>
@@ -738,10 +968,30 @@ onUnmounted(() => {
         <table class="w-full text-sm">
           <thead>
             <tr :style="{ background: 'var(--argus-bg-elevated)' }">
-              <th class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">URL</th>
-              <th class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider hidden md:table-cell" style="color: var(--argus-text-dimmed);">События</th>
-              <th class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Статус</th>
-              <th class="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Действия</th>
+              <th
+                class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                URL
+              </th>
+              <th
+                class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider hidden md:table-cell"
+                style="color: var(--argus-text-dimmed);"
+              >
+                События
+              </th>
+              <th
+                class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Статус
+              </th>
+              <th
+                class="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Действия
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -752,7 +1002,10 @@ onUnmounted(() => {
               :style="{ borderColor: 'var(--argus-border-subtle)' }"
             >
               <td class="px-4 py-3">
-                <code class="text-[11px]" style="color: var(--argus-text-muted); font-family: monospace;">{{ wh.url }}</code>
+                <code
+                  class="text-[11px]"
+                  style="color: var(--argus-text-muted); font-family: monospace;"
+                >{{ wh.url }}</code>
               </td>
               <td class="px-4 py-3 hidden md:table-cell">
                 <div class="flex flex-wrap gap-1">
@@ -789,19 +1042,35 @@ onUnmounted(() => {
                   :disabled="testPayloadSending === wh.id"
                   @click="sendTestPayload(wh.id)"
                 >
-                  <span v-if="testPayloadSending === wh.id" class="flex items-center gap-1">
-                    <UIcon name="i-lucide-loader-2" class="size-3 animate-spin" />
+                  <span
+                    v-if="testPayloadSending === wh.id"
+                    class="flex items-center gap-1"
+                  >
+                    <UIcon
+                      name="i-lucide-loader-2"
+                      class="size-3 animate-spin"
+                    />
                     Отправка...
                   </span>
-                  <span v-else class="flex items-center gap-1">
-                    <UIcon name="i-lucide-send" class="size-3" />
+                  <span
+                    v-else
+                    class="flex items-center gap-1"
+                  >
+                    <UIcon
+                      name="i-lucide-send"
+                      class="size-3"
+                    />
                     Тестовый запрос
                   </span>
                 </button>
               </td>
             </tr>
             <tr v-if="store.webhooks.length === 0">
-              <td colspan="4" class="px-4 py-8 text-center text-xs" style="color: var(--argus-text-dimmed);">
+              <td
+                colspan="4"
+                class="px-4 py-8 text-center text-xs"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Нет настроенных вебхуков.
               </td>
             </tr>
@@ -813,55 +1082,100 @@ onUnmounted(() => {
     <!-- ============================== -->
     <!--  TAB: IP WHITELIST             -->
     <!-- ============================== -->
-    <div v-if="activeTab === 'ip'" class="space-y-4">
+    <div
+      v-if="activeTab === 'ip'"
+      class="space-y-4"
+    >
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-sm font-semibold" style="color: var(--argus-text);">IP Whitelist</h2>
-          <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">Ограничение доступа к API по IP-адресам</p>
+          <h2
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            IP Whitelist
+          </h2>
+          <p
+            class="text-[10px] mt-0.5"
+            style="color: var(--argus-text-dimmed);"
+          >
+            Ограничение доступа к API по IP-адресам
+          </p>
         </div>
         <button
           class="scanner-btn flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium cursor-pointer"
           @click="showIPForm = !showIPForm; ipValidationError = null"
         >
-          <UIcon name="i-lucide-plus" class="size-3.5" />
+          <UIcon
+            name="i-lucide-plus"
+            class="size-3.5"
+          />
           {{ showIPForm ? 'Закрыть' : 'Добавить IP' }}
         </button>
       </div>
 
       <!-- Add IP form -->
       <Transition name="modal">
-        <div v-if="showIPForm" class="glass-card rounded-xl p-5 space-y-4">
-          <h3 class="text-sm font-semibold" style="color: var(--argus-text);">Добавить IP-адрес</h3>
+        <div
+          v-if="showIPForm"
+          class="glass-card rounded-xl p-5 space-y-4"
+        >
+          <h3
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            Добавить IP-адрес
+          </h3>
 
-          <div v-if="ipValidationError" class="rounded-lg px-3 py-2 text-xs font-medium" :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }">
+          <div
+            v-if="ipValidationError"
+            class="rounded-lg px-3 py-2 text-xs font-medium"
+            :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }"
+          >
             {{ ipValidationError }}
           </div>
 
           <div class="grid sm:grid-cols-2 gap-4">
             <div>
-              <label class="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style="color: var(--argus-text-dimmed);">IP / CIDR</label>
+              <label
+                class="text-[10px] font-medium uppercase tracking-wider block mb-1.5"
+                style="color: var(--argus-text-dimmed);"
+              >IP / CIDR</label>
               <input
                 v-model="newIP"
                 type="text"
                 placeholder="192.168.1.0/24"
                 class="w-full px-3 py-2 rounded-lg border text-sm outline-none font-mono"
                 :style="{ background: 'var(--argus-bg-deep)', borderColor: ipValidationError ? 'var(--argus-error)' : 'var(--argus-border)', color: 'var(--argus-text)' }"
-              />
+              >
             </div>
             <div>
-              <label class="text-[10px] font-medium uppercase tracking-wider block mb-1.5" style="color: var(--argus-text-dimmed);">Описание</label>
+              <label
+                class="text-[10px] font-medium uppercase tracking-wider block mb-1.5"
+                style="color: var(--argus-text-dimmed);"
+              >Описание</label>
               <input
                 v-model="newIPLabel"
                 type="text"
                 placeholder="Main Campus Network"
                 class="w-full px-3 py-2 rounded-lg border text-sm outline-none"
                 :style="{ background: 'var(--argus-bg-deep)', borderColor: 'var(--argus-border)', color: 'var(--argus-text)' }"
-              />
+              >
             </div>
           </div>
           <div class="flex justify-end gap-2">
-            <button class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" style="color: var(--argus-text-dimmed);" @click="showIPForm = false">Отмена</button>
-            <button class="scanner-btn px-4 py-2 rounded-lg text-xs font-medium cursor-pointer" @click="addIPEntry">Добавить</button>
+            <button
+              class="px-4 py-2 rounded-lg text-xs font-medium cursor-pointer"
+              style="color: var(--argus-text-dimmed);"
+              @click="showIPForm = false"
+            >
+              Отмена
+            </button>
+            <button
+              class="scanner-btn px-4 py-2 rounded-lg text-xs font-medium cursor-pointer"
+              @click="addIPEntry"
+            >
+              Добавить
+            </button>
           </div>
         </div>
       </Transition>
@@ -871,10 +1185,30 @@ onUnmounted(() => {
         <table class="w-full text-sm">
           <thead>
             <tr :style="{ background: 'var(--argus-bg-elevated)' }">
-              <th class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">IP / CIDR</th>
-              <th class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Описание</th>
-              <th class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider hidden sm:table-cell" style="color: var(--argus-text-dimmed);">Добавлено</th>
-              <th class="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Действия</th>
+              <th
+                class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                IP / CIDR
+              </th>
+              <th
+                class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Описание
+              </th>
+              <th
+                class="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider hidden sm:table-cell"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Добавлено
+              </th>
+              <th
+                class="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Действия
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -885,10 +1219,23 @@ onUnmounted(() => {
               :style="{ borderColor: 'var(--argus-border-subtle)' }"
             >
               <td class="px-4 py-3">
-                <code class="text-xs font-mono px-1.5 py-0.5 rounded" style="background: var(--argus-bg-deep); color: var(--argus-accent);">{{ entry.ip }}</code>
+                <code
+                  class="text-xs font-mono px-1.5 py-0.5 rounded"
+                  style="background: var(--argus-bg-deep); color: var(--argus-accent);"
+                >{{ entry.ip }}</code>
               </td>
-              <td class="px-4 py-3 text-xs" style="color: var(--argus-text-muted);">{{ entry.label }}</td>
-              <td class="px-4 py-3 text-xs hidden sm:table-cell" style="color: var(--argus-text-dimmed);">{{ entry.createdAt }}</td>
+              <td
+                class="px-4 py-3 text-xs"
+                style="color: var(--argus-text-muted);"
+              >
+                {{ entry.label }}
+              </td>
+              <td
+                class="px-4 py-3 text-xs hidden sm:table-cell"
+                style="color: var(--argus-text-dimmed);"
+              >
+                {{ entry.createdAt }}
+              </td>
               <td class="px-4 py-3 text-right">
                 <button
                   class="p-1.5 rounded-md cursor-pointer"
@@ -896,12 +1243,19 @@ onUnmounted(() => {
                   title="Удалить"
                   @click="removeIPEntry(entry.id)"
                 >
-                  <UIcon name="i-lucide-trash-2" class="size-3.5" />
+                  <UIcon
+                    name="i-lucide-trash-2"
+                    class="size-3.5"
+                  />
                 </button>
               </td>
             </tr>
             <tr v-if="orgIPWhitelist.length === 0">
-              <td colspan="4" class="px-4 py-8 text-center text-xs" style="color: var(--argus-text-dimmed);">
+              <td
+                colspan="4"
+                class="px-4 py-8 text-center text-xs"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Нет записей в белом списке IP.
               </td>
             </tr>
@@ -913,19 +1267,42 @@ onUnmounted(() => {
     <!-- ============================== -->
     <!--  TAB: SWAGGER                  -->
     <!-- ============================== -->
-    <div v-if="activeTab === 'swagger'" class="space-y-4">
+    <div
+      v-if="activeTab === 'swagger'"
+      class="space-y-4"
+    >
       <div class="grid sm:grid-cols-2 gap-4">
         <div class="glass-card rounded-xl p-6">
           <div class="flex items-center gap-3 mb-4">
-            <div class="flex items-center justify-center size-10 rounded-lg" :style="{ background: accentBg(0.1) }">
-              <UIcon name="i-lucide-file-code" class="size-5" style="color: var(--argus-accent);" />
+            <div
+              class="flex items-center justify-center size-10 rounded-lg"
+              :style="{ background: accentBg(0.1) }"
+            >
+              <UIcon
+                name="i-lucide-file-code"
+                class="size-5"
+                style="color: var(--argus-accent);"
+              />
             </div>
             <div>
-              <h3 class="text-sm font-semibold" style="color: var(--argus-text);">Swagger UI</h3>
-              <p class="text-[10px]" style="color: var(--argus-text-dimmed);">Интерактивный обозреватель API</p>
+              <h3
+                class="text-sm font-semibold"
+                style="color: var(--argus-text);"
+              >
+                Swagger UI
+              </h3>
+              <p
+                class="text-[10px]"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Интерактивный обозреватель API
+              </p>
             </div>
           </div>
-          <p class="text-xs leading-relaxed mb-4" style="color: var(--argus-text-muted);">
+          <p
+            class="text-xs leading-relaxed mb-4"
+            style="color: var(--argus-text-muted);"
+          >
             Откройте Swagger UI для тестирования API эндпоинтов, просмотра схем запросов и ответов. Все эндпоинты задокументированы с примерами.
           </p>
           <a
@@ -934,22 +1311,45 @@ onUnmounted(() => {
             class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all"
             :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
           >
-            <UIcon name="i-lucide-external-link" class="size-3.5" />
+            <UIcon
+              name="i-lucide-external-link"
+              class="size-3.5"
+            />
             Открыть Swagger UI
           </a>
         </div>
 
         <div class="glass-card rounded-xl p-6">
           <div class="flex items-center gap-3 mb-4">
-            <div class="flex items-center justify-center size-10 rounded-lg" :style="{ background: successBg(0.1) }">
-              <UIcon name="i-lucide-book-open" class="size-5" style="color: var(--argus-success);" />
+            <div
+              class="flex items-center justify-center size-10 rounded-lg"
+              :style="{ background: successBg(0.1) }"
+            >
+              <UIcon
+                name="i-lucide-book-open"
+                class="size-5"
+                style="color: var(--argus-success);"
+              />
             </div>
             <div>
-              <h3 class="text-sm font-semibold" style="color: var(--argus-text);">Документация</h3>
-              <p class="text-[10px]" style="color: var(--argus-text-dimmed);">Руководство для разработчиков</p>
+              <h3
+                class="text-sm font-semibold"
+                style="color: var(--argus-text);"
+              >
+                Документация
+              </h3>
+              <p
+                class="text-[10px]"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Руководство для разработчиков
+              </p>
             </div>
           </div>
-          <p class="text-xs leading-relaxed mb-4" style="color: var(--argus-text-muted);">
+          <p
+            class="text-xs leading-relaxed mb-4"
+            style="color: var(--argus-text-muted);"
+          >
             Полная документация включает примеры кода на cURL и Node.js, описание потока сессий, вебхуков и интеграции виджета.
           </p>
           <NuxtLink
@@ -958,7 +1358,10 @@ onUnmounted(() => {
             class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all"
             :style="{ background: successBg(0.1), color: 'var(--argus-success)' }"
           >
-            <UIcon name="i-lucide-external-link" class="size-3.5" />
+            <UIcon
+              name="i-lucide-external-link"
+              class="size-3.5"
+            />
             Открыть документацию
           </NuxtLink>
         </div>
@@ -968,19 +1371,42 @@ onUnmounted(() => {
     <!-- ============================== -->
     <!--  TAB: HARD GATE                -->
     <!-- ============================== -->
-    <div v-if="activeTab === 'hardgate'" class="space-y-4">
+    <div
+      v-if="activeTab === 'hardgate'"
+      class="space-y-4"
+    >
       <div class="glass-card rounded-xl p-6">
         <div class="flex items-center gap-3 mb-4">
-          <div class="flex items-center justify-center size-10 rounded-lg" :style="{ background: 'rgba(162,89,255,0.1)' }">
-            <UIcon name="i-lucide-scan-face" class="size-5" style="color: var(--argus-brand-purple);" />
+          <div
+            class="flex items-center justify-center size-10 rounded-lg"
+            :style="{ background: 'rgba(162,89,255,0.1)' }"
+          >
+            <UIcon
+              name="i-lucide-scan-face"
+              class="size-5"
+              style="color: var(--argus-brand-purple);"
+            />
           </div>
           <div>
-            <h3 class="text-base font-semibold" style="color: var(--argus-text);">Hard Gate — PreExamCheck</h3>
-            <p class="text-xs" style="color: var(--argus-text-dimmed);">Система предэкзаменационной верификации</p>
+            <h3
+              class="text-base font-semibold"
+              style="color: var(--argus-text);"
+            >
+              Hard Gate — PreExamCheck
+            </h3>
+            <p
+              class="text-xs"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Система предэкзаменационной верификации
+            </p>
           </div>
         </div>
 
-        <p class="text-sm leading-relaxed mb-6" style="color: var(--argus-text-muted);">
+        <p
+          class="text-sm leading-relaxed mb-6"
+          style="color: var(--argus-text-muted);"
+        >
           PreExamCheck — это незакрываемый модальный барьер, который блокирует доступ к экзаменационному контенту до тех пор, пока студент не пройдёт все 4 этапа верификации. Модальное окно нельзя закрыть клавишей Escape, кликом за его пределы или кнопкой закрытия.
         </p>
 
@@ -998,33 +1424,77 @@ onUnmounted(() => {
             :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
           >
             <div class="flex items-center gap-2 mb-3">
-              <div class="flex items-center justify-center size-7 rounded-full text-[11px] font-bold text-white" :style="{ background: stage.color }">
+              <div
+                class="flex items-center justify-center size-7 rounded-full text-[11px] font-bold text-white"
+                :style="{ background: stage.color }"
+              >
                 {{ stage.num }}
               </div>
-              <UIcon :name="stage.icon" class="size-4" :style="{ color: stage.color }" />
+              <UIcon
+                :name="stage.icon"
+                class="size-4"
+                :style="{ color: stage.color }"
+              />
             </div>
-            <h4 class="text-sm font-semibold mb-1" style="color: var(--argus-text);">{{ stage.title }}</h4>
-            <p class="text-xs leading-relaxed" style="color: var(--argus-text-dimmed);">{{ stage.desc }}</p>
+            <h4
+              class="text-sm font-semibold mb-1"
+              style="color: var(--argus-text);"
+            >
+              {{ stage.title }}
+            </h4>
+            <p
+              class="text-xs leading-relaxed"
+              style="color: var(--argus-text-dimmed);"
+            >
+              {{ stage.desc }}
+            </p>
           </div>
         </div>
 
         <!-- Unlocked state explanation -->
-        <div class="rounded-xl border p-4" :style="{ background: 'rgba(162,89,255,0.05)', borderColor: 'rgba(162,89,255,0.15)' }">
+        <div
+          class="rounded-xl border p-4"
+          :style="{ background: 'rgba(162,89,255,0.05)', borderColor: 'rgba(162,89,255,0.15)' }"
+        >
           <div class="flex items-start gap-3">
-            <UIcon name="i-lucide-unlock" class="size-5 shrink-0 mt-0.5" style="color: var(--argus-brand-purple);" />
+            <UIcon
+              name="i-lucide-unlock"
+              class="size-5 shrink-0 mt-0.5"
+              style="color: var(--argus-brand-purple);"
+            />
             <div>
-              <h4 class="text-sm font-semibold mb-1" style="color: var(--argus-brand-purple);">Разблокированное состояние</h4>
-              <p class="text-xs leading-relaxed" style="color: var(--argus-text-muted);">
-                Когда все 4 этапа пройдены, PreExamCheck эмитирует событие <code class="px-1 py-0.5 rounded text-[11px]" style="background: var(--argus-bg-elevated);">verified</code> с данными:
+              <h4
+                class="text-sm font-semibold mb-1"
+                style="color: var(--argus-brand-purple);"
+              >
+                Разблокированное состояние
+              </h4>
+              <p
+                class="text-xs leading-relaxed"
+                style="color: var(--argus-text-muted);"
+              >
+                Когда все 4 этапа пройдены, PreExamCheck эмитирует событие <code
+                  class="px-1 py-0.5 rounded text-[11px]"
+                  style="background: var(--argus-bg-elevated);"
+                >verified</code> с данными:
               </p>
-              <div class="mt-2 rounded-lg p-3" style="background: var(--argus-bg-deep);">
-                <code class="text-[11px] leading-relaxed" style="color: var(--argus-text-muted); font-family: monospace; white-space: pre;">{{ `{
+              <div
+                class="mt-2 rounded-lg p-3"
+                style="background: var(--argus-bg-deep);"
+              >
+                <code
+                  class="text-[11px] leading-relaxed"
+                  style="color: var(--argus-text-muted); font-family: monospace; white-space: pre;"
+                >{{ `{
   referenceFace: Blob,        // JPEG-снимок лица
   mediaStream: MediaStream,   // Живой поток камеры для PIP
   networkMode: 'online' | 'degraded' | 'offline'
 }` }}</code>
               </div>
-              <p class="text-xs mt-2" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-xs mt-2"
+                style="color: var(--argus-text-dimmed);"
+              >
                 Клиентская система использует это событие для отображения экзаменационного контента. MediaStream передаётся в FloatingCamera (PIP) для мониторинга в реальном времени.
               </p>
             </div>
@@ -1039,7 +1509,10 @@ onUnmounted(() => {
             class="flex items-center gap-1.5 text-xs font-medium"
             style="color: var(--argus-accent);"
           >
-            <UIcon name="i-lucide-external-link" class="size-3.5" />
+            <UIcon
+              name="i-lucide-external-link"
+              class="size-3.5"
+            />
             Подробная документация по виджету
           </NuxtLink>
         </div>

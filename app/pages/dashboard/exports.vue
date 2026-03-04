@@ -171,10 +171,16 @@ onUnmounted(() => {
     <!-- Page Header -->
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <h1 class="text-2xl font-bold" style="color: var(--argus-text);">
+        <h1
+          class="text-2xl font-bold"
+          style="color: var(--argus-text);"
+        >
           Экспорт доказательств
         </h1>
-        <p class="text-sm mt-1" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-sm mt-1"
+          style="color: var(--argus-text-dimmed);"
+        >
           Массовый экспорт видеозаписей и манифестов с криптографической верификацией
         </p>
       </div>
@@ -191,27 +197,56 @@ onUnmounted(() => {
         @mouseleave="($event.currentTarget as HTMLElement).style.background = accentBg(0.15)"
         @click="showCreateModal = true"
       >
-        <UIcon name="i-lucide-package-plus" class="size-4" />
+        <UIcon
+          name="i-lucide-package-plus"
+          class="size-4"
+        />
         Создать экспорт
       </button>
     </div>
 
     <!-- Stats Badges -->
     <div class="flex items-center gap-3 flex-wrap">
-      <div class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
-        <UIcon name="i-lucide-package" class="size-3.5" />
+      <div
+        class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full"
+        :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+      >
+        <UIcon
+          name="i-lucide-package"
+          class="size-3.5"
+        />
         {{ stats.total }} всего
       </div>
-      <div class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full" :style="{ background: successBg(0.1), color: 'var(--argus-success)' }">
-        <UIcon name="i-lucide-check-circle" class="size-3.5" />
+      <div
+        class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full"
+        :style="{ background: successBg(0.1), color: 'var(--argus-success)' }"
+      >
+        <UIcon
+          name="i-lucide-check-circle"
+          class="size-3.5"
+        />
         {{ stats.completed }} готово
       </div>
-      <div v-if="stats.processing > 0" class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full" :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }">
-        <UIcon name="i-lucide-loader" class="size-3.5 animate-spin" />
+      <div
+        v-if="stats.processing > 0"
+        class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full"
+        :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
+      >
+        <UIcon
+          name="i-lucide-loader"
+          class="size-3.5 animate-spin"
+        />
         {{ stats.processing }} в процессе
       </div>
-      <div v-if="stats.failed > 0" class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full" :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }">
-        <UIcon name="i-lucide-x-circle" class="size-3.5" />
+      <div
+        v-if="stats.failed > 0"
+        class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full"
+        :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }"
+      >
+        <UIcon
+          name="i-lucide-x-circle"
+          class="size-3.5"
+        />
         {{ stats.failed }} ошибок
       </div>
     </div>
@@ -222,19 +257,40 @@ onUnmounted(() => {
       class="flex items-center gap-3 px-4 py-3 rounded-xl border"
       :style="{ background: errorBg(0.06), borderColor: errorBg(0.2), color: 'var(--argus-error)' }"
     >
-      <UIcon name="i-lucide-alert-triangle" class="size-4 shrink-0" />
+      <UIcon
+        name="i-lucide-alert-triangle"
+        class="size-4 shrink-0"
+      />
       <span class="text-sm">{{ error }}</span>
-      <button class="ml-auto" @click="error = ''">
-        <UIcon name="i-lucide-x" class="size-4" />
+      <button
+        class="ml-auto"
+        @click="error = ''"
+      >
+        <UIcon
+          name="i-lucide-x"
+          class="size-4"
+        />
       </button>
     </div>
 
     <!-- Export Jobs Table -->
     <div class="glass-card rounded-xl overflow-hidden">
-      <div class="px-5 py-3.5 border-b flex items-center justify-between" style="border-color: var(--argus-border);">
+      <div
+        class="px-5 py-3.5 border-b flex items-center justify-between"
+        style="border-color: var(--argus-border);"
+      >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-hard-drive-download" class="size-4" style="color: var(--argus-text-dimmed);" />
-          <h3 class="text-sm font-semibold" style="color: var(--argus-text);">Задания экспорта</h3>
+          <UIcon
+            name="i-lucide-hard-drive-download"
+            class="size-4"
+            style="color: var(--argus-text-dimmed);"
+          />
+          <h3
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            Задания экспорта
+          </h3>
         </div>
         <button
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
@@ -243,28 +299,76 @@ onUnmounted(() => {
           @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
           @click="fetchExports"
         >
-          <UIcon name="i-lucide-refresh-cw" class="size-3.5" :class="loading ? 'animate-spin' : ''" />
+          <UIcon
+            name="i-lucide-refresh-cw"
+            class="size-3.5"
+            :class="loading ? 'animate-spin' : ''"
+          />
           Обновить
         </button>
       </div>
 
       <!-- Loading -->
-      <div v-if="loading && exports.length === 0" class="flex flex-col items-center justify-center py-16">
-        <div class="animate-spin rounded-full size-8 border-2 border-t-transparent mb-3" style="border-color: var(--argus-accent); border-top-color: transparent;" />
-        <p class="text-xs font-medium" style="color: var(--argus-text-dimmed);">Загрузка экспортов...</p>
+      <div
+        v-if="loading && exports.length === 0"
+        class="flex flex-col items-center justify-center py-16"
+      >
+        <div
+          class="animate-spin rounded-full size-8 border-2 border-t-transparent mb-3"
+          style="border-color: var(--argus-accent); border-top-color: transparent;"
+        />
+        <p
+          class="text-xs font-medium"
+          style="color: var(--argus-text-dimmed);"
+        >
+          Загрузка экспортов...
+        </p>
       </div>
 
       <!-- Table -->
-      <div v-else-if="exports.length > 0" class="overflow-x-auto">
+      <div
+        v-else-if="exports.length > 0"
+        class="overflow-x-auto"
+      >
         <table class="w-full">
           <thead>
             <tr style="border-bottom: 1px solid var(--argus-border);">
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">ID</th>
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Сессии</th>
-              <th class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Статус</th>
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Создан</th>
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">SHA-256</th>
-              <th class="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Действия</th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                ID
+              </th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Сессии
+              </th>
+              <th
+                class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Статус
+              </th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Создан
+              </th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                SHA-256
+              </th>
+              <th
+                class="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Действия
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -275,19 +379,38 @@ onUnmounted(() => {
             >
               <!-- ID -->
               <td class="px-5 py-3.5">
-                <p class="text-xs font-mono font-medium" style="color: var(--argus-text);">{{ job.id }}</p>
-                <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">{{ job.requestedBy }}</p>
+                <p
+                  class="text-xs font-mono font-medium"
+                  style="color: var(--argus-text);"
+                >
+                  {{ job.id }}
+                </p>
+                <p
+                  class="text-[10px] mt-0.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
+                  {{ job.requestedBy }}
+                </p>
               </td>
 
               <!-- Sessions -->
               <td class="px-5 py-3.5">
                 <div class="flex items-center gap-1.5">
-                  <span class="text-xs font-bold" style="color: var(--argus-text);">{{ job.sessionIds.length }}</span>
-                  <span class="text-[10px]" style="color: var(--argus-text-dimmed);">
+                  <span
+                    class="text-xs font-bold"
+                    style="color: var(--argus-text);"
+                  >{{ job.sessionIds.length }}</span>
+                  <span
+                    class="text-[10px]"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     {{ job.sessionIds.length === 1 ? 'сессия' : job.sessionIds.length < 5 ? 'сессии' : 'сессий' }}
                   </span>
                 </div>
-                <p class="text-[9px] font-mono mt-0.5 truncate max-w-48" style="color: var(--argus-text-muted);">
+                <p
+                  class="text-[9px] font-mono mt-0.5 truncate max-w-48"
+                  style="color: var(--argus-text-muted);"
+                >
                   {{ job.sessionIds.slice(0, 3).join(', ') }}{{ job.sessionIds.length > 3 ? '...' : '' }}
                 </p>
               </td>
@@ -305,23 +428,45 @@ onUnmounted(() => {
                   />
                   {{ statusLabel(job.status) }}
                 </span>
-                <p v-if="job.errorMessage" class="text-[9px] mt-1 max-w-48 truncate" style="color: var(--argus-error);">
+                <p
+                  v-if="job.errorMessage"
+                  class="text-[9px] mt-1 max-w-48 truncate"
+                  style="color: var(--argus-error);"
+                >
                   {{ job.errorMessage }}
                 </p>
               </td>
 
               <!-- Created -->
               <td class="px-5 py-3.5">
-                <p class="text-xs" style="color: var(--argus-text-muted);">{{ formatTimeAgo(job.createdAt) }}</p>
-                <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">{{ formatDateTime(job.createdAt) }}</p>
+                <p
+                  class="text-xs"
+                  style="color: var(--argus-text-muted);"
+                >
+                  {{ formatTimeAgo(job.createdAt) }}
+                </p>
+                <p
+                  class="text-[10px] mt-0.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
+                  {{ formatDateTime(job.createdAt) }}
+                </p>
               </td>
 
               <!-- SHA-256 -->
               <td class="px-5 py-3.5">
-                <p v-if="job.sha256Archive" class="text-[10px] font-mono truncate max-w-32" style="color: var(--argus-text-muted);">
+                <p
+                  v-if="job.sha256Archive"
+                  class="text-[10px] font-mono truncate max-w-32"
+                  style="color: var(--argus-text-muted);"
+                >
                   {{ job.sha256Archive }}
                 </p>
-                <span v-else class="text-[10px]" style="color: var(--argus-text-dimmed);">—</span>
+                <span
+                  v-else
+                  class="text-[10px]"
+                  style="color: var(--argus-text-dimmed);"
+                >—</span>
               </td>
 
               <!-- Actions -->
@@ -335,7 +480,10 @@ onUnmounted(() => {
                     @mouseenter="($event.currentTarget as HTMLElement).style.background = successBg(0.15)"
                     @mouseleave="($event.currentTarget as HTMLElement).style.background = successBg(0.08)"
                   >
-                    <UIcon name="i-lucide-download" class="size-3" />
+                    <UIcon
+                      name="i-lucide-download"
+                      class="size-3"
+                    />
                     Скачать
                   </button>
 
@@ -348,7 +496,10 @@ onUnmounted(() => {
                     @mouseleave="($event.currentTarget as HTMLElement).style.background = errorBg(0.08)"
                     @click="cancelExport(job.id)"
                   >
-                    <UIcon name="i-lucide-x" class="size-3" />
+                    <UIcon
+                      name="i-lucide-x"
+                      class="size-3"
+                    />
                     Отменить
                   </button>
 
@@ -372,9 +523,21 @@ onUnmounted(() => {
         v-else
         class="flex flex-col items-center justify-center py-16"
       >
-        <UIcon name="i-lucide-package-x" class="size-12 mb-3" style="color: var(--argus-text-dimmed);" />
-        <p class="text-sm font-medium" style="color: var(--argus-text);">Нет экспортов</p>
-        <p class="text-xs mt-1" style="color: var(--argus-text-dimmed);">
+        <UIcon
+          name="i-lucide-package-x"
+          class="size-12 mb-3"
+          style="color: var(--argus-text-dimmed);"
+        />
+        <p
+          class="text-sm font-medium"
+          style="color: var(--argus-text);"
+        >
+          Нет экспортов
+        </p>
+        <p
+          class="text-xs mt-1"
+          style="color: var(--argus-text-dimmed);"
+        >
           Создайте экспорт для скачивания доказательств с криптографическим манифестом
         </p>
         <button
@@ -382,7 +545,10 @@ onUnmounted(() => {
           :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
           @click="showCreateModal = true"
         >
-          <UIcon name="i-lucide-package-plus" class="size-3.5" />
+          <UIcon
+            name="i-lucide-package-plus"
+            class="size-3.5"
+          />
           Создать экспорт
         </button>
       </div>
@@ -395,31 +561,67 @@ onUnmounted(() => {
           class="flex items-center justify-center size-9 rounded-lg shrink-0"
           :style="{ background: accentBg(0.1) }"
         >
-          <UIcon name="i-lucide-shield-check" class="size-5" style="color: var(--argus-accent);" />
+          <UIcon
+            name="i-lucide-shield-check"
+            class="size-5"
+            style="color: var(--argus-accent);"
+          />
         </div>
         <div>
-          <h4 class="text-sm font-semibold" style="color: var(--argus-text);">Содержимое архива</h4>
-          <p class="text-xs mt-1 leading-relaxed" style="color: var(--argus-text-dimmed);">
+          <h4
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            Содержимое архива
+          </h4>
+          <p
+            class="text-xs mt-1 leading-relaxed"
+            style="color: var(--argus-text-dimmed);"
+          >
             Каждый экспорт содержит TAR.GZ архив с видеозаписями, аудиозаписями, снимками экрана
             и криптографический манифест (manifest.json) с SHA-256 хэшами каждого файла
             и привязкой нарушений к временным меткам видео. Архив защищён Object Lock (WORM)
             для обеспечения неизменности доказательной базы.
           </p>
           <div class="flex items-center gap-4 mt-3">
-            <div class="flex items-center gap-1.5 text-[10px]" style="color: var(--argus-text-muted);">
-              <UIcon name="i-lucide-file-archive" class="size-3" />
+            <div
+              class="flex items-center gap-1.5 text-[10px]"
+              style="color: var(--argus-text-muted);"
+            >
+              <UIcon
+                name="i-lucide-file-archive"
+                class="size-3"
+              />
               TAR.GZ архив
             </div>
-            <div class="flex items-center gap-1.5 text-[10px]" style="color: var(--argus-text-muted);">
-              <UIcon name="i-lucide-fingerprint" class="size-3" />
+            <div
+              class="flex items-center gap-1.5 text-[10px]"
+              style="color: var(--argus-text-muted);"
+            >
+              <UIcon
+                name="i-lucide-fingerprint"
+                class="size-3"
+              />
               SHA-256 верификация
             </div>
-            <div class="flex items-center gap-1.5 text-[10px]" style="color: var(--argus-text-muted);">
-              <UIcon name="i-lucide-lock" class="size-3" />
+            <div
+              class="flex items-center gap-1.5 text-[10px]"
+              style="color: var(--argus-text-muted);"
+            >
+              <UIcon
+                name="i-lucide-lock"
+                class="size-3"
+              />
               Object Lock (WORM)
             </div>
-            <div class="flex items-center gap-1.5 text-[10px]" style="color: var(--argus-text-muted);">
-              <UIcon name="i-lucide-clock" class="size-3" />
+            <div
+              class="flex items-center gap-1.5 text-[10px]"
+              style="color: var(--argus-text-muted);"
+            >
+              <UIcon
+                name="i-lucide-clock"
+                class="size-3"
+              />
               Ссылка на 24 часа
             </div>
           </div>
@@ -447,10 +649,22 @@ onUnmounted(() => {
             :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
           >
             <!-- Header -->
-            <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--argus-border);">
+            <div
+              class="flex items-center justify-between px-6 py-4 border-b"
+              style="border-color: var(--argus-border);"
+            >
               <div class="flex items-center gap-2">
-                <UIcon name="i-lucide-package-plus" class="size-5" style="color: var(--argus-accent);" />
-                <h2 class="text-lg font-bold" style="color: var(--argus-text);">Новый экспорт</h2>
+                <UIcon
+                  name="i-lucide-package-plus"
+                  class="size-5"
+                  style="color: var(--argus-accent);"
+                />
+                <h2
+                  class="text-lg font-bold"
+                  style="color: var(--argus-text);"
+                >
+                  Новый экспорт
+                </h2>
               </div>
               <button
                 class="flex items-center justify-center size-8 rounded-lg transition-colors"
@@ -459,14 +673,20 @@ onUnmounted(() => {
                 @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
                 @click="showCreateModal = false"
               >
-                <UIcon name="i-lucide-x" class="size-5" />
+                <UIcon
+                  name="i-lucide-x"
+                  class="size-5"
+                />
               </button>
             </div>
 
             <!-- Body -->
             <div class="px-6 py-5 space-y-4">
               <div>
-                <label class="text-xs font-semibold mb-2 block" style="color: var(--argus-text-muted);">
+                <label
+                  class="text-xs font-semibold mb-2 block"
+                  style="color: var(--argus-text-muted);"
+                >
                   ID сессий (по одному на строку или через запятую)
                 </label>
                 <textarea
@@ -482,14 +702,20 @@ onUnmounted(() => {
                   @focus="($event.target as HTMLElement).style.borderColor = 'var(--argus-accent)'"
                   @blur="($event.target as HTMLElement).style.borderColor = 'var(--argus-border)'"
                 />
-                <p class="text-[10px] mt-1.5" style="color: var(--argus-text-dimmed);">
+                <p
+                  class="text-[10px] mt-1.5"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   Максимум 50 сессий на один экспорт. Архив будет готов в течение нескольких минут.
                 </p>
               </div>
             </div>
 
             <!-- Footer -->
-            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t" style="border-color: var(--argus-border);">
+            <div
+              class="flex items-center justify-end gap-3 px-6 py-4 border-t"
+              style="border-color: var(--argus-border);"
+            >
               <button
                 class="px-4 py-2 rounded-lg text-sm font-medium transition-all"
                 :style="{ color: 'var(--argus-text-dimmed)' }"
@@ -511,8 +737,16 @@ onUnmounted(() => {
                 @mouseleave="($event.currentTarget as HTMLElement).style.background = accentBg(0.15)"
                 @click="createExport"
               >
-                <UIcon v-if="creating" name="i-lucide-loader" class="size-4 animate-spin" />
-                <UIcon v-else name="i-lucide-package-plus" class="size-4" />
+                <UIcon
+                  v-if="creating"
+                  name="i-lucide-loader"
+                  class="size-4 animate-spin"
+                />
+                <UIcon
+                  v-else
+                  name="i-lucide-package-plus"
+                  class="size-4"
+                />
                 {{ creating ? 'Создание...' : 'Создать экспорт' }}
               </button>
             </div>

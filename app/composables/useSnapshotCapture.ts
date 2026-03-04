@@ -106,7 +106,7 @@ export function useSnapshotCapture(config: SnapshotCaptureConfig) {
   // -------------------------------------------------------------------------
 
   /** Get or create the offscreen canvas at the target resolution. */
-  function getCanvas(width: number, height: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+  function getCanvas(width: number, height: number): { canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D } | null {
     if (!canvas) {
       canvas = document.createElement('canvas')
       canvasCtx = canvas.getContext('2d')

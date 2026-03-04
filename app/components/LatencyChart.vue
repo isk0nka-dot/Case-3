@@ -113,7 +113,7 @@ const chartOptions = computed(() => ({
         size: 12
       },
       callbacks: {
-        label: (ctx: { dataset: { label?: string }; parsed: { y: number | null } }) => {
+        label: (ctx: { dataset: { label?: string }, parsed: { y: number | null } }) => {
           return `${ctx.dataset.label ?? ''}: ${ctx.parsed.y ?? 0}ms`
         }
       }
@@ -159,6 +159,10 @@ const chartOptions = computed(() => ({
 
 <template>
   <div class="w-full h-56">
-    <Line :key="chartKey" :data="chartData" :options="chartOptions" />
+    <Line
+      :key="chartKey"
+      :data="chartData"
+      :options="chartOptions"
+    />
   </div>
 </template>

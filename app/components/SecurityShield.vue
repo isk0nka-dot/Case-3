@@ -47,10 +47,10 @@ const subsystems = computed<SubsystemStatus[]>(() => {
 
   // 1. Browser Integrity
   const bi = props.browserState
-  const biIssues = (bi.tabSwitchCount > 3 ? 1 : 0) +
-    (bi.devToolsOpen ? 1 : 0) +
-    (bi.isSecondScreenDetected ? 1 : 0) +
-    (bi.copyAttempts > 0 ? 1 : 0)
+  const biIssues = (bi.tabSwitchCount > 3 ? 1 : 0)
+    + (bi.devToolsOpen ? 1 : 0)
+    + (bi.isSecondScreenDetected ? 1 : 0)
+    + (bi.copyAttempts > 0 ? 1 : 0)
   list.push({
     name: 'Браузер',
     icon: 'i-lucide-globe',
@@ -65,13 +65,18 @@ const subsystems = computed<SubsystemStatus[]>(() => {
   list.push({
     name: 'Лицо',
     icon: 'i-lucide-scan-face',
-    status: !spoof ? 'inactive'
-      : spoof.isSpoof ? 'critical'
-      : spoof.confidence > 0.3 ? 'warning'
-      : 'ok',
-    detail: !spoof ? 'Ожидание'
-      : spoof.isSpoof ? `Обнаружен ${spoof.spoofType}`
-      : 'Живое лицо'
+    status: !spoof
+      ? 'inactive'
+      : spoof.isSpoof
+        ? 'critical'
+        : spoof.confidence > 0.3
+          ? 'warning'
+          : 'ok',
+    detail: !spoof
+      ? 'Ожидание'
+      : spoof.isSpoof
+        ? `Обнаружен ${spoof.spoofType}`
+        : 'Живое лицо'
   })
 
   // 3. Virtual Camera
@@ -79,12 +84,16 @@ const subsystems = computed<SubsystemStatus[]>(() => {
   list.push({
     name: 'Камера',
     icon: 'i-lucide-camera',
-    status: !vc ? 'inactive'
-      : vc.isVirtual ? 'critical'
-      : 'ok',
-    detail: !vc ? 'Проверка...'
-      : vc.isVirtual ? `Виртуальная (${(vc.confidence * 100).toFixed(0)}%)`
-      : 'Физическая'
+    status: !vc
+      ? 'inactive'
+      : vc.isVirtual
+        ? 'critical'
+        : 'ok',
+    detail: !vc
+      ? 'Проверка...'
+      : vc.isVirtual
+        ? `Виртуальная (${(vc.confidence * 100).toFixed(0)}%)`
+        : 'Физическая'
   })
 
   // 4. Device Fingerprint
@@ -92,23 +101,31 @@ const subsystems = computed<SubsystemStatus[]>(() => {
   list.push({
     name: 'Устройство',
     icon: 'i-lucide-fingerprint',
-    status: !df ? 'inactive'
-      : df.isVirtualMachine ? 'critical'
-      : 'ok',
-    detail: !df ? 'Сбор...'
-      : df.isVirtualMachine ? 'Виртуальная машина'
-      : `ID: ${df.deviceId.substring(0, 8)}`
+    status: !df
+      ? 'inactive'
+      : df.isVirtualMachine
+        ? 'critical'
+        : 'ok',
+    detail: !df
+      ? 'Сбор...'
+      : df.isVirtualMachine
+        ? 'Виртуальная машина'
+        : `ID: ${df.deviceId.substring(0, 8)}`
   })
 
   // 5. Liveness
   list.push({
     name: 'Живость',
     icon: 'i-lucide-heart-pulse',
-    status: props.currentChallenge ? 'warning'
-      : props.livenessPassRate < 0.5 ? 'critical'
-      : props.livenessPassRate < 0.8 ? 'warning'
-      : 'ok',
-    detail: props.currentChallenge ? 'Активная проверка'
+    status: props.currentChallenge
+      ? 'warning'
+      : props.livenessPassRate < 0.5
+        ? 'critical'
+        : props.livenessPassRate < 0.8
+          ? 'warning'
+          : 'ok',
+    detail: props.currentChallenge
+      ? 'Активная проверка'
       : `Пройдено ${(props.livenessPassRate * 100).toFixed(0)}%`
   })
 
@@ -174,14 +191,24 @@ function statusBg(status: SubsystemStatus['status']): string {
         :style="{
           background: isDark ? 'rgba(11, 15, 20, 0.95)' : 'rgba(255, 255, 255, 0.97)',
           borderColor: 'var(--argus-border)',
-          width: '260px',
+          width: '260px'
         }"
       >
         <!-- Header -->
-        <div class="px-3 py-2 border-b" :style="{ borderColor: 'var(--argus-border)' }">
+        <div
+          class="px-3 py-2 border-b"
+          :style="{ borderColor: 'var(--argus-border)' }"
+        >
           <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-shield" class="size-4" :style="{ color: overallColor }" />
-            <span class="text-xs font-bold" style="color: var(--argus-text);">Щит безопасности</span>
+            <UIcon
+              name="i-lucide-shield"
+              class="size-4"
+              :style="{ color: overallColor }"
+            />
+            <span
+              class="text-xs font-bold"
+              style="color: var(--argus-text);"
+            >Щит безопасности</span>
             <div class="flex-1" />
             <span
               v-if="criticalCount > 0"
@@ -218,15 +245,25 @@ function statusBg(status: SubsystemStatus['status']): string {
               class="flex items-center justify-center size-6 rounded shrink-0"
               :style="{ background: statusBg(sub.status) }"
             >
-              <UIcon :name="sub.icon" class="size-3.5" :style="{ color: statusColor(sub.status) }" />
+              <UIcon
+                :name="sub.icon"
+                class="size-3.5"
+                :style="{ color: statusColor(sub.status) }"
+              />
             </div>
 
             <!-- Info -->
             <div class="flex-1 min-w-0">
-              <p class="text-[10px] font-semibold truncate" style="color: var(--argus-text);">
+              <p
+                class="text-[10px] font-semibold truncate"
+                style="color: var(--argus-text);"
+              >
                 {{ sub.name }}
               </p>
-              <p class="text-[9px] truncate" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-[9px] truncate"
+                style="color: var(--argus-text-dimmed);"
+              >
                 {{ sub.detail }}
               </p>
             </div>
@@ -240,7 +277,7 @@ function statusBg(status: SubsystemStatus['status']): string {
       class="flex items-center gap-1.5 px-3 py-2 rounded-xl shadow-lg border backdrop-blur-xl cursor-default transition-all"
       :style="{
         background: isDark ? 'rgba(11, 15, 20, 0.9)' : 'rgba(255, 255, 255, 0.95)',
-        borderColor: overallColor,
+        borderColor: overallColor
       }"
     >
       <span class="relative flex size-2.5">
@@ -254,8 +291,15 @@ function statusBg(status: SubsystemStatus['status']): string {
           :style="{ background: overallColor }"
         />
       </span>
-      <UIcon name="i-lucide-shield" class="size-4" :style="{ color: overallColor }" />
-      <span class="text-[10px] font-bold" :style="{ color: overallColor }">
+      <UIcon
+        name="i-lucide-shield"
+        class="size-4"
+        :style="{ color: overallColor }"
+      />
+      <span
+        class="text-[10px] font-bold"
+        :style="{ color: overallColor }"
+      >
         {{ overallStatus === 'ok' ? 'Защита' : overallStatus === 'warning' ? 'Внимание' : 'Угроза' }}
       </span>
     </button>

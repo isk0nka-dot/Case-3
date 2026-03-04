@@ -643,8 +643,6 @@ function archiveSeekToEvent(timeStr: string, source?: string) {
   }
 }
 
-
-
 const archiveKernelLabels: Record<string, string> = {
   processScanning: 'Process Scan',
   hardwareDeviceDetection: 'HW Detect',
@@ -655,25 +653,56 @@ const archiveKernelLabels: Record<string, string> = {
 </script>
 
 <template>
-  <div class="landing-page min-h-screen overflow-x-hidden" style="background: #121820;">
+  <div
+    class="landing-page min-h-screen overflow-x-hidden"
+    style="background: #121820;"
+  >
     <!-- ============================== -->
     <!--  NAVIGATION                    -->
     <!-- ============================== -->
-    <nav class="fixed top-0 left-0 right-0 z-50 px-6 py-4" style="background: rgba(18, 24, 32, 0.75); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.06);">
+    <nav
+      class="fixed top-0 left-0 right-0 z-50 px-6 py-4"
+      style="background: rgba(18, 24, 32, 0.75); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.06);"
+    >
       <div class="max-w-7xl mx-auto flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <ArgusLogo :size="36" :animated="true" />
+          <ArgusLogo
+            :size="36"
+            :animated="true"
+          />
           <span class="text-lg font-bold text-white tracking-tight">Argus AI</span>
         </div>
 
         <div class="hidden md:flex items-center gap-8">
-          <a href="#features" class="text-sm text-white/50 hover:text-white transition-colors">Возможности</a>
-          <a href="#settings-demo" class="text-sm text-white/50 hover:text-white transition-colors">Настройки</a>
-          <a href="#archive-demo" class="text-sm text-white/50 hover:text-white transition-colors">Архив</a>
-          <a href="#stats" class="text-sm text-white/50 hover:text-white transition-colors">Результаты</a>
-          <a href="#comparison" class="text-sm text-white/50 hover:text-white transition-colors">Сравнение</a>
-          <a href="#pricing" class="text-sm text-white/50 hover:text-white transition-colors">Стоимость</a>
-          <NuxtLink v-if="authStore.isLoggedIn" to="/" class="text-sm text-white/50 hover:text-white transition-colors">Дашборд</NuxtLink>
+          <a
+            href="#features"
+            class="text-sm text-white/50 hover:text-white transition-colors"
+          >Возможности</a>
+          <a
+            href="#settings-demo"
+            class="text-sm text-white/50 hover:text-white transition-colors"
+          >Настройки</a>
+          <a
+            href="#archive-demo"
+            class="text-sm text-white/50 hover:text-white transition-colors"
+          >Архив</a>
+          <a
+            href="#stats"
+            class="text-sm text-white/50 hover:text-white transition-colors"
+          >Результаты</a>
+          <a
+            href="#comparison"
+            class="text-sm text-white/50 hover:text-white transition-colors"
+          >Сравнение</a>
+          <a
+            href="#pricing"
+            class="text-sm text-white/50 hover:text-white transition-colors"
+          >Стоимость</a>
+          <NuxtLink
+            v-if="authStore.isLoggedIn"
+            to="/"
+            class="text-sm text-white/50 hover:text-white transition-colors"
+          >Дашборд</NuxtLink>
         </div>
 
         <div class="flex items-center gap-3">
@@ -741,12 +770,18 @@ const archiveKernelLabels: Record<string, string> = {
           }"
         />
         <!-- Static glow — brand gradient -->
-        <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full" style="background: radial-gradient(circle, rgba(66, 133, 244, 0.05) 0%, rgba(162, 89, 255, 0.03) 30%, transparent 70%);" />
+        <div
+          class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full"
+          style="background: radial-gradient(circle, rgba(66, 133, 244, 0.05) 0%, rgba(162, 89, 255, 0.03) 30%, transparent 70%);"
+        />
       </div>
 
       <div class="relative z-10 max-w-5xl mx-auto text-center">
         <!-- Pre-headline badge -->
-        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8" style="background: rgba(66, 133, 244, 0.08); border: 1px solid rgba(66, 133, 244, 0.15);">
+        <div
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8"
+          style="background: rgba(66, 133, 244, 0.08); border: 1px solid rgba(66, 133, 244, 0.15);"
+        >
           <div class="size-2 rounded-full bg-green-400 animate-pulse" />
           <span class="text-xs font-semibold text-white/70">AI-powered vigilance · 99.97% uptime</span>
         </div>
@@ -779,7 +814,10 @@ const archiveKernelLabels: Record<string, string> = {
         <!-- Scroll indicator -->
         <div class="mt-20 flex flex-col items-center gap-2 animate-bounce">
           <span class="text-[10px] text-white/30 uppercase tracking-widest">Узнать больше</span>
-          <UIcon name="i-lucide-chevron-down" class="size-5 text-white/20" />
+          <UIcon
+            name="i-lucide-chevron-down"
+            class="size-5 text-white/20"
+          />
         </div>
       </div>
     </section>
@@ -787,10 +825,17 @@ const archiveKernelLabels: Record<string, string> = {
     <!-- ============================== -->
     <!--  FEATURES — 360° CONTROL       -->
     <!-- ============================== -->
-    <section id="features" ref="featuresRef" class="relative py-32 px-6">
+    <section
+      id="features"
+      ref="featuresRef"
+      class="relative py-32 px-6"
+    >
       <div class="max-w-7xl mx-auto">
         <div class="text-center mb-20">
-          <span class="text-xs font-bold uppercase tracking-widest" style="color: #4285F4;">360° Контроль</span>
+          <span
+            class="text-xs font-bold uppercase tracking-widest"
+            style="color: #4285F4;"
+          >360° Контроль</span>
           <h2 class="text-4xl md:text-5xl font-bold text-white mt-4 tracking-tight">
             Интеллект на каждом уровне
           </h2>
@@ -825,11 +870,19 @@ const archiveKernelLabels: Record<string, string> = {
                   border: `1px solid ${hexToRgba(feature.accent, 0.15)}`
                 }"
               >
-                <UIcon :name="feature.icon" class="size-7" :style="{ color: feature.accent }" />
+                <UIcon
+                  :name="feature.icon"
+                  class="size-7"
+                  :style="{ color: feature.accent }"
+                />
               </div>
 
-              <h3 class="text-lg font-bold text-white">{{ feature.title }}</h3>
-              <p class="text-sm text-white/50 mt-4 leading-relaxed">{{ feature.description }}</p>
+              <h3 class="text-lg font-bold text-white">
+                {{ feature.title }}
+              </h3>
+              <p class="text-sm text-white/50 mt-4 leading-relaxed">
+                {{ feature.description }}
+              </p>
             </div>
           </div>
         </div>
@@ -840,10 +893,18 @@ const archiveKernelLabels: Record<string, string> = {
     <!--  INTERACTIVE PROCTORING SETTINGS SHOWCASE    -->
     <!--  Dual-Tab Modal + Killer Features Sidebar    -->
     <!-- ============================================ -->
-    <section id="settings-demo" ref="settingsRef" class="relative py-32 px-6" style="background: #0F151D;">
+    <section
+      id="settings-demo"
+      ref="settingsRef"
+      class="relative py-32 px-6"
+      style="background: #0F151D;"
+    >
       <div class="max-w-7xl mx-auto">
         <div class="text-center mb-16">
-          <span class="text-xs font-bold uppercase tracking-widest" style="color: #A259FF;">Настройки прокторинга</span>
+          <span
+            class="text-xs font-bold uppercase tracking-widest"
+            style="color: #A259FF;"
+          >Настройки прокторинга</span>
           <h2 class="text-4xl md:text-5xl font-bold text-white mt-4 tracking-tight">
             Полный контроль над каждым параметром
           </h2>
@@ -854,7 +915,6 @@ const archiveKernelLabels: Record<string, string> = {
 
         <!-- === MAIN LAYOUT: Settings Modal (left) + Killer Features (right) === -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
           <!-- ========== LEFT: Settings Modal (8 cols) ========== -->
           <div
             class="lg:col-span-8 relative rounded-2xl border overflow-hidden transition-all duration-1000"
@@ -862,52 +922,97 @@ const archiveKernelLabels: Record<string, string> = {
             style="background: #1A2130; border-color: rgba(162, 89, 255, 0.15);"
           >
             <!-- Modal header -->
-            <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: rgba(255,255,255,0.06);">
+            <div
+              class="flex items-center justify-between px-6 py-4 border-b"
+              style="border-color: rgba(255,255,255,0.06);"
+            >
               <div class="flex items-center gap-3">
-                <div class="flex items-center justify-center size-8 rounded-lg" style="background: rgba(162, 89, 255, 0.1);">
-                  <UIcon name="i-lucide-settings-2" class="size-4" style="color: #A259FF;" />
+                <div
+                  class="flex items-center justify-center size-8 rounded-lg"
+                  style="background: rgba(162, 89, 255, 0.1);"
+                >
+                  <UIcon
+                    name="i-lucide-settings-2"
+                    class="size-4"
+                    style="color: #A259FF;"
+                  />
                 </div>
                 <div>
                   <span class="text-sm font-bold text-white">Настройки прокторинга</span>
-                  <span class="text-[9px] font-bold px-2 py-0.5 rounded-full ml-2" style="background: rgba(52, 168, 83, 0.15); color: #34A853;">ARGUS PROTECTED</span>
+                  <span
+                    class="text-[9px] font-bold px-2 py-0.5 rounded-full ml-2"
+                    style="background: rgba(52, 168, 83, 0.15); color: #34A853;"
+                  >ARGUS PROTECTED</span>
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <span class="text-[9px] font-bold px-2 py-0.5 rounded-full" style="background: rgba(66, 133, 244, 0.1); color: #4285F4;">{{ activeSettingsCount }}/11 активно</span>
+                <span
+                  class="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                  style="background: rgba(66, 133, 244, 0.1); color: #4285F4;"
+                >{{ activeSettingsCount }}/11 активно</span>
                 <span class="text-[10px] text-white/30 font-mono">Демо</span>
               </div>
             </div>
 
             <!-- ===== DUAL TAB BAR ===== -->
-            <div class="flex items-center border-b px-4" style="border-color: rgba(255,255,255,0.06);">
+            <div
+              class="flex items-center border-b px-4"
+              style="border-color: rgba(255,255,255,0.06);"
+            >
               <button
                 class="flex items-center gap-2 px-4 py-3 text-xs font-bold cursor-pointer transition-all relative"
                 :style="{ color: settingsTab === 'general' ? '#A259FF' : 'rgba(255,255,255,0.4)' }"
                 @click="settingsTab = 'general'"
               >
-                <UIcon name="i-lucide-sliders-horizontal" class="size-3.5" />
+                <UIcon
+                  name="i-lucide-sliders-horizontal"
+                  class="size-3.5"
+                />
                 Общие настройки
-                <div v-if="settingsTab === 'general'" class="absolute bottom-0 left-0 right-0 h-0.5" style="background: #A259FF;" />
+                <div
+                  v-if="settingsTab === 'general'"
+                  class="absolute bottom-0 left-0 right-0 h-0.5"
+                  style="background: #A259FF;"
+                />
               </button>
               <button
                 class="flex items-center gap-2 px-4 py-3 text-xs font-bold cursor-pointer transition-all relative"
                 :style="{ color: settingsTab === 'exceptions' ? '#A259FF' : 'rgba(255,255,255,0.4)' }"
                 @click="settingsTab = 'exceptions'"
               >
-                <UIcon name="i-lucide-user-cog" class="size-3.5" />
+                <UIcon
+                  name="i-lucide-user-cog"
+                  class="size-3.5"
+                />
                 Индивидуальные исключения
-                <span class="text-[8px] font-bold px-1.5 py-0.5 rounded-full ml-1" style="background: rgba(162, 89, 255, 0.12); color: #A259FF;">{{ mockExceptions.length }}</span>
-                <div v-if="settingsTab === 'exceptions'" class="absolute bottom-0 left-0 right-0 h-0.5" style="background: #A259FF;" />
+                <span
+                  class="text-[8px] font-bold px-1.5 py-0.5 rounded-full ml-1"
+                  style="background: rgba(162, 89, 255, 0.12); color: #A259FF;"
+                >{{ mockExceptions.length }}</span>
+                <div
+                  v-if="settingsTab === 'exceptions'"
+                  class="absolute bottom-0 left-0 right-0 h-0.5"
+                  style="background: #A259FF;"
+                />
               </button>
             </div>
 
             <!-- ===== TAB 1: GENERAL SETTINGS ===== -->
-            <div v-if="settingsTab === 'general'" class="p-6 space-y-6 max-h-[560px] overflow-y-auto custom-scrollbar">
+            <div
+              v-if="settingsTab === 'general'"
+              class="p-6 space-y-6 max-h-[560px] overflow-y-auto custom-scrollbar"
+            >
               <!-- QUICK PROFILES -->
               <div>
                 <div class="flex items-center gap-2 mb-3">
-                  <UIcon name="i-lucide-zap" class="size-4" style="color: #FBBC05;" />
-                  <h3 class="text-xs font-bold text-white uppercase tracking-wider">Быстрые профили</h3>
+                  <UIcon
+                    name="i-lucide-zap"
+                    class="size-4"
+                    style="color: #FBBC05;"
+                  />
+                  <h3 class="text-xs font-bold text-white uppercase tracking-wider">
+                    Быстрые профили
+                  </h3>
                 </div>
                 <div class="grid grid-cols-3 gap-2">
                   <button
@@ -919,8 +1024,15 @@ const archiveKernelLabels: Record<string, string> = {
                     }"
                     @click="applyMockPreset('extreme')"
                   >
-                    <UIcon name="i-lucide-shield-alert" class="size-5" :style="{ color: mockActivePreset === 'extreme' ? '#EA4335' : 'rgba(255,255,255,0.4)' }" />
-                    <span class="text-[10px] font-bold" :style="{ color: mockActivePreset === 'extreme' ? '#EA4335' : 'rgba(255,255,255,0.5)' }">Экстремальная</span>
+                    <UIcon
+                      name="i-lucide-shield-alert"
+                      class="size-5"
+                      :style="{ color: mockActivePreset === 'extreme' ? '#EA4335' : 'rgba(255,255,255,0.4)' }"
+                    />
+                    <span
+                      class="text-[10px] font-bold"
+                      :style="{ color: mockActivePreset === 'extreme' ? '#EA4335' : 'rgba(255,255,255,0.5)' }"
+                    >Экстремальная</span>
                   </button>
                   <button
                     class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all cursor-pointer"
@@ -931,8 +1043,15 @@ const archiveKernelLabels: Record<string, string> = {
                     }"
                     @click="applyMockPreset('standard')"
                   >
-                    <UIcon name="i-lucide-shield-check" class="size-5" :style="{ color: mockActivePreset === 'standard' ? '#4285F4' : 'rgba(255,255,255,0.4)' }" />
-                    <span class="text-[10px] font-bold" :style="{ color: mockActivePreset === 'standard' ? '#4285F4' : 'rgba(255,255,255,0.5)' }">Стандарт</span>
+                    <UIcon
+                      name="i-lucide-shield-check"
+                      class="size-5"
+                      :style="{ color: mockActivePreset === 'standard' ? '#4285F4' : 'rgba(255,255,255,0.4)' }"
+                    />
+                    <span
+                      class="text-[10px] font-bold"
+                      :style="{ color: mockActivePreset === 'standard' ? '#4285F4' : 'rgba(255,255,255,0.5)' }"
+                    >Стандарт</span>
                   </button>
                   <button
                     class="flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all cursor-pointer"
@@ -943,8 +1062,15 @@ const archiveKernelLabels: Record<string, string> = {
                     }"
                     @click="applyMockPreset('light')"
                   >
-                    <UIcon name="i-lucide-shield-off" class="size-5" :style="{ color: mockActivePreset === 'light' ? '#34A853' : 'rgba(255,255,255,0.4)' }" />
-                    <span class="text-[10px] font-bold" :style="{ color: mockActivePreset === 'light' ? '#34A853' : 'rgba(255,255,255,0.5)' }">Лёгкая</span>
+                    <UIcon
+                      name="i-lucide-shield-off"
+                      class="size-5"
+                      :style="{ color: mockActivePreset === 'light' ? '#34A853' : 'rgba(255,255,255,0.4)' }"
+                    />
+                    <span
+                      class="text-[10px] font-bold"
+                      :style="{ color: mockActivePreset === 'light' ? '#34A853' : 'rgba(255,255,255,0.5)' }"
+                    >Лёгкая</span>
                   </button>
                 </div>
               </div>
@@ -952,53 +1078,126 @@ const archiveKernelLabels: Record<string, string> = {
               <!-- VIDEO RULES -->
               <div>
                 <div class="flex items-center gap-2 mb-3">
-                  <UIcon name="i-lucide-video" class="size-4" style="color: #4285F4;" />
-                  <h3 class="text-xs font-bold text-white uppercase tracking-wider">Видео-правила</h3>
+                  <UIcon
+                    name="i-lucide-video"
+                    class="size-4"
+                    style="color: #4285F4;"
+                  />
+                  <h3 class="text-xs font-bold text-white uppercase tracking-wider">
+                    Видео-правила
+                  </h3>
                 </div>
                 <div class="space-y-0">
-                  <div class="flex items-center justify-between py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                  <div
+                    class="flex items-center justify-between py-3 border-b"
+                    style="border-color: rgba(255,255,255,0.04);"
+                  >
                     <div>
-                      <p class="text-xs font-medium text-white/80">Требовать боковую камеру</p>
-                      <p class="text-[10px] text-white/30">Мобильный телефон как боковая камера</p>
+                      <p class="text-xs font-medium text-white/80">
+                        Требовать боковую камеру
+                      </p>
+                      <p class="text-[10px] text-white/30">
+                        Мобильный телефон как боковая камера
+                      </p>
                     </div>
-                    <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.requireSideCamera ? '#4285F4' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.requireSideCamera = !mockSettings.requireSideCamera">
-                      <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.requireSideCamera ? '22px' : '2px' }" />
+                    <button
+                      class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockSettings.requireSideCamera ? '#4285F4' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockSettings.requireSideCamera = !mockSettings.requireSideCamera"
+                    >
+                      <div
+                        class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockSettings.requireSideCamera ? '22px' : '2px' }"
+                      />
                     </button>
                   </div>
-                  <div class="flex items-center justify-between py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                  <div
+                    class="flex items-center justify-between py-3 border-b"
+                    style="border-color: rgba(255,255,255,0.04);"
+                  >
                     <div>
-                      <p class="text-xs font-medium text-white/80">Верификация лица (Face ID)</p>
-                      <p class="text-[10px] text-white/30">Проверка личности перед началом</p>
+                      <p class="text-xs font-medium text-white/80">
+                        Верификация лица (Face ID)
+                      </p>
+                      <p class="text-[10px] text-white/30">
+                        Проверка личности перед началом
+                      </p>
                     </div>
-                    <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.faceVerification ? '#4285F4' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.faceVerification = !mockSettings.faceVerification">
-                      <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.faceVerification ? '22px' : '2px' }" />
+                    <button
+                      class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockSettings.faceVerification ? '#4285F4' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockSettings.faceVerification = !mockSettings.faceVerification"
+                    >
+                      <div
+                        class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockSettings.faceVerification ? '22px' : '2px' }"
+                      />
                     </button>
                   </div>
-                  <div class="flex items-center justify-between py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                  <div
+                    class="flex items-center justify-between py-3 border-b"
+                    style="border-color: rgba(255,255,255,0.04);"
+                  >
                     <div>
-                      <p class="text-xs font-medium text-white/80">Dynamic Face ID</p>
-                      <p class="text-[10px] text-white/30">Периодическая повторная проверка</p>
+                      <p class="text-xs font-medium text-white/80">
+                        Dynamic Face ID
+                      </p>
+                      <p class="text-[10px] text-white/30">
+                        Периодическая повторная проверка
+                      </p>
                     </div>
-                    <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.dynamicFaceRecheck ? '#4285F4' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.dynamicFaceRecheck = !mockSettings.dynamicFaceRecheck">
-                      <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.dynamicFaceRecheck ? '22px' : '2px' }" />
+                    <button
+                      class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockSettings.dynamicFaceRecheck ? '#4285F4' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockSettings.dynamicFaceRecheck = !mockSettings.dynamicFaceRecheck"
+                    >
+                      <div
+                        class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockSettings.dynamicFaceRecheck ? '22px' : '2px' }"
+                      />
                     </button>
                   </div>
-                  <div class="flex items-center justify-between py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                  <div
+                    class="flex items-center justify-between py-3 border-b"
+                    style="border-color: rgba(255,255,255,0.04);"
+                  >
                     <div>
-                      <p class="text-xs font-medium text-white/80">Детекция телефона</p>
-                      <p class="text-[10px] text-white/30">AI-обнаружение мобильных устройств</p>
+                      <p class="text-xs font-medium text-white/80">
+                        Детекция телефона
+                      </p>
+                      <p class="text-[10px] text-white/30">
+                        AI-обнаружение мобильных устройств
+                      </p>
                     </div>
-                    <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.objectDetectionPhone ? '#4285F4' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.objectDetectionPhone = !mockSettings.objectDetectionPhone">
-                      <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.objectDetectionPhone ? '22px' : '2px' }" />
+                    <button
+                      class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockSettings.objectDetectionPhone ? '#4285F4' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockSettings.objectDetectionPhone = !mockSettings.objectDetectionPhone"
+                    >
+                      <div
+                        class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockSettings.objectDetectionPhone ? '22px' : '2px' }"
+                      />
                     </button>
                   </div>
                   <div class="flex items-center justify-between py-3">
                     <div>
-                      <p class="text-xs font-medium text-white/80">Anti-Spoofing</p>
-                      <p class="text-[10px] text-white/30">Защита от подмены лица</p>
+                      <p class="text-xs font-medium text-white/80">
+                        Anti-Spoofing
+                      </p>
+                      <p class="text-[10px] text-white/30">
+                        Защита от подмены лица
+                      </p>
                     </div>
-                    <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.antiSpoofing ? '#4285F4' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.antiSpoofing = !mockSettings.antiSpoofing">
-                      <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.antiSpoofing ? '22px' : '2px' }" />
+                    <button
+                      class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockSettings.antiSpoofing ? '#4285F4' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockSettings.antiSpoofing = !mockSettings.antiSpoofing"
+                    >
+                      <div
+                        class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockSettings.antiSpoofing ? '22px' : '2px' }"
+                      />
                     </button>
                   </div>
                 </div>
@@ -1007,71 +1206,185 @@ const archiveKernelLabels: Record<string, string> = {
               <!-- AI SENSITIVITY -->
               <div>
                 <div class="flex items-center gap-2 mb-3">
-                  <UIcon name="i-lucide-brain" class="size-4" style="color: #A259FF;" />
-                  <h3 class="text-xs font-bold text-white uppercase tracking-wider">Чувствительность ИИ</h3>
+                  <UIcon
+                    name="i-lucide-brain"
+                    class="size-4"
+                    style="color: #A259FF;"
+                  />
+                  <h3 class="text-xs font-bold text-white uppercase tracking-wider">
+                    Чувствительность ИИ
+                  </h3>
                 </div>
-                <div class="py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                <div
+                  class="py-3 border-b"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
                   <div class="flex items-center justify-between mb-2">
-                    <p class="text-xs font-medium text-white/80">Порог детекции голоса</p>
-                    <span class="text-xs font-bold tabular-nums" style="color: #A259FF;">{{ mockSettings.voiceDetectionThreshold }}%</span>
+                    <p class="text-xs font-medium text-white/80">
+                      Порог детекции голоса
+                    </p>
+                    <span
+                      class="text-xs font-bold tabular-nums"
+                      style="color: #A259FF;"
+                    >{{ mockSettings.voiceDetectionThreshold }}%</span>
                   </div>
-                  <input v-model.number="mockSettings.voiceDetectionThreshold" type="range" min="0" max="100" class="w-full h-1.5 rounded-full appearance-none cursor-pointer" :style="{ background: `linear-gradient(to right, #A259FF ${mockSettings.voiceDetectionThreshold}%, rgba(255,255,255,0.1) ${mockSettings.voiceDetectionThreshold}%)` }">
+                  <input
+                    v-model.number="mockSettings.voiceDetectionThreshold"
+                    type="range"
+                    min="0"
+                    max="100"
+                    class="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                    :style="{ background: `linear-gradient(to right, #A259FF ${mockSettings.voiceDetectionThreshold}%, rgba(255,255,255,0.1) ${mockSettings.voiceDetectionThreshold}%)` }"
+                  >
                 </div>
-                <div class="py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                <div
+                  class="py-3 border-b"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
                   <div class="flex items-center justify-between mb-2">
-                    <p class="text-xs font-medium text-white/80">Чувствительность взгляда</p>
-                    <span class="text-xs font-bold tabular-nums" style="color: #A259FF;">{{ mockSettings.gazeSensitivity }}%</span>
+                    <p class="text-xs font-medium text-white/80">
+                      Чувствительность взгляда
+                    </p>
+                    <span
+                      class="text-xs font-bold tabular-nums"
+                      style="color: #A259FF;"
+                    >{{ mockSettings.gazeSensitivity }}%</span>
                   </div>
-                  <input v-model.number="mockSettings.gazeSensitivity" type="range" min="10" max="95" class="w-full h-1.5 rounded-full appearance-none cursor-pointer" :style="{ background: `linear-gradient(to right, #A259FF ${(mockSettings.gazeSensitivity - 10) / 85 * 100}%, rgba(255,255,255,0.1) ${(mockSettings.gazeSensitivity - 10) / 85 * 100}%)` }">
+                  <input
+                    v-model.number="mockSettings.gazeSensitivity"
+                    type="range"
+                    min="10"
+                    max="95"
+                    class="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                    :style="{ background: `linear-gradient(to right, #A259FF ${(mockSettings.gazeSensitivity - 10) / 85 * 100}%, rgba(255,255,255,0.1) ${(mockSettings.gazeSensitivity - 10) / 85 * 100}%)` }"
+                  >
                 </div>
                 <div class="py-3">
                   <div class="flex items-center justify-between mb-2">
-                    <p class="text-xs font-medium text-white/80">Лимит отклонения взгляда</p>
-                    <span class="text-xs font-bold tabular-nums px-2 py-0.5 rounded" :style="{ background: mockSettings.gazeDeviationLimitSec <= 5 ? 'rgba(234,67,53,0.15)' : 'rgba(255,255,255,0.06)', color: mockSettings.gazeDeviationLimitSec <= 5 ? '#EA4335' : 'white' }">
+                    <p class="text-xs font-medium text-white/80">
+                      Лимит отклонения взгляда
+                    </p>
+                    <span
+                      class="text-xs font-bold tabular-nums px-2 py-0.5 rounded"
+                      :style="{ background: mockSettings.gazeDeviationLimitSec <= 5 ? 'rgba(234,67,53,0.15)' : 'rgba(255,255,255,0.06)', color: mockSettings.gazeDeviationLimitSec <= 5 ? '#EA4335' : 'white' }"
+                    >
                       {{ mockSettings.gazeDeviationLimitSec }} сек
                     </span>
                   </div>
-                  <input v-model.number="mockSettings.gazeDeviationLimitSec" type="range" min="3" max="30" class="w-full h-1.5 rounded-full appearance-none cursor-pointer" :style="{ background: `linear-gradient(to right, #A259FF ${(mockSettings.gazeDeviationLimitSec - 3) / 27 * 100}%, rgba(255,255,255,0.1) ${(mockSettings.gazeDeviationLimitSec - 3) / 27 * 100}%)` }">
+                  <input
+                    v-model.number="mockSettings.gazeDeviationLimitSec"
+                    type="range"
+                    min="3"
+                    max="30"
+                    class="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                    :style="{ background: `linear-gradient(to right, #A259FF ${(mockSettings.gazeDeviationLimitSec - 3) / 27 * 100}%, rgba(255,255,255,0.1) ${(mockSettings.gazeDeviationLimitSec - 3) / 27 * 100}%)` }"
+                  >
                 </div>
               </div>
 
               <!-- BROWSER LOCKDOWN -->
               <div>
                 <div class="flex items-center gap-2 mb-3">
-                  <UIcon name="i-lucide-monitor" class="size-4" style="color: #EA4335;" />
-                  <h3 class="text-xs font-bold text-white uppercase tracking-wider">Ограничения браузера</h3>
+                  <UIcon
+                    name="i-lucide-monitor"
+                    class="size-4"
+                    style="color: #EA4335;"
+                  />
+                  <h3 class="text-xs font-bold text-white uppercase tracking-wider">
+                    Ограничения браузера
+                  </h3>
                 </div>
-                <div class="py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                <div
+                  class="py-3 border-b"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
                   <div class="flex items-center justify-between mb-2">
-                    <p class="text-xs font-medium text-white/80">Лимит переключения вкладок</p>
-                    <span class="text-xs font-bold tabular-nums px-2 py-0.5 rounded" :style="{ background: mockSettings.tabSwitchingLimit === 0 ? 'rgba(234,67,53,0.15)' : 'rgba(255,255,255,0.06)', color: mockSettings.tabSwitchingLimit === 0 ? '#EA4335' : 'white' }">
+                    <p class="text-xs font-medium text-white/80">
+                      Лимит переключения вкладок
+                    </p>
+                    <span
+                      class="text-xs font-bold tabular-nums px-2 py-0.5 rounded"
+                      :style="{ background: mockSettings.tabSwitchingLimit === 0 ? 'rgba(234,67,53,0.15)' : 'rgba(255,255,255,0.06)', color: mockSettings.tabSwitchingLimit === 0 ? '#EA4335' : 'white' }"
+                    >
                       {{ mockSettings.tabSwitchingLimit === 0 ? 'Запрещено' : mockSettings.tabSwitchingLimit }}
                     </span>
                   </div>
-                  <input v-model.number="mockSettings.tabSwitchingLimit" type="range" min="0" max="10" class="w-full h-1.5 rounded-full appearance-none cursor-pointer" :style="{ background: `linear-gradient(to right, #EA4335 ${mockSettings.tabSwitchingLimit / 10 * 100}%, rgba(255,255,255,0.1) ${mockSettings.tabSwitchingLimit / 10 * 100}%)` }">
+                  <input
+                    v-model.number="mockSettings.tabSwitchingLimit"
+                    type="range"
+                    min="0"
+                    max="10"
+                    class="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                    :style="{ background: `linear-gradient(to right, #EA4335 ${mockSettings.tabSwitchingLimit / 10 * 100}%, rgba(255,255,255,0.1) ${mockSettings.tabSwitchingLimit / 10 * 100}%)` }"
+                  >
                 </div>
-                <div class="flex items-center justify-between py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
-                  <p class="text-xs font-medium text-white/80">Блокировка буфера обмена</p>
-                  <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.blockCopyPaste ? '#EA4335' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.blockCopyPaste = !mockSettings.blockCopyPaste">
-                    <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.blockCopyPaste ? '22px' : '2px' }" />
+                <div
+                  class="flex items-center justify-between py-3 border-b"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
+                  <p class="text-xs font-medium text-white/80">
+                    Блокировка буфера обмена
+                  </p>
+                  <button
+                    class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                    :style="{ background: mockSettings.blockCopyPaste ? '#EA4335' : 'rgba(255,255,255,0.15)' }"
+                    @click="mockSettings.blockCopyPaste = !mockSettings.blockCopyPaste"
+                  >
+                    <div
+                      class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                      :style="{ left: mockSettings.blockCopyPaste ? '22px' : '2px' }"
+                    />
                   </button>
                 </div>
-                <div class="flex items-center justify-between py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
-                  <p class="text-xs font-medium text-white/80">Блокировка PrintScreen</p>
-                  <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.blockPrintScreen ? '#EA4335' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.blockPrintScreen = !mockSettings.blockPrintScreen">
-                    <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.blockPrintScreen ? '22px' : '2px' }" />
+                <div
+                  class="flex items-center justify-between py-3 border-b"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
+                  <p class="text-xs font-medium text-white/80">
+                    Блокировка PrintScreen
+                  </p>
+                  <button
+                    class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                    :style="{ background: mockSettings.blockPrintScreen ? '#EA4335' : 'rgba(255,255,255,0.15)' }"
+                    @click="mockSettings.blockPrintScreen = !mockSettings.blockPrintScreen"
+                  >
+                    <div
+                      class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                      :style="{ left: mockSettings.blockPrintScreen ? '22px' : '2px' }"
+                    />
                   </button>
                 </div>
-                <div class="flex items-center justify-between py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
-                  <p class="text-xs font-medium text-white/80">Блокировка виртуальных машин</p>
-                  <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.blockVirtualMachine ? '#EA4335' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.blockVirtualMachine = !mockSettings.blockVirtualMachine">
-                    <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.blockVirtualMachine ? '22px' : '2px' }" />
+                <div
+                  class="flex items-center justify-between py-3 border-b"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
+                  <p class="text-xs font-medium text-white/80">
+                    Блокировка виртуальных машин
+                  </p>
+                  <button
+                    class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                    :style="{ background: mockSettings.blockVirtualMachine ? '#EA4335' : 'rgba(255,255,255,0.15)' }"
+                    @click="mockSettings.blockVirtualMachine = !mockSettings.blockVirtualMachine"
+                  >
+                    <div
+                      class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                      :style="{ left: mockSettings.blockVirtualMachine ? '22px' : '2px' }"
+                    />
                   </button>
                 </div>
                 <div class="flex items-center justify-between py-3">
-                  <p class="text-xs font-medium text-white/80">Блокировка удалённого доступа</p>
-                  <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.blockRemoteAccess ? '#EA4335' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.blockRemoteAccess = !mockSettings.blockRemoteAccess">
-                    <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.blockRemoteAccess ? '22px' : '2px' }" />
+                  <p class="text-xs font-medium text-white/80">
+                    Блокировка удалённого доступа
+                  </p>
+                  <button
+                    class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                    :style="{ background: mockSettings.blockRemoteAccess ? '#EA4335' : 'rgba(255,255,255,0.15)' }"
+                    @click="mockSettings.blockRemoteAccess = !mockSettings.blockRemoteAccess"
+                  >
+                    <div
+                      class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                      :style="{ left: mockSettings.blockRemoteAccess ? '22px' : '2px' }"
+                    />
                   </button>
                 </div>
               </div>
@@ -1079,63 +1392,145 @@ const archiveKernelLabels: Record<string, string> = {
               <!-- KERNEL-LEVEL SYSTEM CONTROL -->
               <div>
                 <div class="flex items-center gap-2 mb-3">
-                  <UIcon name="i-lucide-cpu" class="size-4" style="color: #FBBC05;" />
-                  <h3 class="text-xs font-bold text-white uppercase tracking-wider">Системный контроль (Kernel-Level)</h3>
+                  <UIcon
+                    name="i-lucide-cpu"
+                    class="size-4"
+                    style="color: #FBBC05;"
+                  />
+                  <h3 class="text-xs font-bold text-white uppercase tracking-wider">
+                    Системный контроль (Kernel-Level)
+                  </h3>
                 </div>
-                <div class="flex items-center justify-between py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                <div
+                  class="flex items-center justify-between py-3 border-b"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
                   <div>
-                    <p class="text-xs font-medium text-white/80">Контроль процессов</p>
-                    <p class="text-[10px] text-white/30">AI-сканирование всех процессов ОС</p>
+                    <p class="text-xs font-medium text-white/80">
+                      Контроль процессов
+                    </p>
+                    <p class="text-[10px] text-white/30">
+                      AI-сканирование всех процессов ОС
+                    </p>
                   </div>
-                  <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.processScanning ? '#FBBC05' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.processScanning = !mockSettings.processScanning">
-                    <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.processScanning ? '22px' : '2px' }" />
+                  <button
+                    class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                    :style="{ background: mockSettings.processScanning ? '#FBBC05' : 'rgba(255,255,255,0.15)' }"
+                    @click="mockSettings.processScanning = !mockSettings.processScanning"
+                  >
+                    <div
+                      class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                      :style="{ left: mockSettings.processScanning ? '22px' : '2px' }"
+                    />
                   </button>
                 </div>
-                <div class="flex items-center justify-between py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                <div
+                  class="flex items-center justify-between py-3 border-b"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
                   <div>
-                    <p class="text-xs font-medium text-white/80">Детекция внешних устройств</p>
-                    <p class="text-[10px] text-white/30">Блокировка USB-захвата, HDMI-карт</p>
+                    <p class="text-xs font-medium text-white/80">
+                      Детекция внешних устройств
+                    </p>
+                    <p class="text-[10px] text-white/30">
+                      Блокировка USB-захвата, HDMI-карт
+                    </p>
                   </div>
-                  <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.hardwareDeviceDetection ? '#FBBC05' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.hardwareDeviceDetection = !mockSettings.hardwareDeviceDetection">
-                    <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.hardwareDeviceDetection ? '22px' : '2px' }" />
+                  <button
+                    class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                    :style="{ background: mockSettings.hardwareDeviceDetection ? '#FBBC05' : 'rgba(255,255,255,0.15)' }"
+                    @click="mockSettings.hardwareDeviceDetection = !mockSettings.hardwareDeviceDetection"
+                  >
+                    <div
+                      class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                      :style="{ left: mockSettings.hardwareDeviceDetection ? '22px' : '2px' }"
+                    />
                   </button>
                 </div>
-                <div class="flex items-center justify-between py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                <div
+                  class="flex items-center justify-between py-3 border-b"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
                   <div>
-                    <p class="text-xs font-medium text-white/80">Удалённый доступ (Advanced)</p>
-                    <p class="text-[10px] text-white/30">TeamViewer, AnyDesk, VNC + скрипты</p>
+                    <p class="text-xs font-medium text-white/80">
+                      Удалённый доступ (Advanced)
+                    </p>
+                    <p class="text-[10px] text-white/30">
+                      TeamViewer, AnyDesk, VNC + скрипты
+                    </p>
                   </div>
-                  <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.advancedRemoteBlock ? '#FBBC05' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.advancedRemoteBlock = !mockSettings.advancedRemoteBlock">
-                    <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.advancedRemoteBlock ? '22px' : '2px' }" />
+                  <button
+                    class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                    :style="{ background: mockSettings.advancedRemoteBlock ? '#FBBC05' : 'rgba(255,255,255,0.15)' }"
+                    @click="mockSettings.advancedRemoteBlock = !mockSettings.advancedRemoteBlock"
+                  >
+                    <div
+                      class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                      :style="{ left: mockSettings.advancedRemoteBlock ? '22px' : '2px' }"
+                    />
                   </button>
                 </div>
-                <div class="flex items-center justify-between py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                <div
+                  class="flex items-center justify-between py-3 border-b"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
                   <div>
-                    <p class="text-xs font-medium text-white/80">Hardware ID Binding</p>
-                    <p class="text-[10px] text-white/30">Привязка к CPU/Motherboard ID</p>
+                    <p class="text-xs font-medium text-white/80">
+                      Hardware ID Binding
+                    </p>
+                    <p class="text-[10px] text-white/30">
+                      Привязка к CPU/Motherboard ID
+                    </p>
                   </div>
-                  <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.hardwareIdBinding ? '#FBBC05' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.hardwareIdBinding = !mockSettings.hardwareIdBinding">
-                    <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.hardwareIdBinding ? '22px' : '2px' }" />
+                  <button
+                    class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                    :style="{ background: mockSettings.hardwareIdBinding ? '#FBBC05' : 'rgba(255,255,255,0.15)' }"
+                    @click="mockSettings.hardwareIdBinding = !mockSettings.hardwareIdBinding"
+                  >
+                    <div
+                      class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                      :style="{ left: mockSettings.hardwareIdBinding ? '22px' : '2px' }"
+                    />
                   </button>
                 </div>
                 <div class="flex items-center justify-between py-3">
                   <div>
-                    <p class="text-xs font-medium text-white/80">Deep Multi-Monitor Check</p>
-                    <p class="text-[10px] text-white/30">100% детекция всех мониторов</p>
+                    <p class="text-xs font-medium text-white/80">
+                      Deep Multi-Monitor Check
+                    </p>
+                    <p class="text-[10px] text-white/30">
+                      100% детекция всех мониторов
+                    </p>
                   </div>
-                  <button class="relative w-10 h-5 rounded-full transition-all cursor-pointer" :style="{ background: mockSettings.deepMultiMonitorCheck ? '#FBBC05' : 'rgba(255,255,255,0.15)' }" @click="mockSettings.deepMultiMonitorCheck = !mockSettings.deepMultiMonitorCheck">
-                    <div class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all" :style="{ left: mockSettings.deepMultiMonitorCheck ? '22px' : '2px' }" />
+                  <button
+                    class="relative w-10 h-5 rounded-full transition-all cursor-pointer"
+                    :style="{ background: mockSettings.deepMultiMonitorCheck ? '#FBBC05' : 'rgba(255,255,255,0.15)' }"
+                    @click="mockSettings.deepMultiMonitorCheck = !mockSettings.deepMultiMonitorCheck"
+                  >
+                    <div
+                      class="absolute top-0.5 size-4 rounded-full bg-white shadow transition-all"
+                      :style="{ left: mockSettings.deepMultiMonitorCheck ? '22px' : '2px' }"
+                    />
                   </button>
                 </div>
               </div>
             </div>
 
             <!-- ===== TAB 2: INDIVIDUAL EXCEPTIONS ===== -->
-            <div v-if="settingsTab === 'exceptions'" class="max-h-[560px] overflow-y-auto custom-scrollbar">
+            <div
+              v-if="settingsTab === 'exceptions'"
+              class="max-h-[560px] overflow-y-auto custom-scrollbar"
+            >
               <!-- Search bar -->
               <div class="px-6 pt-5 pb-3">
-                <div v-if="!mockExcSelectedStudent" class="relative">
-                  <UIcon name="i-lucide-search" class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/30" />
+                <div
+                  v-if="!mockExcSelectedStudent"
+                  class="relative"
+                >
+                  <UIcon
+                    name="i-lucide-search"
+                    class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/30"
+                  />
                   <input
                     v-model="excSearchQuery"
                     type="text"
@@ -1146,39 +1541,93 @@ const archiveKernelLabels: Record<string, string> = {
                 </div>
 
                 <!-- Selected student chip -->
-                <div v-else class="rounded-xl border overflow-hidden" style="border-color: rgba(162, 89, 255, 0.2);">
-                  <div class="flex items-center justify-between gap-3 px-4 py-3" style="background: rgba(162, 89, 255, 0.06);">
+                <div
+                  v-else
+                  class="rounded-xl border overflow-hidden"
+                  style="border-color: rgba(162, 89, 255, 0.2);"
+                >
+                  <div
+                    class="flex items-center justify-between gap-3 px-4 py-3"
+                    style="background: rgba(162, 89, 255, 0.06);"
+                  >
                     <div class="flex items-center gap-3">
-                      <div class="flex items-center justify-center size-9 rounded-lg" style="background: rgba(162, 89, 255, 0.12);">
-                        <UIcon name="i-lucide-user" class="size-4" style="color: #A259FF;" />
+                      <div
+                        class="flex items-center justify-center size-9 rounded-lg"
+                        style="background: rgba(162, 89, 255, 0.12);"
+                      >
+                        <UIcon
+                          name="i-lucide-user"
+                          class="size-4"
+                          style="color: #A259FF;"
+                        />
                       </div>
                       <div>
                         <div class="flex items-center gap-2">
-                          <p class="text-xs font-bold text-white/90">{{ mockExcSelectedStudent.name }}</p>
-                          <span class="inline-flex items-center gap-1 text-[7px] font-bold px-1.5 py-0.5 rounded" style="background: rgba(230, 126, 34, 0.12); color: #E67E22;">
-                            <UIcon name="i-lucide-pen-line" class="size-2.5" />
+                          <p class="text-xs font-bold text-white/90">
+                            {{ mockExcSelectedStudent.name }}
+                          </p>
+                          <span
+                            class="inline-flex items-center gap-1 text-[7px] font-bold px-1.5 py-0.5 rounded"
+                            style="background: rgba(230, 126, 34, 0.12); color: #E67E22;"
+                          >
+                            <UIcon
+                              name="i-lucide-pen-line"
+                              class="size-2.5"
+                            />
                             Manual Override
                           </span>
                         </div>
-                        <p class="text-[10px] font-mono text-white/30">{{ mockExcSelectedStudent.studentId }}</p>
+                        <p class="text-[10px] font-mono text-white/30">
+                          {{ mockExcSelectedStudent.studentId }}
+                        </p>
                       </div>
                     </div>
                     <div class="flex items-center gap-2">
-                      <span v-if="mockExcDiffCount > 0" class="text-[9px] font-bold px-2 py-0.5 rounded-full" style="background: rgba(162, 89, 255, 0.12); color: #A259FF;">{{ mockExcDiffCount }} отличий</span>
-                      <button class="flex items-center justify-center size-7 rounded-lg cursor-pointer text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors" @click="clearMockException">
-                        <UIcon name="i-lucide-x" class="size-3.5" />
+                      <span
+                        v-if="mockExcDiffCount > 0"
+                        class="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                        style="background: rgba(162, 89, 255, 0.12); color: #A259FF;"
+                      >{{ mockExcDiffCount }} отличий</span>
+                      <button
+                        class="flex items-center justify-center size-7 rounded-lg cursor-pointer text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
+                        @click="clearMockException"
+                      >
+                        <UIcon
+                          name="i-lucide-x"
+                          class="size-3.5"
+                        />
                       </button>
                     </div>
                   </div>
                   <!-- Custom Settings + Reset to Global -->
-                  <div class="flex items-center justify-between px-4 py-2 border-t" style="border-color: rgba(162, 89, 255, 0.1); background: rgba(162, 89, 255, 0.03);">
+                  <div
+                    class="flex items-center justify-between px-4 py-2 border-t"
+                    style="border-color: rgba(162, 89, 255, 0.1); background: rgba(162, 89, 255, 0.03);"
+                  >
                     <div class="flex items-center gap-1.5">
-                      <UIcon name="i-lucide-sliders-horizontal" class="size-3" style="color: #A259FF;" />
-                      <span class="text-[10px] font-semibold" style="color: #A259FF;">Custom Settings</span>
-                      <span v-if="mockExcDiffCount > 0" class="text-[9px] text-white/30">— {{ mockExcDiffCount }} параметров отличаются</span>
+                      <UIcon
+                        name="i-lucide-sliders-horizontal"
+                        class="size-3"
+                        style="color: #A259FF;"
+                      />
+                      <span
+                        class="text-[10px] font-semibold"
+                        style="color: #A259FF;"
+                      >Custom Settings</span>
+                      <span
+                        v-if="mockExcDiffCount > 0"
+                        class="text-[9px] text-white/30"
+                      >— {{ mockExcDiffCount }} параметров отличаются</span>
                     </div>
-                    <button v-if="mockExcDiffCount > 0" class="flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold text-white/30 cursor-pointer hover:text-white/60 hover:bg-white/5 transition-all" @click="resetMockExcToGlobal">
-                      <UIcon name="i-lucide-rotate-ccw" class="size-3" />
+                    <button
+                      v-if="mockExcDiffCount > 0"
+                      class="flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold text-white/30 cursor-pointer hover:text-white/60 hover:bg-white/5 transition-all"
+                      @click="resetMockExcToGlobal"
+                    >
+                      <UIcon
+                        name="i-lucide-rotate-ccw"
+                        class="size-3"
+                      />
                       Reset to Global
                     </button>
                   </div>
@@ -1186,59 +1635,152 @@ const archiveKernelLabels: Record<string, string> = {
               </div>
 
               <!-- When student selected: Show mirrored toggles -->
-              <div v-if="mockExcSelectedStudent" class="px-6 pb-5 space-y-4">
+              <div
+                v-if="mockExcSelectedStudent"
+                class="px-6 pb-5 space-y-4"
+              >
                 <div>
                   <div class="flex items-center gap-2 mb-2">
-                    <UIcon name="i-lucide-video" class="size-3.5" style="color: #A259FF;" />
-                    <h4 class="text-[10px] font-bold text-white/50 uppercase tracking-wider">Видео-правила</h4>
+                    <UIcon
+                      name="i-lucide-video"
+                      class="size-3.5"
+                      style="color: #A259FF;"
+                    />
+                    <h4 class="text-[10px] font-bold text-white/50 uppercase tracking-wider">
+                      Видео-правила
+                    </h4>
                   </div>
-                  <div class="flex items-center justify-between py-2.5 border-b" style="border-color: rgba(255,255,255,0.04);">
-                    <p class="text-[11px] font-medium text-white/70">Боковая камера</p>
-                    <button class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer" :style="{ background: mockExcSettings.requireSideCamera ? '#A259FF' : 'rgba(255,255,255,0.15)' }" @click="mockExcSettings.requireSideCamera = !mockExcSettings.requireSideCamera">
-                      <div class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all" :style="{ left: mockExcSettings.requireSideCamera ? '19px' : '2px' }" />
+                  <div
+                    class="flex items-center justify-between py-2.5 border-b"
+                    style="border-color: rgba(255,255,255,0.04);"
+                  >
+                    <p class="text-[11px] font-medium text-white/70">
+                      Боковая камера
+                    </p>
+                    <button
+                      class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockExcSettings.requireSideCamera ? '#A259FF' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockExcSettings.requireSideCamera = !mockExcSettings.requireSideCamera"
+                    >
+                      <div
+                        class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockExcSettings.requireSideCamera ? '19px' : '2px' }"
+                      />
                     </button>
                   </div>
-                  <div class="flex items-center justify-between py-2.5 border-b" style="border-color: rgba(255,255,255,0.04);">
-                    <p class="text-[11px] font-medium text-white/70">Face ID</p>
-                    <button class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer" :style="{ background: mockExcSettings.faceVerification ? '#A259FF' : 'rgba(255,255,255,0.15)' }" @click="mockExcSettings.faceVerification = !mockExcSettings.faceVerification">
-                      <div class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all" :style="{ left: mockExcSettings.faceVerification ? '19px' : '2px' }" />
+                  <div
+                    class="flex items-center justify-between py-2.5 border-b"
+                    style="border-color: rgba(255,255,255,0.04);"
+                  >
+                    <p class="text-[11px] font-medium text-white/70">
+                      Face ID
+                    </p>
+                    <button
+                      class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockExcSettings.faceVerification ? '#A259FF' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockExcSettings.faceVerification = !mockExcSettings.faceVerification"
+                    >
+                      <div
+                        class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockExcSettings.faceVerification ? '19px' : '2px' }"
+                      />
                     </button>
                   </div>
-                  <div class="flex items-center justify-between py-2.5 border-b" style="border-color: rgba(255,255,255,0.04);">
-                    <p class="text-[11px] font-medium text-white/70">Dynamic Face ID</p>
-                    <button class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer" :style="{ background: mockExcSettings.dynamicFaceRecheck ? '#A259FF' : 'rgba(255,255,255,0.15)' }" @click="mockExcSettings.dynamicFaceRecheck = !mockExcSettings.dynamicFaceRecheck">
-                      <div class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all" :style="{ left: mockExcSettings.dynamicFaceRecheck ? '19px' : '2px' }" />
+                  <div
+                    class="flex items-center justify-between py-2.5 border-b"
+                    style="border-color: rgba(255,255,255,0.04);"
+                  >
+                    <p class="text-[11px] font-medium text-white/70">
+                      Dynamic Face ID
+                    </p>
+                    <button
+                      class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockExcSettings.dynamicFaceRecheck ? '#A259FF' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockExcSettings.dynamicFaceRecheck = !mockExcSettings.dynamicFaceRecheck"
+                    >
+                      <div
+                        class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockExcSettings.dynamicFaceRecheck ? '19px' : '2px' }"
+                      />
                     </button>
                   </div>
                   <div class="flex items-center justify-between py-2.5">
-                    <p class="text-[11px] font-medium text-white/70">Anti-Spoofing</p>
-                    <button class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer" :style="{ background: mockExcSettings.antiSpoofing ? '#A259FF' : 'rgba(255,255,255,0.15)' }" @click="mockExcSettings.antiSpoofing = !mockExcSettings.antiSpoofing">
-                      <div class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all" :style="{ left: mockExcSettings.antiSpoofing ? '19px' : '2px' }" />
+                    <p class="text-[11px] font-medium text-white/70">
+                      Anti-Spoofing
+                    </p>
+                    <button
+                      class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockExcSettings.antiSpoofing ? '#A259FF' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockExcSettings.antiSpoofing = !mockExcSettings.antiSpoofing"
+                    >
+                      <div
+                        class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockExcSettings.antiSpoofing ? '19px' : '2px' }"
+                      />
                     </button>
                   </div>
                 </div>
 
                 <div>
                   <div class="flex items-center gap-2 mb-2">
-                    <UIcon name="i-lucide-cpu" class="size-3.5" style="color: #FBBC05;" />
-                    <h4 class="text-[10px] font-bold text-white/50 uppercase tracking-wider">Kernel-Level</h4>
+                    <UIcon
+                      name="i-lucide-cpu"
+                      class="size-3.5"
+                      style="color: #FBBC05;"
+                    />
+                    <h4 class="text-[10px] font-bold text-white/50 uppercase tracking-wider">
+                      Kernel-Level
+                    </h4>
                   </div>
-                  <div class="flex items-center justify-between py-2.5 border-b" style="border-color: rgba(255,255,255,0.04);">
-                    <p class="text-[11px] font-medium text-white/70">Скан. процессов</p>
-                    <button class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer" :style="{ background: mockExcSettings.processScanning ? '#FBBC05' : 'rgba(255,255,255,0.15)' }" @click="mockExcSettings.processScanning = !mockExcSettings.processScanning">
-                      <div class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all" :style="{ left: mockExcSettings.processScanning ? '19px' : '2px' }" />
+                  <div
+                    class="flex items-center justify-between py-2.5 border-b"
+                    style="border-color: rgba(255,255,255,0.04);"
+                  >
+                    <p class="text-[11px] font-medium text-white/70">
+                      Скан. процессов
+                    </p>
+                    <button
+                      class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockExcSettings.processScanning ? '#FBBC05' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockExcSettings.processScanning = !mockExcSettings.processScanning"
+                    >
+                      <div
+                        class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockExcSettings.processScanning ? '19px' : '2px' }"
+                      />
                     </button>
                   </div>
-                  <div class="flex items-center justify-between py-2.5 border-b" style="border-color: rgba(255,255,255,0.04);">
-                    <p class="text-[11px] font-medium text-white/70">Hardware ID</p>
-                    <button class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer" :style="{ background: mockExcSettings.hardwareIdBinding ? '#FBBC05' : 'rgba(255,255,255,0.15)' }" @click="mockExcSettings.hardwareIdBinding = !mockExcSettings.hardwareIdBinding">
-                      <div class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all" :style="{ left: mockExcSettings.hardwareIdBinding ? '19px' : '2px' }" />
+                  <div
+                    class="flex items-center justify-between py-2.5 border-b"
+                    style="border-color: rgba(255,255,255,0.04);"
+                  >
+                    <p class="text-[11px] font-medium text-white/70">
+                      Hardware ID
+                    </p>
+                    <button
+                      class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockExcSettings.hardwareIdBinding ? '#FBBC05' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockExcSettings.hardwareIdBinding = !mockExcSettings.hardwareIdBinding"
+                    >
+                      <div
+                        class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockExcSettings.hardwareIdBinding ? '19px' : '2px' }"
+                      />
                     </button>
                   </div>
                   <div class="flex items-center justify-between py-2.5">
-                    <p class="text-[11px] font-medium text-white/70">Deep Multi-Monitor</p>
-                    <button class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer" :style="{ background: mockExcSettings.deepMultiMonitorCheck ? '#FBBC05' : 'rgba(255,255,255,0.15)' }" @click="mockExcSettings.deepMultiMonitorCheck = !mockExcSettings.deepMultiMonitorCheck">
-                      <div class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all" :style="{ left: mockExcSettings.deepMultiMonitorCheck ? '19px' : '2px' }" />
+                    <p class="text-[11px] font-medium text-white/70">
+                      Deep Multi-Monitor
+                    </p>
+                    <button
+                      class="relative w-9 h-[18px] rounded-full transition-all cursor-pointer"
+                      :style="{ background: mockExcSettings.deepMultiMonitorCheck ? '#FBBC05' : 'rgba(255,255,255,0.15)' }"
+                      @click="mockExcSettings.deepMultiMonitorCheck = !mockExcSettings.deepMultiMonitorCheck"
+                    >
+                      <div
+                        class="absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all"
+                        :style="{ left: mockExcSettings.deepMultiMonitorCheck ? '19px' : '2px' }"
+                      />
                     </button>
                   </div>
                 </div>
@@ -1248,7 +1790,10 @@ const archiveKernelLabels: Record<string, string> = {
               <template v-if="!mockExcSelectedStudent">
                 <div class="px-6 py-2 flex items-center justify-between">
                   <span class="text-[10px] text-white/30 uppercase tracking-wider">Студенты с исключениями</span>
-                  <span class="text-[10px] font-bold" style="color: #A259FF;">{{ filteredMockExceptions.length }} из {{ mockExceptions.length }}</span>
+                  <span
+                    class="text-[10px] font-bold"
+                    style="color: #A259FF;"
+                  >{{ filteredMockExceptions.length }} из {{ mockExceptions.length }}</span>
                 </div>
 
                 <div class="px-6 pb-4 space-y-3">
@@ -1261,29 +1806,58 @@ const archiveKernelLabels: Record<string, string> = {
                     @mouseleave="($event.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'"
                     @click="selectMockException(exc)"
                   >
-                    <div class="flex items-start justify-between p-4" style="background: rgba(255,255,255,0.02);">
+                    <div
+                      class="flex items-start justify-between p-4"
+                      style="background: rgba(255,255,255,0.02);"
+                    >
                       <div class="flex items-center gap-3">
-                        <div class="flex items-center justify-center size-9 rounded-lg shrink-0" style="background: rgba(162, 89, 255, 0.08);">
-                          <UIcon name="i-lucide-user-cog" class="size-4" style="color: #A259FF;" />
+                        <div
+                          class="flex items-center justify-center size-9 rounded-lg shrink-0"
+                          style="background: rgba(162, 89, 255, 0.08);"
+                        >
+                          <UIcon
+                            name="i-lucide-user-cog"
+                            class="size-4"
+                            style="color: #A259FF;"
+                          />
                         </div>
                         <div>
                           <div class="flex items-center gap-2">
-                            <p class="text-xs font-bold text-white/80">{{ exc.name }}</p>
-                            <span class="inline-flex items-center gap-1 text-[7px] font-bold px-1.5 py-0.5 rounded" style="background: rgba(230, 126, 34, 0.12); color: #E67E22;">
-                              <UIcon name="i-lucide-pen-line" class="size-2" />
+                            <p class="text-xs font-bold text-white/80">
+                              {{ exc.name }}
+                            </p>
+                            <span
+                              class="inline-flex items-center gap-1 text-[7px] font-bold px-1.5 py-0.5 rounded"
+                              style="background: rgba(230, 126, 34, 0.12); color: #E67E22;"
+                            >
+                              <UIcon
+                                name="i-lucide-pen-line"
+                                class="size-2"
+                              />
                               Manual Override
                             </span>
                           </div>
-                          <p class="text-[10px] font-mono text-white/25">ИИН: {{ exc.studentId }}</p>
+                          <p class="text-[10px] font-mono text-white/25">
+                            ИИН: {{ exc.studentId }}
+                          </p>
                         </div>
                       </div>
-                      <span class="text-[8px] font-bold px-2 py-0.5 rounded-full shrink-0" style="background: rgba(162, 89, 255, 0.1); color: #A259FF;">
+                      <span
+                        class="text-[8px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                        style="background: rgba(162, 89, 255, 0.1); color: #A259FF;"
+                      >
                         {{ Object.keys(exc.overrides).length }} переопр.
                       </span>
                     </div>
                     <!-- Custom Settings summary row -->
-                    <div class="flex items-center gap-2 px-4 py-2 border-t" style="border-color: rgba(255,255,255,0.04); background: rgba(162, 89, 255, 0.02);">
-                      <span class="text-[8px] font-bold uppercase tracking-wider shrink-0" style="color: #A259FF;">Custom Settings</span>
+                    <div
+                      class="flex items-center gap-2 px-4 py-2 border-t"
+                      style="border-color: rgba(255,255,255,0.04); background: rgba(162, 89, 255, 0.02);"
+                    >
+                      <span
+                        class="text-[8px] font-bold uppercase tracking-wider shrink-0"
+                        style="color: #A259FF;"
+                      >Custom Settings</span>
                       <div class="flex flex-wrap gap-1">
                         <span
                           v-for="(val, key) in exc.overrides"
@@ -1300,13 +1874,27 @@ const archiveKernelLabels: Record<string, string> = {
                     </div>
                   </div>
 
-                  <div v-if="filteredMockExceptions.length === 0" class="text-center py-8">
-                    <UIcon name="i-lucide-search-x" class="size-8 text-white/15 mx-auto mb-2" />
-                    <p class="text-xs text-white/30">Исключений не найдено</p>
+                  <div
+                    v-if="filteredMockExceptions.length === 0"
+                    class="text-center py-8"
+                  >
+                    <UIcon
+                      name="i-lucide-search-x"
+                      class="size-8 text-white/15 mx-auto mb-2"
+                    />
+                    <p class="text-xs text-white/30">
+                      Исключений не найдено
+                    </p>
                   </div>
 
-                  <button class="w-full py-3 rounded-xl border-2 border-dashed text-xs font-medium text-white/25 cursor-pointer transition-all hover:border-[rgba(162,89,255,0.3)] hover:text-white/40" style="border-color: rgba(255,255,255,0.06);">
-                    <UIcon name="i-lucide-plus" class="size-4 inline-block mr-1" />
+                  <button
+                    class="w-full py-3 rounded-xl border-2 border-dashed text-xs font-medium text-white/25 cursor-pointer transition-all hover:border-[rgba(162,89,255,0.3)] hover:text-white/40"
+                    style="border-color: rgba(255,255,255,0.06);"
+                  >
+                    <UIcon
+                      name="i-lucide-plus"
+                      class="size-4 inline-block mr-1"
+                    />
                     Добавить исключение
                   </button>
                 </div>
@@ -1314,9 +1902,16 @@ const archiveKernelLabels: Record<string, string> = {
             </div>
 
             <!-- Settings footer -->
-            <div class="px-6 py-4 border-t" style="border-color: rgba(255,255,255,0.06);">
+            <div
+              class="px-6 py-4 border-t"
+              style="border-color: rgba(255,255,255,0.06);"
+            >
               <p class="text-[11px] text-white/40 text-center leading-relaxed">
-                <UIcon name="i-lucide-shield-check" class="size-3.5 inline-block mr-1" style="color: #34A853;" />
+                <UIcon
+                  name="i-lucide-shield-check"
+                  class="size-3.5 inline-block mr-1"
+                  style="color: #34A853;"
+                />
                 Политика вашего экзамена: Полный контроль над AI-детекцией и безопасностью браузера. Гибкая настройка для любой дисциплины.
               </p>
             </div>
@@ -1331,10 +1926,16 @@ const archiveKernelLabels: Record<string, string> = {
             <!-- Section header -->
             <div class="mb-2">
               <h3 class="text-lg font-bold text-white flex items-center gap-2">
-                <UIcon name="i-lucide-sparkles" class="size-5" style="color: #FBBC05;" />
+                <UIcon
+                  name="i-lucide-sparkles"
+                  class="size-5"
+                  style="color: #FBBC05;"
+                />
                 Почему Argus AI?
               </h3>
-              <p class="text-[11px] text-white/30 mt-1">Шесть причин выбрать Argus AI</p>
+              <p class="text-[11px] text-white/30 mt-1">
+                Шесть причин выбрать Argus AI
+              </p>
             </div>
 
             <!-- Killer feature cards -->
@@ -1355,11 +1956,19 @@ const archiveKernelLabels: Record<string, string> = {
                   class="flex items-center justify-center size-9 rounded-lg shrink-0 transition-all group-hover:scale-110"
                   :style="{ background: hexToRgba(feat.color, 0.08), border: `1px solid ${hexToRgba(feat.color, 0.15)}` }"
                 >
-                  <UIcon :name="feat.icon" class="size-4" :style="{ color: feat.color }" />
+                  <UIcon
+                    :name="feat.icon"
+                    class="size-4"
+                    :style="{ color: feat.color }"
+                  />
                 </div>
                 <div>
-                  <h4 class="text-xs font-bold text-white/80">{{ feat.title }}</h4>
-                  <p class="text-[10px] text-white/40 mt-1 leading-relaxed">{{ feat.description }}</p>
+                  <h4 class="text-xs font-bold text-white/80">
+                    {{ feat.title }}
+                  </h4>
+                  <p class="text-[10px] text-white/40 mt-1 leading-relaxed">
+                    {{ feat.description }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1371,17 +1980,35 @@ const archiveKernelLabels: Record<string, string> = {
               style="background: linear-gradient(135deg, rgba(52, 168, 83, 0.04), rgba(66, 133, 244, 0.04)); border-color: rgba(52, 168, 83, 0.15); transition-delay: 1100ms;"
             >
               <div class="flex items-center gap-3 mb-3">
-                <div class="flex items-center justify-center size-9 rounded-lg shrink-0" style="background: rgba(52, 168, 83, 0.1);">
-                  <UIcon name="i-lucide-badge-dollar-sign" class="size-4" style="color: #34A853;" />
+                <div
+                  class="flex items-center justify-center size-9 rounded-lg shrink-0"
+                  style="background: rgba(52, 168, 83, 0.1);"
+                >
+                  <UIcon
+                    name="i-lucide-badge-dollar-sign"
+                    class="size-4"
+                    style="color: #34A853;"
+                  />
                 </div>
                 <div>
-                  <p class="text-xs font-bold text-white/80">Enterprise: от <span style="color: #34A853;">$1.00</span></p>
-                  <p class="text-[9px] text-white/30">за студента / экзаменационный цикл</p>
+                  <p class="text-xs font-bold text-white/80">
+                    Enterprise: от <span style="color: #34A853;">$1.00</span>
+                  </p>
+                  <p class="text-[9px] text-white/30">
+                    за студента / экзаменационный цикл
+                  </p>
                 </div>
               </div>
-              <a href="#pricing" class="flex items-center gap-1.5 text-[10px] font-bold cursor-pointer transition-colors hover:opacity-80" style="color: #4285F4;">
+              <a
+                href="#pricing"
+                class="flex items-center gap-1.5 text-[10px] font-bold cursor-pointer transition-colors hover:opacity-80"
+                style="color: #4285F4;"
+              >
                 Рассчитать стоимость
-                <UIcon name="i-lucide-arrow-right" class="size-3" />
+                <UIcon
+                  name="i-lucide-arrow-right"
+                  class="size-3"
+                />
               </a>
             </div>
           </div>
@@ -1392,10 +2019,17 @@ const archiveKernelLabels: Record<string, string> = {
     <!-- ============================================ -->
     <!--  INTERACTIVE ARCHIVE SESSION SHOWCASE        -->
     <!-- ============================================ -->
-    <section id="archive-demo" ref="archiveRef" class="relative py-32 px-6">
+    <section
+      id="archive-demo"
+      ref="archiveRef"
+      class="relative py-32 px-6"
+    >
       <div class="max-w-7xl mx-auto">
         <div class="text-center mb-16">
-          <span class="text-xs font-bold uppercase tracking-widest" style="color: #34A853;">Архив сессий</span>
+          <span
+            class="text-xs font-bold uppercase tracking-widest"
+            style="color: #34A853;"
+          >Архив сессий</span>
           <h2 class="text-4xl md:text-5xl font-bold text-white mt-4 tracking-tight">
             Полная прозрачность каждой сессии
           </h2>
@@ -1411,7 +2045,10 @@ const archiveKernelLabels: Record<string, string> = {
           style="background: #1A2130; border-color: rgba(52, 168, 83, 0.15);"
         >
           <!-- Table header -->
-          <div class="grid grid-cols-12 gap-0 px-5 py-3 border-b" style="border-color: rgba(255,255,255,0.06); background: rgba(0,0,0,0.15);">
+          <div
+            class="grid grid-cols-12 gap-0 px-5 py-3 border-b"
+            style="border-color: rgba(255,255,255,0.06); background: rgba(0,0,0,0.15);"
+          >
             <div class="col-span-3">
               <span class="text-[9px] font-bold text-white/30 uppercase tracking-wider">Студент</span>
             </div>
@@ -1431,7 +2068,7 @@ const archiveKernelLabels: Record<string, string> = {
               <span class="text-[9px] font-bold text-white/30 uppercase tracking-wider">Длит.</span>
             </div>
             <div class="col-span-1 text-right">
-              <span class="text-[9px] font-bold text-white/30 uppercase tracking-wider"></span>
+              <span class="text-[9px] font-bold text-white/30 uppercase tracking-wider" />
             </div>
           </div>
 
@@ -1454,12 +2091,22 @@ const archiveKernelLabels: Record<string, string> = {
             <!-- Name + IIN -->
             <div class="col-span-3">
               <div class="flex items-center gap-2">
-                <div class="size-7 rounded-full flex items-center justify-center shrink-0" style="background: rgba(66, 133, 244, 0.1);">
-                  <span class="text-[9px] font-bold" style="color: #4285F4;">{{ session.name.charAt(0) }}</span>
+                <div
+                  class="size-7 rounded-full flex items-center justify-center shrink-0"
+                  style="background: rgba(66, 133, 244, 0.1);"
+                >
+                  <span
+                    class="text-[9px] font-bold"
+                    style="color: #4285F4;"
+                  >{{ session.name.charAt(0) }}</span>
                 </div>
                 <div>
-                  <p class="text-[11px] font-semibold text-white/80 leading-tight">{{ session.name }}</p>
-                  <p class="text-[8px] font-mono text-white/20">{{ session.iin }}</p>
+                  <p class="text-[11px] font-semibold text-white/80 leading-tight">
+                    {{ session.name }}
+                  </p>
+                  <p class="text-[8px] font-mono text-white/20">
+                    {{ session.iin }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1469,9 +2116,18 @@ const archiveKernelLabels: Record<string, string> = {
             </div>
             <!-- Integrity with mini bar -->
             <div class="col-span-2 flex flex-col items-center gap-1">
-              <span class="text-[11px] font-bold tabular-nums" :style="{ color: integrityColor(session.integrity) }">{{ session.integrity }}%</span>
-              <div class="w-full max-w-[60px] h-1 rounded-full overflow-hidden" style="background: rgba(255,255,255,0.06);">
-                <div class="h-full rounded-full transition-all duration-700" :style="{ width: `${session.integrity}%`, background: integrityColor(session.integrity) }" />
+              <span
+                class="text-[11px] font-bold tabular-nums"
+                :style="{ color: integrityColor(session.integrity) }"
+              >{{ session.integrity }}%</span>
+              <div
+                class="w-full max-w-[60px] h-1 rounded-full overflow-hidden"
+                style="background: rgba(255,255,255,0.06);"
+              >
+                <div
+                  class="h-full rounded-full transition-all duration-700"
+                  :style="{ width: `${session.integrity}%`, background: integrityColor(session.integrity) }"
+                />
               </div>
             </div>
             <!-- Violations -->
@@ -1490,7 +2146,10 @@ const archiveKernelLabels: Record<string, string> = {
                 class="text-[9px] font-bold px-2.5 py-1 rounded-full inline-flex items-center gap-1"
                 :style="{ background: `${sessionStatusColor(session.status)}15`, color: sessionStatusColor(session.status) }"
               >
-                <UIcon :name="session.status === 'reviewed' ? 'i-lucide-check-circle' : session.status === 'pending' ? 'i-lucide-clock' : 'i-lucide-x-circle'" class="size-2.5" />
+                <UIcon
+                  :name="session.status === 'reviewed' ? 'i-lucide-check-circle' : session.status === 'pending' ? 'i-lucide-clock' : 'i-lucide-x-circle'"
+                  class="size-2.5"
+                />
                 {{ sessionStatusLabel(session.status) }}
               </span>
             </div>
@@ -1500,8 +2159,15 @@ const archiveKernelLabels: Record<string, string> = {
             </div>
             <!-- Action -->
             <div class="col-span-1 text-right">
-              <button class="size-7 rounded-lg flex items-center justify-center cursor-pointer transition-all hover:scale-110" style="background: rgba(66, 133, 244, 0.1);">
-                <UIcon name="i-lucide-play" class="size-3.5" style="color: #4285F4;" />
+              <button
+                class="size-7 rounded-lg flex items-center justify-center cursor-pointer transition-all hover:scale-110"
+                style="background: rgba(66, 133, 244, 0.1);"
+              >
+                <UIcon
+                  name="i-lucide-play"
+                  class="size-3.5"
+                  style="color: #4285F4;"
+                />
               </button>
             </div>
           </div>
@@ -1514,17 +2180,30 @@ const archiveKernelLabels: Record<string, string> = {
           style="background: #1A2130; border-color: rgba(52, 168, 83, 0.15); transition-delay: 300ms;"
         >
           <!-- Detail header bar -->
-          <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: rgba(255,255,255,0.06);">
+          <div
+            class="flex items-center justify-between px-6 py-4 border-b"
+            style="border-color: rgba(255,255,255,0.06);"
+          >
             <div class="flex items-center gap-3">
-              <div class="flex items-center justify-center size-8 rounded-lg" style="background: rgba(52, 168, 83, 0.1);">
-                <UIcon name="i-lucide-film" class="size-4" style="color: #34A853;" />
+              <div
+                class="flex items-center justify-center size-8 rounded-lg"
+                style="background: rgba(52, 168, 83, 0.1);"
+              >
+                <UIcon
+                  name="i-lucide-film"
+                  class="size-4"
+                  style="color: #34A853;"
+                />
               </div>
               <div class="flex items-center gap-2">
                 <span
                   class="text-[9px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"
                   :style="{ background: `${sessionStatusColor(archiveSelectedSessionData!.status)}15`, color: sessionStatusColor(archiveSelectedSessionData!.status) }"
                 >
-                  <UIcon :name="archiveSelectedSessionData!.status === 'reviewed' ? 'i-lucide-check-circle' : archiveSelectedSessionData!.status === 'pending' ? 'i-lucide-clock' : 'i-lucide-x-circle'" class="size-2.5" />
+                  <UIcon
+                    :name="archiveSelectedSessionData!.status === 'reviewed' ? 'i-lucide-check-circle' : archiveSelectedSessionData!.status === 'pending' ? 'i-lucide-clock' : 'i-lucide-x-circle'"
+                    class="size-2.5"
+                  />
                   {{ sessionStatusLabel(archiveSelectedSessionData!.status) }}
                 </span>
                 <span class="text-sm font-bold text-white">{{ archiveSelectedSessionData!.name }}</span>
@@ -1536,19 +2215,31 @@ const archiveKernelLabels: Record<string, string> = {
                 class="text-[8px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"
                 style="background: rgba(49, 130, 206, 0.12); color: #3182CE;"
               >
-                <UIcon name="i-lucide-shield-alert" class="size-2.5" />
+                <UIcon
+                  name="i-lucide-shield-alert"
+                  class="size-2.5"
+                />
                 Manual Override ({{ archiveSelectedSessionData!.exceptionCount }})
               </span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full" style="background: rgba(234, 67, 53, 0.15); color: #EA4335;">{{ archiveEvents.filter(e => e.severity === 'critical').length }} критич.</span>
-              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full" style="background: rgba(251, 188, 5, 0.15); color: #FBBC05;">{{ archiveEvents.filter(e => e.severity === 'warning').length }} предупр.</span>
+              <span
+                class="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                style="background: rgba(234, 67, 53, 0.15); color: #EA4335;"
+              >{{ archiveEvents.filter(e => e.severity === 'critical').length }} критич.</span>
+              <span
+                class="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                style="background: rgba(251, 188, 5, 0.15); color: #FBBC05;"
+              >{{ archiveEvents.filter(e => e.severity === 'warning').length }} предупр.</span>
               <span class="text-[10px] text-white/30 font-mono">{{ archiveSelectedSessionData!.date }}</span>
             </div>
           </div>
 
           <!-- Detail tabs -->
-          <div class="flex items-center gap-0 border-b" style="border-color: rgba(255,255,255,0.06);">
+          <div
+            class="flex items-center gap-0 border-b"
+            style="border-color: rgba(255,255,255,0.06);"
+          >
             <button
               class="px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
               :style="{
@@ -1558,7 +2249,10 @@ const archiveKernelLabels: Record<string, string> = {
               }"
               @click="archiveDetailTab = 'video'"
             >
-              <UIcon name="i-lucide-video" class="size-3 inline-block mr-1" />
+              <UIcon
+                name="i-lucide-video"
+                class="size-3 inline-block mr-1"
+              />
               Воспроизведение
             </button>
             <button
@@ -1570,7 +2264,10 @@ const archiveKernelLabels: Record<string, string> = {
               }"
               @click="archiveDetailTab = 'kernel'"
             >
-              <UIcon name="i-lucide-cpu" class="size-3 inline-block mr-1" />
+              <UIcon
+                name="i-lucide-cpu"
+                class="size-3 inline-block mr-1"
+              />
               Kernel-Level
             </button>
           </div>
@@ -1578,12 +2275,20 @@ const archiveKernelLabels: Record<string, string> = {
           <!-- ===== VIDEO TAB ===== -->
           <div v-show="archiveDetailTab === 'video'">
             <!-- 7-col grid: 5 left (video+audio), 2 right (event log) -->
-            <div class="grid grid-cols-1 md:grid-cols-7 gap-0" style="min-height: 380px;">
-
+            <div
+              class="grid grid-cols-1 md:grid-cols-7 gap-0"
+              style="min-height: 380px;"
+            >
               <!-- LEFT: 5 cols — Video + Audio + Kernel mini -->
-              <div class="md:col-span-5 flex flex-col" style="border-right: 1px solid rgba(255,255,255,0.04);">
+              <div
+                class="md:col-span-5 flex flex-col"
+                style="border-right: 1px solid rgba(255,255,255,0.04);"
+              >
                 <!-- Dual camera row -->
-                <div class="flex gap-0 flex-1" style="min-height: 260px;">
+                <div
+                  class="flex gap-0 flex-1"
+                  style="min-height: 260px;"
+                >
                   <!-- Main camera (flex-3) -->
                   <div
                     class="relative transition-all duration-500"
@@ -1596,36 +2301,83 @@ const archiveKernelLabels: Record<string, string> = {
                   >
                     <div class="absolute inset-0 flex items-center justify-center">
                       <div class="flex flex-col items-center gap-3">
-                        <div class="scanning-circle size-20 rounded-full border-2 flex items-center justify-center" :style="{ borderColor: archiveCamerasSwapped ? 'rgba(162, 89, 255, 0.3)' : 'rgba(66, 133, 244, 0.3)' }">
-                          <UIcon :name="archiveCamerasSwapped ? 'i-lucide-smartphone' : 'i-lucide-video'" class="size-8 text-white/20" />
+                        <div
+                          class="scanning-circle size-20 rounded-full border-2 flex items-center justify-center"
+                          :style="{ borderColor: archiveCamerasSwapped ? 'rgba(162, 89, 255, 0.3)' : 'rgba(66, 133, 244, 0.3)' }"
+                        >
+                          <UIcon
+                            :name="archiveCamerasSwapped ? 'i-lucide-smartphone' : 'i-lucide-video'"
+                            class="size-8 text-white/20"
+                          />
                         </div>
                         <span class="text-[9px] font-mono text-white/30">{{ archiveCamerasSwapped ? 'SIDE CAM \u00b7 720p' : 'WEBCAM \u00b7 1080p \u00b7 30fps' }}</span>
                       </div>
                     </div>
                     <!-- Overlays -->
-                    <div class="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 rounded" style="background: rgba(0,0,0,0.6);">
-                      <div class="size-2 rounded-full animate-pulse" style="background: #EA4335;" />
+                    <div
+                      class="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 rounded"
+                      style="background: rgba(0,0,0,0.6);"
+                    >
+                      <div
+                        class="size-2 rounded-full animate-pulse"
+                        style="background: #EA4335;"
+                      />
                       <span class="text-[8px] font-mono text-white/70">REC</span>
                     </div>
-                    <div class="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded" style="background: rgba(0,0,0,0.6);">
-                      <UIcon name="i-lucide-shield-check" class="size-2.5" style="color: #34A853;" />
+                    <div
+                      class="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded"
+                      style="background: rgba(0,0,0,0.6);"
+                    >
+                      <UIcon
+                        name="i-lucide-shield-check"
+                        class="size-2.5"
+                        style="color: #34A853;"
+                      />
                       <span class="text-[8px] font-bold text-white/60">AI ACTIVE</span>
                     </div>
                     <!-- Integrity badge on video -->
-                    <div class="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-full" style="background: rgba(0,0,0,0.7);">
-                      <span class="text-[9px] font-bold" :style="{ color: integrityColor(archiveSelectedSessionData!.integrity) }">{{ archiveSelectedSessionData!.integrity }}%</span>
+                    <div
+                      class="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                      style="background: rgba(0,0,0,0.7);"
+                    >
+                      <span
+                        class="text-[9px] font-bold"
+                        :style="{ color: integrityColor(archiveSelectedSessionData!.integrity) }"
+                      >{{ archiveSelectedSessionData!.integrity }}%</span>
                       <span class="text-[7px] text-white/30">Integrity</span>
                     </div>
                     <div class="absolute bottom-3 left-3 flex items-center gap-2">
-                      <span class="text-[8px] font-bold px-1.5 py-0.5 rounded" :style="{ background: archiveCamerasSwapped ? 'rgba(162, 89, 255, 0.2)' : 'rgba(66, 133, 244, 0.2)', color: archiveCamerasSwapped ? '#A259FF' : '#4285F4' }">{{ archiveCamerasSwapped ? '\u0411\u041e\u041a\u041e\u0412\u0410\u042f' : '\u041e\u0421\u041d\u041e\u0412\u041d\u0410\u042f' }}</span>
-                      <span class="text-[7px] font-mono px-1.5 py-0.5 rounded text-white/30" style="background: rgba(0,0,0,0.6);">{{ archiveCurrentTime }}</span>
+                      <span
+                        class="text-[8px] font-bold px-1.5 py-0.5 rounded"
+                        :style="{ background: archiveCamerasSwapped ? 'rgba(162, 89, 255, 0.2)' : 'rgba(66, 133, 244, 0.2)', color: archiveCamerasSwapped ? '#A259FF' : '#4285F4' }"
+                      >{{ archiveCamerasSwapped ? '\u0411\u041e\u041a\u041e\u0412\u0410\u042f' : '\u041e\u0421\u041d\u041e\u0412\u041d\u0410\u042f' }}</span>
+                      <span
+                        class="text-[7px] font-mono px-1.5 py-0.5 rounded text-white/30"
+                        style="background: rgba(0,0,0,0.6);"
+                      >{{ archiveCurrentTime }}</span>
                     </div>
                     <!-- Face bounding box overlay (main cam only) -->
-                    <div v-if="!archiveCamerasSwapped" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-28 border border-dashed rounded-lg" style="border-color: rgba(66, 133, 244, 0.25);">
-                      <div class="absolute -top-1 -left-1 w-2.5 h-2.5 border-l-2 border-t-2" style="border-color: #4285F4;" />
-                      <div class="absolute -top-1 -right-1 w-2.5 h-2.5 border-r-2 border-t-2" style="border-color: #4285F4;" />
-                      <div class="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-l-2 border-b-2" style="border-color: #4285F4;" />
-                      <div class="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-r-2 border-b-2" style="border-color: #4285F4;" />
+                    <div
+                      v-if="!archiveCamerasSwapped"
+                      class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-28 border border-dashed rounded-lg"
+                      style="border-color: rgba(66, 133, 244, 0.25);"
+                    >
+                      <div
+                        class="absolute -top-1 -left-1 w-2.5 h-2.5 border-l-2 border-t-2"
+                        style="border-color: #4285F4;"
+                      />
+                      <div
+                        class="absolute -top-1 -right-1 w-2.5 h-2.5 border-r-2 border-t-2"
+                        style="border-color: #4285F4;"
+                      />
+                      <div
+                        class="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-l-2 border-b-2"
+                        style="border-color: #4285F4;"
+                      />
+                      <div
+                        class="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-r-2 border-b-2"
+                        style="border-color: #4285F4;"
+                      />
                     </div>
                   </div>
 
@@ -1638,46 +2390,79 @@ const archiveKernelLabels: Record<string, string> = {
                       boxShadow: archiveHighlightedCamera === (archiveCamerasSwapped ? 'webcam' : 'side') ? 'inset 0 0 30px rgba(162, 89, 255, 0.15)' : 'none'
                     }"
                   >
-                    <div v-if="archiveShowSide" class="absolute inset-0 flex items-center justify-center">
+                    <div
+                      v-if="archiveShowSide"
+                      class="absolute inset-0 flex items-center justify-center"
+                    >
                       <div class="flex flex-col items-center gap-2">
-                        <div class="scanning-circle-delayed size-14 rounded-full border-2 flex items-center justify-center" :style="{ borderColor: archiveCamerasSwapped ? 'rgba(66, 133, 244, 0.3)' : 'rgba(162, 89, 255, 0.3)' }">
-                          <UIcon :name="archiveCamerasSwapped ? 'i-lucide-video' : 'i-lucide-smartphone'" class="size-6 text-white/20" />
+                        <div
+                          class="scanning-circle-delayed size-14 rounded-full border-2 flex items-center justify-center"
+                          :style="{ borderColor: archiveCamerasSwapped ? 'rgba(66, 133, 244, 0.3)' : 'rgba(162, 89, 255, 0.3)' }"
+                        >
+                          <UIcon
+                            :name="archiveCamerasSwapped ? 'i-lucide-video' : 'i-lucide-smartphone'"
+                            class="size-6 text-white/20"
+                          />
                         </div>
                         <span class="text-[8px] font-mono text-white/30">{{ archiveCamerasSwapped ? 'WEBCAM \u00b7 1080p' : 'SIDE CAM \u00b7 720p' }}</span>
                       </div>
                     </div>
-                    <div v-else class="absolute inset-0 flex items-center justify-center">
+                    <div
+                      v-else
+                      class="absolute inset-0 flex items-center justify-center"
+                    >
                       <div class="flex flex-col items-center gap-1 opacity-30">
-                        <UIcon name="i-lucide-camera-off" class="size-8 text-white" />
+                        <UIcon
+                          name="i-lucide-camera-off"
+                          class="size-8 text-white"
+                        />
                         <span class="text-[8px] text-white/60">Отключена</span>
                       </div>
                     </div>
                     <!-- Overlays -->
-                    <div class="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded" style="background: rgba(0,0,0,0.6);">
-                      <div class="size-1.5 rounded-full" :style="{ background: archiveCamerasSwapped ? '#4285F4' : '#A259FF' }" />
+                    <div
+                      class="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded"
+                      style="background: rgba(0,0,0,0.6);"
+                    >
+                      <div
+                        class="size-1.5 rounded-full"
+                        :style="{ background: archiveCamerasSwapped ? '#4285F4' : '#A259FF' }"
+                      />
                       <span class="text-[7px] font-mono text-white/70">REC</span>
                     </div>
                     <div class="absolute bottom-2 left-2">
-                      <span class="text-[7px] font-bold px-1.5 py-0.5 rounded" :style="{ background: archiveCamerasSwapped ? 'rgba(66, 133, 244, 0.2)' : 'rgba(162, 89, 255, 0.2)', color: archiveCamerasSwapped ? '#4285F4' : '#A259FF' }">{{ archiveCamerasSwapped ? '\u041e\u0421\u041d\u041e\u0412\u041d\u0410\u042f' : '\u0411\u041e\u041a\u041e\u0412\u0410\u042f' }}</span>
+                      <span
+                        class="text-[7px] font-bold px-1.5 py-0.5 rounded"
+                        :style="{ background: archiveCamerasSwapped ? 'rgba(66, 133, 244, 0.2)' : 'rgba(162, 89, 255, 0.2)', color: archiveCamerasSwapped ? '#4285F4' : '#A259FF' }"
+                      >{{ archiveCamerasSwapped ? '\u041e\u0421\u041d\u041e\u0412\u041d\u0410\u042f' : '\u0411\u041e\u041a\u041e\u0412\u0410\u042f' }}</span>
                     </div>
                     <button
                       class="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded cursor-pointer transition-all hover:opacity-80"
                       style="background: rgba(0,0,0,0.6);"
                       @click="archiveShowSide = !archiveShowSide"
                     >
-                      <UIcon :name="archiveShowSide ? 'i-lucide-eye' : 'i-lucide-eye-off'" class="size-2.5 text-white/60" />
+                      <UIcon
+                        :name="archiveShowSide ? 'i-lucide-eye' : 'i-lucide-eye-off'"
+                        class="size-2.5 text-white/60"
+                      />
                     </button>
                   </div>
                 </div>
 
                 <!-- Camera swap button -->
-                <div class="px-4 py-2 border-t flex items-center justify-between" style="border-color: rgba(255,255,255,0.04); background: rgba(0,0,0,0.1);">
+                <div
+                  class="px-4 py-2 border-t flex items-center justify-between"
+                  style="border-color: rgba(255,255,255,0.04); background: rgba(0,0,0,0.1);"
+                >
                   <button
                     class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer transition-all hover:scale-105"
                     style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);"
                     @click="archiveCamerasSwapped = !archiveCamerasSwapped"
                   >
-                    <UIcon name="i-lucide-arrow-left-right" class="size-3 text-white/40" />
+                    <UIcon
+                      name="i-lucide-arrow-left-right"
+                      class="size-3 text-white/40"
+                    />
                     <span class="text-[9px] font-bold text-white/40">Поменять камеры</span>
                   </button>
                   <div class="flex items-center gap-3">
@@ -1687,9 +2472,15 @@ const archiveKernelLabels: Record<string, string> = {
                 </div>
 
                 <!-- Audio analytics section -->
-                <div class="px-4 py-3 border-t" style="border-color: rgba(255,255,255,0.04);">
+                <div
+                  class="px-4 py-3 border-t"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
                   <div class="flex items-center gap-3">
-                    <UIcon name="i-lucide-audio-waveform" class="size-3.5 text-white/40 shrink-0" />
+                    <UIcon
+                      name="i-lucide-audio-waveform"
+                      class="size-3.5 text-white/40 shrink-0"
+                    />
                     <div class="flex-1 h-8 flex items-end gap-[2px]">
                       <div
                         v-for="(bar, i) in waveformBars"
@@ -1707,7 +2498,10 @@ const archiveKernelLabels: Record<string, string> = {
                     <!-- Noise level -->
                     <div class="flex flex-col items-center gap-0.5 shrink-0 px-2">
                       <span class="text-[7px] text-white/25 uppercase">Шум</span>
-                      <span class="text-[10px] font-bold tabular-nums" :style="{ color: archiveNoiseLevel > 60 ? '#EA4335' : archiveNoiseLevel > 40 ? '#FBBC05' : '#34A853' }">{{ archiveNoiseLevel }}dB</span>
+                      <span
+                        class="text-[10px] font-bold tabular-nums"
+                        :style="{ color: archiveNoiseLevel > 60 ? '#EA4335' : archiveNoiseLevel > 40 ? '#FBBC05' : '#34A853' }"
+                      >{{ archiveNoiseLevel }}dB</span>
                     </div>
                     <!-- Mute toggle -->
                     <button
@@ -1715,20 +2509,41 @@ const archiveKernelLabels: Record<string, string> = {
                       :style="{ background: archiveMuted ? 'rgba(234, 67, 53, 0.1)' : 'rgba(66, 133, 244, 0.1)' }"
                       @click="archiveMuted = !archiveMuted"
                     >
-                      <UIcon :name="archiveMuted ? 'i-lucide-volume-x' : 'i-lucide-volume-2'" class="size-3.5" :style="{ color: archiveMuted ? '#EA4335' : '#4285F4' }" />
+                      <UIcon
+                        :name="archiveMuted ? 'i-lucide-volume-x' : 'i-lucide-volume-2'"
+                        class="size-3.5"
+                        :style="{ color: archiveMuted ? '#EA4335' : '#4285F4' }"
+                      />
                     </button>
                     <!-- Volume slider -->
                     <div class="flex items-center gap-1.5 shrink-0">
-                      <input v-model.number="archiveVolume" type="range" min="0" max="100" class="w-16 h-1 rounded-full appearance-none cursor-pointer" :style="{ background: `linear-gradient(to right, #4285F4 ${archiveVolume}%, rgba(255,255,255,0.1) ${archiveVolume}%)` }">
+                      <input
+                        v-model.number="archiveVolume"
+                        type="range"
+                        min="0"
+                        max="100"
+                        class="w-16 h-1 rounded-full appearance-none cursor-pointer"
+                        :style="{ background: `linear-gradient(to right, #4285F4 ${archiveVolume}%, rgba(255,255,255,0.1) ${archiveVolume}%)` }"
+                      >
                     </div>
                   </div>
                 </div>
 
                 <!-- Kernel-Level Status mini row -->
-                <div class="px-4 py-2.5 border-t" style="border-color: rgba(255,255,255,0.04); background: rgba(251, 188, 5, 0.02);">
+                <div
+                  class="px-4 py-2.5 border-t"
+                  style="border-color: rgba(255,255,255,0.04); background: rgba(251, 188, 5, 0.02);"
+                >
                   <div class="flex items-center gap-2 mb-2">
-                    <UIcon name="i-lucide-cpu" class="size-3" style="color: #FBBC05;" />
-                    <span class="text-[8px] font-bold uppercase tracking-wider" style="color: rgba(251, 188, 5, 0.6);">Kernel-Level</span>
+                    <UIcon
+                      name="i-lucide-cpu"
+                      class="size-3"
+                      style="color: #FBBC05;"
+                    />
+                    <span
+                      class="text-[8px] font-bold uppercase tracking-wider"
+                      style="color: rgba(251, 188, 5, 0.6);"
+                    >Kernel-Level</span>
                   </div>
                   <div class="flex items-center gap-3 flex-wrap">
                     <div
@@ -1741,21 +2556,41 @@ const archiveKernelLabels: Record<string, string> = {
                       }"
                       @click="(archiveKernelStatus as any)[key] = !(archiveKernelStatus as any)[key]"
                     >
-                      <div class="size-1.5 rounded-full" :style="{ background: val ? '#FBBC05' : 'rgba(255,255,255,0.15)' }" />
-                      <span class="text-[8px] font-bold" :style="{ color: val ? '#FBBC05' : 'rgba(255,255,255,0.25)' }">{{ archiveKernelLabels[key] || key }}</span>
+                      <div
+                        class="size-1.5 rounded-full"
+                        :style="{ background: val ? '#FBBC05' : 'rgba(255,255,255,0.15)' }"
+                      />
+                      <span
+                        class="text-[8px] font-bold"
+                        :style="{ color: val ? '#FBBC05' : 'rgba(255,255,255,0.25)' }"
+                      >{{ archiveKernelLabels[key] || key }}</span>
                     </div>
                   </div>
                 </div>
 
                 <!-- Individual Exception indicator -->
-                <div v-if="archiveSelectedSessionData!.hasException" class="px-4 py-2.5 border-t" style="border-color: rgba(255,255,255,0.04); background: rgba(49, 130, 206, 0.02);">
+                <div
+                  v-if="archiveSelectedSessionData!.hasException"
+                  class="px-4 py-2.5 border-t"
+                  style="border-color: rgba(255,255,255,0.04); background: rgba(49, 130, 206, 0.02);"
+                >
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                      <UIcon name="i-lucide-shield-alert" class="size-3" style="color: #3182CE;" />
-                      <span class="text-[9px] font-bold" style="color: #3182CE;">Индивидуальные исключения</span>
+                      <UIcon
+                        name="i-lucide-shield-alert"
+                        class="size-3"
+                        style="color: #3182CE;"
+                      />
+                      <span
+                        class="text-[9px] font-bold"
+                        style="color: #3182CE;"
+                      >Индивидуальные исключения</span>
                     </div>
                     <div class="flex items-center gap-2">
-                      <span class="text-[8px] font-bold px-2 py-0.5 rounded-full" style="background: rgba(49, 130, 206, 0.12); color: #3182CE;">Manual Override</span>
+                      <span
+                        class="text-[8px] font-bold px-2 py-0.5 rounded-full"
+                        style="background: rgba(49, 130, 206, 0.12); color: #3182CE;"
+                      >Manual Override</span>
                       <span class="text-[8px] text-white/30">{{ archiveSelectedSessionData!.exceptionCount }} переопред.</span>
                     </div>
                   </div>
@@ -1763,35 +2598,69 @@ const archiveKernelLabels: Record<string, string> = {
               </div>
 
               <!-- RIGHT: 2 cols — Event Log -->
-              <div class="md:col-span-2 flex flex-col" style="background: rgba(0,0,0,0.15);">
+              <div
+                class="md:col-span-2 flex flex-col"
+                style="background: rgba(0,0,0,0.15);"
+              >
                 <!-- Event log header -->
-                <div class="px-4 py-3 border-b" style="border-color: rgba(255,255,255,0.04);">
+                <div
+                  class="px-4 py-3 border-b"
+                  style="border-color: rgba(255,255,255,0.04);"
+                >
                   <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center gap-2">
-                      <UIcon name="i-lucide-activity" class="size-3.5" style="color: #34A853;" />
+                      <UIcon
+                        name="i-lucide-activity"
+                        class="size-3.5"
+                        style="color: #34A853;"
+                      />
                       <span class="text-[10px] font-bold text-white/50 uppercase tracking-wider">Журнал</span>
                     </div>
-                    <span class="text-[8px] font-bold px-1.5 py-0.5 rounded-full" style="background: rgba(52, 168, 83, 0.1); color: #34A853;">{{ archiveEvents.length }}</span>
+                    <span
+                      class="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+                      style="background: rgba(52, 168, 83, 0.1); color: #34A853;"
+                    >{{ archiveEvents.length }}</span>
                   </div>
                   <!-- Source summary -->
                   <div class="flex items-center gap-2">
-                    <span class="text-[7px] font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5" style="background: rgba(66, 133, 244, 0.08); color: #4285F4;">
-                      <UIcon name="i-lucide-video" class="size-2" />
+                    <span
+                      class="text-[7px] font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5"
+                      style="background: rgba(66, 133, 244, 0.08); color: #4285F4;"
+                    >
+                      <UIcon
+                        name="i-lucide-video"
+                        class="size-2"
+                      />
                       {{ archiveWebcamEvents }} веб
                     </span>
-                    <span class="text-[7px] font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5" style="background: rgba(162, 89, 255, 0.08); color: #A259FF;">
-                      <UIcon name="i-lucide-camera" class="size-2" />
+                    <span
+                      class="text-[7px] font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5"
+                      style="background: rgba(162, 89, 255, 0.08); color: #A259FF;"
+                    >
+                      <UIcon
+                        name="i-lucide-camera"
+                        class="size-2"
+                      />
                       {{ archiveSideEvents }} бок.
                     </span>
-                    <span class="text-[7px] font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5" style="background: rgba(52, 168, 83, 0.08); color: #34A853;">
-                      <UIcon name="i-lucide-monitor" class="size-2" />
+                    <span
+                      class="text-[7px] font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5"
+                      style="background: rgba(52, 168, 83, 0.08); color: #34A853;"
+                    >
+                      <UIcon
+                        name="i-lucide-monitor"
+                        class="size-2"
+                      />
                       {{ archiveSystemEvents }} сист.
                     </span>
                   </div>
                 </div>
 
                 <!-- Timeline events -->
-                <div class="flex-1 overflow-y-auto custom-scrollbar" style="max-height: 380px;">
+                <div
+                  class="flex-1 overflow-y-auto custom-scrollbar"
+                  style="max-height: 380px;"
+                >
                   <div
                     v-for="(evt, idx) in archiveEvents"
                     :key="idx"
@@ -1803,7 +2672,10 @@ const archiveKernelLabels: Record<string, string> = {
                     }"
                   >
                     <!-- Timeline connector -->
-                    <div class="absolute left-3.5 top-0 bottom-0 w-px" style="background: rgba(255,255,255,0.06);" />
+                    <div
+                      class="absolute left-3.5 top-0 bottom-0 w-px"
+                      style="background: rgba(255,255,255,0.06);"
+                    />
                     <!-- Timeline dot -->
                     <div
                       class="absolute left-2.5 top-3.5 size-2.5 rounded-full border-2 z-10"
@@ -1832,13 +2704,20 @@ const archiveKernelLabels: Record<string, string> = {
                             color: sourceColor(evt.source)
                           }"
                         >
-                          <UIcon :name="sourceIcon(evt.source)" class="size-1.5" />
+                          <UIcon
+                            :name="sourceIcon(evt.source)"
+                            class="size-1.5"
+                          />
                           {{ sourceLabel(evt.source) }}
                         </span>
                       </div>
                       <!-- Event label -->
                       <div class="flex items-center gap-1.5">
-                        <UIcon :name="evt.icon" class="size-3 shrink-0" :style="{ color: evt.severity === 'critical' ? '#EA4335' : evt.severity === 'warning' ? '#FBBC05' : 'rgba(255,255,255,0.3)' }" />
+                        <UIcon
+                          :name="evt.icon"
+                          class="size-3 shrink-0"
+                          :style="{ color: evt.severity === 'critical' ? '#EA4335' : evt.severity === 'warning' ? '#FBBC05' : 'rgba(255,255,255,0.3)' }"
+                        />
                         <span class="text-[9px] text-white/50 leading-tight">{{ evt.label }}</span>
                       </div>
                       <!-- Seek-to button -->
@@ -1847,7 +2726,10 @@ const archiveKernelLabels: Record<string, string> = {
                         style="background: rgba(66, 133, 244, 0.08); color: #4285F4;"
                         @click.stop="archiveSeekToEvent(evt.time, evt.source)"
                       >
-                        <UIcon name="i-lucide-skip-forward" class="size-2" />
+                        <UIcon
+                          name="i-lucide-skip-forward"
+                          class="size-2"
+                        />
                         Перейти к
                       </button>
                     </div>
@@ -1858,17 +2740,34 @@ const archiveKernelLabels: Record<string, string> = {
           </div>
 
           <!-- ===== KERNEL TAB ===== -->
-          <div v-show="archiveDetailTab === 'kernel'" class="p-6">
+          <div
+            v-show="archiveDetailTab === 'kernel'"
+            class="p-6"
+          >
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <!-- Kernel-Level System Control -->
-              <div class="rounded-xl border p-5" style="background: rgba(251, 188, 5, 0.02); border-color: rgba(251, 188, 5, 0.1);">
+              <div
+                class="rounded-xl border p-5"
+                style="background: rgba(251, 188, 5, 0.02); border-color: rgba(251, 188, 5, 0.1);"
+              >
                 <div class="flex items-center gap-2 mb-4">
-                  <div class="size-8 rounded-lg flex items-center justify-center" style="background: rgba(251, 188, 5, 0.1);">
-                    <UIcon name="i-lucide-cpu" class="size-4" style="color: #FBBC05;" />
+                  <div
+                    class="size-8 rounded-lg flex items-center justify-center"
+                    style="background: rgba(251, 188, 5, 0.1);"
+                  >
+                    <UIcon
+                      name="i-lucide-cpu"
+                      class="size-4"
+                      style="color: #FBBC05;"
+                    />
                   </div>
                   <div>
-                    <h4 class="text-sm font-bold text-white">Kernel-Level System Control</h4>
-                    <p class="text-[10px] text-white/30">Низкоуровневый контроль системы</p>
+                    <h4 class="text-sm font-bold text-white">
+                      Kernel-Level System Control
+                    </h4>
+                    <p class="text-[10px] text-white/30">
+                      Низкоуровневый контроль системы
+                    </p>
                   </div>
                 </div>
                 <div class="space-y-3">
@@ -1883,8 +2782,15 @@ const archiveKernelLabels: Record<string, string> = {
                     @click="(archiveKernelStatus as any)[key] = !(archiveKernelStatus as any)[key]"
                   >
                     <div class="flex items-center gap-2">
-                      <UIcon name="i-lucide-shield" class="size-3.5" :style="{ color: val ? '#FBBC05' : 'rgba(255,255,255,0.2)' }" />
-                      <span class="text-[11px] font-semibold" :style="{ color: val ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)' }">{{ archiveKernelLabels[key] || key }}</span>
+                      <UIcon
+                        name="i-lucide-shield"
+                        class="size-3.5"
+                        :style="{ color: val ? '#FBBC05' : 'rgba(255,255,255,0.2)' }"
+                      />
+                      <span
+                        class="text-[11px] font-semibold"
+                        :style="{ color: val ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)' }"
+                      >{{ archiveKernelLabels[key] || key }}</span>
                     </div>
                     <div
                       class="w-8 h-4 rounded-full relative transition-all cursor-pointer"
@@ -1900,38 +2806,85 @@ const archiveKernelLabels: Record<string, string> = {
               </div>
 
               <!-- Individual Exceptions Detail -->
-              <div class="rounded-xl border p-5" style="background: rgba(49, 130, 206, 0.02); border-color: rgba(49, 130, 206, 0.1);">
+              <div
+                class="rounded-xl border p-5"
+                style="background: rgba(49, 130, 206, 0.02); border-color: rgba(49, 130, 206, 0.1);"
+              >
                 <div class="flex items-center gap-2 mb-4">
-                  <div class="size-8 rounded-lg flex items-center justify-center" style="background: rgba(49, 130, 206, 0.1);">
-                    <UIcon name="i-lucide-shield-alert" class="size-4" style="color: #3182CE;" />
+                  <div
+                    class="size-8 rounded-lg flex items-center justify-center"
+                    style="background: rgba(49, 130, 206, 0.1);"
+                  >
+                    <UIcon
+                      name="i-lucide-shield-alert"
+                      class="size-4"
+                      style="color: #3182CE;"
+                    />
                   </div>
                   <div>
-                    <h4 class="text-sm font-bold text-white">Индивидуальные исключения</h4>
-                    <p class="text-[10px] text-white/30">Для выбранного студента</p>
+                    <h4 class="text-sm font-bold text-white">
+                      Индивидуальные исключения
+                    </h4>
+                    <p class="text-[10px] text-white/30">
+                      Для выбранного студента
+                    </p>
                   </div>
                 </div>
 
-                <div v-if="archiveSelectedSessionData!.hasException" class="space-y-3">
-                  <div class="flex items-center justify-between p-3 rounded-lg" style="background: rgba(49, 130, 206, 0.06); border: 1px solid rgba(49, 130, 206, 0.12);">
+                <div
+                  v-if="archiveSelectedSessionData!.hasException"
+                  class="space-y-3"
+                >
+                  <div
+                    class="flex items-center justify-between p-3 rounded-lg"
+                    style="background: rgba(49, 130, 206, 0.06); border: 1px solid rgba(49, 130, 206, 0.12);"
+                  >
                     <div class="flex items-center gap-2">
-                      <UIcon name="i-lucide-user" class="size-3.5" style="color: #3182CE;" />
+                      <UIcon
+                        name="i-lucide-user"
+                        class="size-3.5"
+                        style="color: #3182CE;"
+                      />
                       <span class="text-[11px] font-semibold text-white/80">{{ archiveSelectedSessionData!.name }}</span>
                     </div>
-                    <span class="text-[9px] font-bold px-2 py-0.5 rounded-full" style="background: rgba(49, 130, 206, 0.12); color: #3182CE;">Manual Override</span>
+                    <span
+                      class="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                      style="background: rgba(49, 130, 206, 0.12); color: #3182CE;"
+                    >Manual Override</span>
                   </div>
-                  <div class="p-3 rounded-lg" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);">
+                  <div
+                    class="p-3 rounded-lg"
+                    style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);"
+                  >
                     <div class="flex items-center justify-between mb-2">
                       <span class="text-[9px] text-white/40">Переопределённые параметры</span>
-                      <span class="text-[10px] font-bold" style="color: #3182CE;">{{ archiveSelectedSessionData!.exceptionCount }}</span>
+                      <span
+                        class="text-[10px] font-bold"
+                        style="color: #3182CE;"
+                      >{{ archiveSelectedSessionData!.exceptionCount }}</span>
                     </div>
-                    <div class="w-full h-1.5 rounded-full overflow-hidden" style="background: rgba(255,255,255,0.06);">
-                      <div class="h-full rounded-full" :style="{ width: `${(archiveSelectedSessionData!.exceptionCount / 19) * 100}%`, background: '#3182CE' }" />
+                    <div
+                      class="w-full h-1.5 rounded-full overflow-hidden"
+                      style="background: rgba(255,255,255,0.06);"
+                    >
+                      <div
+                        class="h-full rounded-full"
+                        :style="{ width: `${(archiveSelectedSessionData!.exceptionCount / 19) * 100}%`, background: '#3182CE' }"
+                      />
                     </div>
-                    <p class="text-[8px] text-white/20 mt-1">{{ archiveSelectedSessionData!.exceptionCount }} из 19 параметров изменены</p>
+                    <p class="text-[8px] text-white/20 mt-1">
+                      {{ archiveSelectedSessionData!.exceptionCount }} из 19 параметров изменены
+                    </p>
                   </div>
                 </div>
-                <div v-else class="flex flex-col items-center justify-center py-8 opacity-30">
-                  <UIcon name="i-lucide-check-circle" class="size-8 text-white mb-2" />
+                <div
+                  v-else
+                  class="flex flex-col items-center justify-center py-8 opacity-30"
+                >
+                  <UIcon
+                    name="i-lucide-check-circle"
+                    class="size-8 text-white mb-2"
+                  />
                   <span class="text-[10px] text-white/60">Без исключений</span>
                   <span class="text-[8px] text-white/30">Используются глобальные настройки</span>
                 </div>
@@ -1940,7 +2893,10 @@ const archiveKernelLabels: Record<string, string> = {
           </div>
 
           <!-- Playback Controls with event markers -->
-          <div class="px-6 py-4 border-t" style="border-color: rgba(255,255,255,0.06);">
+          <div
+            class="px-6 py-4 border-t"
+            style="border-color: rgba(255,255,255,0.06);"
+          >
             <div class="flex items-center gap-4">
               <!-- Play/Pause -->
               <button
@@ -1948,7 +2904,10 @@ const archiveKernelLabels: Record<string, string> = {
                 style="background: linear-gradient(135deg, #4285F4, #A259FF);"
                 @click="toggleArchivePlay"
               >
-                <UIcon :name="archivePlaying ? 'i-lucide-pause' : 'i-lucide-play'" class="size-5 text-white" />
+                <UIcon
+                  :name="archivePlaying ? 'i-lucide-pause' : 'i-lucide-play'"
+                  class="size-5 text-white"
+                />
               </button>
 
               <!-- Progress bar with event markers -->
@@ -1966,7 +2925,15 @@ const archiveKernelLabels: Record<string, string> = {
                     }"
                   />
                 </div>
-                <input v-model.number="archiveProgress" type="range" min="0" max="100" step="0.1" class="w-full h-1.5 rounded-full appearance-none cursor-pointer relative z-20" :style="{ background: `linear-gradient(to right, #4285F4 ${archiveProgress}%, rgba(255,255,255,0.1) ${archiveProgress}%)` }">
+                <input
+                  v-model.number="archiveProgress"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  class="w-full h-1.5 rounded-full appearance-none cursor-pointer relative z-20"
+                  :style="{ background: `linear-gradient(to right, #4285F4 ${archiveProgress}%, rgba(255,255,255,0.1) ${archiveProgress}%)` }"
+                >
                 <div class="flex items-center justify-between mt-1">
                   <span class="text-[10px] font-mono text-white/30">{{ archiveCurrentTime }}</span>
                   <span class="text-[10px] font-mono text-white/30">{{ archiveTotalTime }}</span>
@@ -1974,13 +2941,22 @@ const archiveKernelLabels: Record<string, string> = {
               </div>
 
               <!-- Speed -->
-              <div class="flex items-center gap-1 px-2 py-1 rounded" style="background: rgba(255,255,255,0.06);">
+              <div
+                class="flex items-center gap-1 px-2 py-1 rounded"
+                style="background: rgba(255,255,255,0.06);"
+              >
                 <span class="text-[10px] font-bold text-white/50">1.0x</span>
               </div>
 
               <!-- Fullscreen toggle -->
-              <button class="flex items-center justify-center size-8 rounded-lg cursor-pointer transition-all hover:scale-105" style="background: rgba(255,255,255,0.06);">
-                <UIcon name="i-lucide-maximize" class="size-4 text-white/50" />
+              <button
+                class="flex items-center justify-center size-8 rounded-lg cursor-pointer transition-all hover:scale-105"
+                style="background: rgba(255,255,255,0.06);"
+              >
+                <UIcon
+                  name="i-lucide-maximize"
+                  class="size-4 text-white/50"
+                />
               </button>
             </div>
           </div>
@@ -1988,7 +2964,11 @@ const archiveKernelLabels: Record<string, string> = {
 
         <!-- Caption -->
         <p class="text-center text-[11px] text-white/30 mt-6 leading-relaxed max-w-xl mx-auto">
-          <UIcon name="i-lucide-eye" class="size-3.5 inline-block mr-1" style="color: #34A853;" />
+          <UIcon
+            name="i-lucide-eye"
+            class="size-3.5 inline-block mr-1"
+            style="color: #34A853;"
+          />
           Полная прозрачность каждой сессии: Просматривайте записи, анализируйте события, слушайте аудио — в любой момент.
         </p>
       </div>
@@ -1997,10 +2977,18 @@ const archiveKernelLabels: Record<string, string> = {
     <!-- ============================== -->
     <!--  INTERACTIVE SHOWCASE          -->
     <!-- ============================== -->
-    <section id="showcase" ref="showcaseRef" class="relative py-32 px-6" style="background: #0F151D;">
+    <section
+      id="showcase"
+      ref="showcaseRef"
+      class="relative py-32 px-6"
+      style="background: #0F151D;"
+    >
       <div class="max-w-7xl mx-auto">
         <div class="text-center mb-16">
-          <span class="text-xs font-bold uppercase tracking-widest" style="color: #4285F4;">Платформа</span>
+          <span
+            class="text-xs font-bold uppercase tracking-widest"
+            style="color: #4285F4;"
+          >Платформа</span>
           <h2 class="text-4xl md:text-5xl font-bold text-white mt-4 tracking-tight">
             Контроль в реальном времени
           </h2>
@@ -2012,9 +3000,15 @@ const archiveKernelLabels: Record<string, string> = {
           :class="showcaseVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-16'"
           style="background: #1A2130; border-color: rgba(255,255,255,0.06);"
         >
-          <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: rgba(255,255,255,0.06);">
+          <div
+            class="flex items-center justify-between px-6 py-4 border-b"
+            style="border-color: rgba(255,255,255,0.06);"
+          >
             <div class="flex items-center gap-3">
-              <div class="size-3 rounded-full animate-pulse" style="background: #34A853;" />
+              <div
+                class="size-3 rounded-full animate-pulse"
+                style="background: #34A853;"
+              />
               <span class="text-sm font-semibold text-white">Мониторинг · 847 активных сессий</span>
             </div>
             <div class="flex items-center gap-2">
@@ -2022,7 +3016,10 @@ const archiveKernelLabels: Record<string, string> = {
             </div>
           </div>
 
-          <div class="grid grid-cols-4 gap-px p-px" style="background: rgba(255,255,255,0.04);">
+          <div
+            class="grid grid-cols-4 gap-px p-px"
+            style="background: rgba(255,255,255,0.04);"
+          >
             <div
               v-for="i in 8"
               :key="i"
@@ -2031,23 +3028,38 @@ const archiveKernelLabels: Record<string, string> = {
             >
               <div class="absolute inset-0 flex items-center justify-center">
                 <div class="flex flex-col items-center gap-2 opacity-20">
-                  <UIcon name="i-lucide-video" class="size-8 text-white" />
+                  <UIcon
+                    name="i-lucide-video"
+                    class="size-8 text-white"
+                  />
                   <span class="text-[9px] font-mono text-white/60">CAM-{{ String(i).padStart(3, '0') }}</span>
                 </div>
               </div>
-              <div class="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded" style="background: rgba(0,0,0,0.6);">
-                <div class="size-1.5 rounded-full" :style="{ background: i === 3 || i === 7 ? '#EA4335' : i === 5 ? '#FBBC05' : '#34A853' }" />
+              <div
+                class="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded"
+                style="background: rgba(0,0,0,0.6);"
+              >
+                <div
+                  class="size-1.5 rounded-full"
+                  :style="{ background: i === 3 || i === 7 ? '#EA4335' : i === 5 ? '#FBBC05' : '#34A853' }"
+                />
                 <span class="text-[7px] font-mono text-white/60">{{ i === 3 || i === 7 ? 'ALERT' : i === 5 ? 'WARN' : 'OK' }}</span>
               </div>
               <div class="absolute bottom-2 right-2">
-                <span class="text-[10px] font-bold font-mono tabular-nums" :style="{ color: i === 3 ? '#EA4335' : i === 7 ? '#EA4335' : i === 5 ? '#FBBC05' : '#34A853' }">
+                <span
+                  class="text-[10px] font-bold font-mono tabular-nums"
+                  :style="{ color: i === 3 ? '#EA4335' : i === 7 ? '#EA4335' : i === 5 ? '#FBBC05' : '#34A853' }"
+                >
                   {{ i === 3 ? '34%' : i === 7 ? '41%' : i === 5 ? '67%' : `${85 + i}%` }}
                 </span>
               </div>
             </div>
           </div>
 
-          <div class="px-6 py-4 border-t" style="border-color: rgba(255,255,255,0.06);">
+          <div
+            class="px-6 py-4 border-t"
+            style="border-color: rgba(255,255,255,0.06);"
+          >
             <div class="flex items-center gap-6 overflow-x-auto">
               <div
                 v-for="(v, idx) in violationTypes"
@@ -2077,10 +3089,17 @@ const archiveKernelLabels: Record<string, string> = {
     <!-- ============================== -->
     <!--  SOCIAL PROOF / STATS          -->
     <!-- ============================== -->
-    <section id="stats" ref="statsRef" class="relative py-32 px-6">
+    <section
+      id="stats"
+      ref="statsRef"
+      class="relative py-32 px-6"
+    >
       <div class="max-w-7xl mx-auto">
         <div class="text-center mb-16">
-          <span class="text-xs font-bold uppercase tracking-widest" style="color: #4285F4;">Результаты</span>
+          <span
+            class="text-xs font-bold uppercase tracking-widest"
+            style="color: #4285F4;"
+          >Результаты</span>
           <h2 class="text-4xl md:text-5xl font-bold text-white mt-4 tracking-tight">
             Цифры, которые говорят сами за себя
           </h2>
@@ -2095,7 +3114,9 @@ const archiveKernelLabels: Record<string, string> = {
             <p class="text-4xl md:text-5xl font-bold text-white tabular-nums">
               {{ Math.round(counterHours).toLocaleString() }}+
             </p>
-            <p class="text-sm text-white/40 mt-2">проверенных часов</p>
+            <p class="text-sm text-white/40 mt-2">
+              проверенных часов
+            </p>
           </div>
 
           <div
@@ -2103,10 +3124,15 @@ const archiveKernelLabels: Record<string, string> = {
             :class="statsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
             style="background: #1A2130; border-color: rgba(255,255,255,0.06); transition-delay: 150ms;"
           >
-            <p class="text-4xl md:text-5xl font-bold tabular-nums" style="color: #4285F4;">
+            <p
+              class="text-4xl md:text-5xl font-bold tabular-nums"
+              style="color: #4285F4;"
+            >
               {{ Math.round(counterCountries) }}+
             </p>
-            <p class="text-sm text-white/40 mt-2">стран</p>
+            <p class="text-sm text-white/40 mt-2">
+              стран
+            </p>
           </div>
 
           <div
@@ -2117,7 +3143,9 @@ const archiveKernelLabels: Record<string, string> = {
             <p class="text-4xl md:text-5xl font-bold text-white tabular-nums">
               {{ Math.round(counterReduction) }}%
             </p>
-            <p class="text-sm text-white/40 mt-2">снижение нарушений</p>
+            <p class="text-sm text-white/40 mt-2">
+              снижение нарушений
+            </p>
           </div>
 
           <div
@@ -2125,31 +3153,50 @@ const archiveKernelLabels: Record<string, string> = {
             :class="statsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
             style="background: #1A2130; border-color: rgba(255,255,255,0.06); transition-delay: 450ms;"
           >
-            <p class="text-4xl md:text-5xl font-bold tabular-nums" style="color: #34A853;">
+            <p
+              class="text-4xl md:text-5xl font-bold tabular-nums"
+              style="color: #34A853;"
+            >
               {{ Math.round(counterSessions).toLocaleString() }}+
             </p>
-            <p class="text-sm text-white/40 mt-2">одновременных сессий</p>
+            <p class="text-sm text-white/40 mt-2">
+              одновременных сессий
+            </p>
           </div>
         </div>
 
         <!-- Integration logos -->
         <div class="mt-20 text-center">
-          <p class="text-xs text-white/30 uppercase tracking-widest mb-8">Интеграции</p>
+          <p class="text-xs text-white/30 uppercase tracking-widest mb-8">
+            Интеграции
+          </p>
           <div class="flex items-center justify-center gap-12 opacity-30">
             <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-graduation-cap" class="size-6 text-white" />
+              <UIcon
+                name="i-lucide-graduation-cap"
+                class="size-6 text-white"
+              />
               <span class="text-sm font-semibold text-white">Moodle</span>
             </div>
             <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-palette" class="size-6 text-white" />
+              <UIcon
+                name="i-lucide-palette"
+                class="size-6 text-white"
+              />
               <span class="text-sm font-semibold text-white">Canvas</span>
             </div>
             <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-shield-check" class="size-6 text-white" />
+              <UIcon
+                name="i-lucide-shield-check"
+                class="size-6 text-white"
+              />
               <span class="text-sm font-semibold text-white">Eduser</span>
             </div>
             <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-book-open" class="size-6 text-white" />
+              <UIcon
+                name="i-lucide-book-open"
+                class="size-6 text-white"
+              />
               <span class="text-sm font-semibold text-white">Google Classroom</span>
             </div>
           </div>
@@ -2160,10 +3207,17 @@ const archiveKernelLabels: Record<string, string> = {
     <!-- ============================================ -->
     <!--  ARGUS AI VS STANDARD — COMPARISON MATRIX   -->
     <!-- ============================================ -->
-    <section id="comparison" ref="comparisonRef" class="relative py-32 px-6">
+    <section
+      id="comparison"
+      ref="comparisonRef"
+      class="relative py-32 px-6"
+    >
       <div class="max-w-6xl mx-auto">
         <div class="text-center mb-16">
-          <span class="text-xs font-bold uppercase tracking-widest" style="color: #EA4335;">Опережая конкурентов</span>
+          <span
+            class="text-xs font-bold uppercase tracking-widest"
+            style="color: #EA4335;"
+          >Опережая конкурентов</span>
           <h2 class="text-3xl md:text-4xl lg:text-[2.75rem] font-bold text-white mt-4 tracking-tight leading-tight">
             Argus AI vs <span class="comparison-gradient-text">Стандартный прокторинг</span>
           </h2>
@@ -2179,21 +3233,39 @@ const archiveKernelLabels: Record<string, string> = {
           style="background: #1A2130; border-color: rgba(234, 67, 53, 0.12);"
         >
           <!-- Table header -->
-          <div class="grid grid-cols-12 gap-0 border-b" style="border-color: rgba(255,255,255,0.06);">
+          <div
+            class="grid grid-cols-12 gap-0 border-b"
+            style="border-color: rgba(255,255,255,0.06);"
+          >
             <div class="col-span-4 px-6 py-4 flex items-center">
               <span class="text-xs font-bold text-white/40 uppercase tracking-wider">Параметр</span>
             </div>
-            <div class="col-span-4 px-6 py-4 text-center" style="background: rgba(255,255,255,0.02);">
+            <div
+              class="col-span-4 px-6 py-4 text-center"
+              style="background: rgba(255,255,255,0.02);"
+            >
               <div class="flex items-center justify-center gap-2">
-                <UIcon name="i-lucide-monitor" class="size-4 text-white/30" />
+                <UIcon
+                  name="i-lucide-monitor"
+                  class="size-4 text-white/30"
+                />
                 <span class="text-xs font-bold text-white/40 uppercase tracking-wider">Стандартный</span>
               </div>
             </div>
-            <div class="col-span-4 px-6 py-4 text-center" style="background: rgba(66, 133, 244, 0.04); border-left: 2px solid rgba(66, 133, 244, 0.2);">
+            <div
+              class="col-span-4 px-6 py-4 text-center"
+              style="background: rgba(66, 133, 244, 0.04); border-left: 2px solid rgba(66, 133, 244, 0.2);"
+            >
               <div class="flex items-center justify-center gap-2">
                 <ArgusLogo :size="18" />
-                <span class="text-xs font-bold uppercase tracking-wider" style="color: #4285F4;">Argus AI</span>
-                <span class="text-[7px] font-black px-1.5 py-0.5 rounded-full" style="background: rgba(52, 168, 83, 0.15); color: #34A853;">WINNER</span>
+                <span
+                  class="text-xs font-bold uppercase tracking-wider"
+                  style="color: #4285F4;"
+                >Argus AI</span>
+                <span
+                  class="text-[7px] font-black px-1.5 py-0.5 rounded-full"
+                  style="background: rgba(52, 168, 83, 0.15); color: #34A853;"
+                >WINNER</span>
               </div>
             </div>
           </div>
@@ -2216,7 +3288,11 @@ const archiveKernelLabels: Record<string, string> = {
                 class="flex items-center justify-center size-7 rounded-lg shrink-0"
                 :style="{ background: row.highlight ? `${row.highlight}12` : 'rgba(255,255,255,0.04)' }"
               >
-                <UIcon :name="row.icon" class="size-3.5" :style="{ color: row.highlight || 'rgba(255,255,255,0.4)' }" />
+                <UIcon
+                  :name="row.icon"
+                  class="size-3.5"
+                  :style="{ color: row.highlight || 'rgba(255,255,255,0.4)' }"
+                />
               </div>
               <div class="min-w-0">
                 <span class="text-xs font-semibold text-white/70">{{ row.category }}</span>
@@ -2229,7 +3305,10 @@ const archiveKernelLabels: Record<string, string> = {
             </div>
 
             <!-- Standard -->
-            <div class="col-span-4 px-6 py-4 flex items-center justify-center" style="background: rgba(255,255,255,0.02);">
+            <div
+              class="col-span-4 px-6 py-4 flex items-center justify-center"
+              style="background: rgba(255,255,255,0.02);"
+            >
               <div class="flex items-center gap-2.5">
                 <div
                   class="flex items-center justify-center size-5 rounded-full shrink-0"
@@ -2258,7 +3337,11 @@ const archiveKernelLabels: Record<string, string> = {
                   class="flex items-center justify-center size-5 rounded-full shrink-0"
                   :style="{ background: 'rgba(52, 168, 83, 0.15)' }"
                 >
-                  <UIcon name="i-lucide-check" class="size-3" style="color: #34A853;" />
+                  <UIcon
+                    name="i-lucide-check"
+                    class="size-3"
+                    style="color: #34A853;"
+                  />
                 </div>
                 <span class="text-[10px] font-medium text-white/70 leading-tight">{{ row.argus.label }}</span>
               </div>
@@ -2266,25 +3349,54 @@ const archiveKernelLabels: Record<string, string> = {
           </div>
 
           <!-- Bottom highlight — Low Latency callout -->
-          <div class="px-6 py-5 flex items-center justify-between" style="background: linear-gradient(135deg, rgba(66, 133, 244, 0.06), rgba(52, 168, 83, 0.06));">
+          <div
+            class="px-6 py-5 flex items-center justify-between"
+            style="background: linear-gradient(135deg, rgba(66, 133, 244, 0.06), rgba(52, 168, 83, 0.06));"
+          >
             <div class="flex items-center gap-4">
-              <div class="flex items-center justify-center size-12 rounded-xl" style="background: rgba(52, 168, 83, 0.1); border: 1px solid rgba(52, 168, 83, 0.2);">
-                <UIcon name="i-lucide-zap" class="size-6" style="color: #34A853;" />
+              <div
+                class="flex items-center justify-center size-12 rounded-xl"
+                style="background: rgba(52, 168, 83, 0.1); border: 1px solid rgba(52, 168, 83, 0.2);"
+              >
+                <UIcon
+                  name="i-lucide-zap"
+                  class="size-6"
+                  style="color: #34A853;"
+                />
               </div>
               <div>
-                <p class="text-sm font-bold text-white">Ultra Low-Latency: <span style="color: #34A853;">52 kb/s</span></p>
-                <p class="text-[11px] text-white/40 mt-0.5">Стабильная работа даже на мобильном интернете 3G. В 10 раз экономичнее стандартных решений.</p>
+                <p class="text-sm font-bold text-white">
+                  Ultra Low-Latency: <span style="color: #34A853;">52 kb/s</span>
+                </p>
+                <p class="text-[11px] text-white/40 mt-0.5">
+                  Стабильная работа даже на мобильном интернете 3G. В 10 раз экономичнее стандартных решений.
+                </p>
               </div>
             </div>
             <div class="hidden md:flex items-center gap-3">
-              <div class="flex flex-col items-center px-4 py-2 rounded-lg" style="background: rgba(255,255,255,0.04);">
+              <div
+                class="flex flex-col items-center px-4 py-2 rounded-lg"
+                style="background: rgba(255,255,255,0.04);"
+              >
                 <span class="text-[9px] text-white/30 uppercase">Стандарт</span>
                 <span class="text-sm font-bold text-white/40 line-through">500+ kb/s</span>
               </div>
-              <UIcon name="i-lucide-arrow-right" class="size-4 text-white/20" />
-              <div class="flex flex-col items-center px-4 py-2 rounded-lg" style="background: rgba(52, 168, 83, 0.08); border: 1px solid rgba(52, 168, 83, 0.2);">
-                <span class="text-[9px] uppercase" style="color: #34A853;">Argus AI</span>
-                <span class="text-sm font-bold" style="color: #34A853;">52 kb/s</span>
+              <UIcon
+                name="i-lucide-arrow-right"
+                class="size-4 text-white/20"
+              />
+              <div
+                class="flex flex-col items-center px-4 py-2 rounded-lg"
+                style="background: rgba(52, 168, 83, 0.08); border: 1px solid rgba(52, 168, 83, 0.2);"
+              >
+                <span
+                  class="text-[9px] uppercase"
+                  style="color: #34A853;"
+                >Argus AI</span>
+                <span
+                  class="text-sm font-bold"
+                  style="color: #34A853;"
+                >52 kb/s</span>
               </div>
             </div>
           </div>
@@ -2299,13 +3411,25 @@ const archiveKernelLabels: Record<string, string> = {
             style="background: rgba(251, 188, 5, 0.03); border-color: rgba(251, 188, 5, 0.12); transition-delay: 1100ms;"
           >
             <div class="flex items-center gap-3 mb-3">
-              <div class="flex items-center justify-center size-10 rounded-xl shrink-0" style="background: rgba(251, 188, 5, 0.08); border: 1px solid rgba(251, 188, 5, 0.15);">
-                <UIcon name="i-lucide-cpu" class="size-5" style="color: #FBBC05;" />
+              <div
+                class="flex items-center justify-center size-10 rounded-xl shrink-0"
+                style="background: rgba(251, 188, 5, 0.08); border: 1px solid rgba(251, 188, 5, 0.15);"
+              >
+                <UIcon
+                  name="i-lucide-cpu"
+                  class="size-5"
+                  style="color: #FBBC05;"
+                />
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
-                  <p class="text-sm font-bold text-white">Kernel-Level System Control</p>
-                  <span class="text-[7px] font-black px-1.5 py-0.5 rounded-full" style="background: rgba(251, 188, 5, 0.15); color: #FBBC05;">ЭКСКЛЮЗИВ</span>
+                  <p class="text-sm font-bold text-white">
+                    Kernel-Level System Control
+                  </p>
+                  <span
+                    class="text-[7px] font-black px-1.5 py-0.5 rounded-full"
+                    style="background: rgba(251, 188, 5, 0.15); color: #FBBC05;"
+                  >ЭКСКЛЮЗИВ</span>
                 </div>
               </div>
             </div>
@@ -2314,7 +3438,12 @@ const archiveKernelLabels: Record<string, string> = {
               обнаружение аппаратных устройств, блокировка удалённого доступа, привязка к оборудованию и детекция мульти-мониторов.
             </p>
             <div class="flex items-center gap-2 mt-3 flex-wrap">
-              <span v-for="tag in ['Процессы ОС', 'Устройства', 'Remote Block', 'Hardware ID', 'Мониторы']" :key="tag" class="text-[8px] font-bold px-2 py-1 rounded-md" style="background: rgba(251, 188, 5, 0.06); color: rgba(251, 188, 5, 0.7); border: 1px solid rgba(251, 188, 5, 0.1);">{{ tag }}</span>
+              <span
+                v-for="tag in ['Процессы ОС', 'Устройства', 'Remote Block', 'Hardware ID', 'Мониторы']"
+                :key="tag"
+                class="text-[8px] font-bold px-2 py-1 rounded-md"
+                style="background: rgba(251, 188, 5, 0.06); color: rgba(251, 188, 5, 0.7); border: 1px solid rgba(251, 188, 5, 0.1);"
+              >{{ tag }}</span>
             </div>
           </div>
 
@@ -2325,13 +3454,25 @@ const archiveKernelLabels: Record<string, string> = {
             style="background: rgba(162, 89, 255, 0.03); border-color: rgba(162, 89, 255, 0.12); transition-delay: 1200ms;"
           >
             <div class="flex items-center gap-3 mb-3">
-              <div class="flex items-center justify-center size-10 rounded-xl shrink-0" style="background: rgba(162, 89, 255, 0.08); border: 1px solid rgba(162, 89, 255, 0.15);">
-                <UIcon name="i-lucide-user-cog" class="size-5" style="color: #A259FF;" />
+              <div
+                class="flex items-center justify-center size-10 rounded-xl shrink-0"
+                style="background: rgba(162, 89, 255, 0.08); border: 1px solid rgba(162, 89, 255, 0.15);"
+              >
+                <UIcon
+                  name="i-lucide-user-cog"
+                  class="size-5"
+                  style="color: #A259FF;"
+                />
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
-                  <p class="text-sm font-bold text-white">Индивидуальные исключения</p>
-                  <span class="text-[7px] font-black px-1.5 py-0.5 rounded-full" style="background: rgba(162, 89, 255, 0.15); color: #A259FF;">ЭКСКЛЮЗИВ</span>
+                  <p class="text-sm font-bold text-white">
+                    Индивидуальные исключения
+                  </p>
+                  <span
+                    class="text-[7px] font-black px-1.5 py-0.5 rounded-full"
+                    style="background: rgba(162, 89, 255, 0.15); color: #A259FF;"
+                  >ЭКСКЛЮЗИВ</span>
                 </div>
               </div>
             </div>
@@ -2340,7 +3481,12 @@ const archiveKernelLabels: Record<string, string> = {
               24 параметра AI-детекции, видео и блокировки могут быть переопределены для студентов с особыми потребностями.
             </p>
             <div class="flex items-center gap-2 mt-3 flex-wrap">
-              <span v-for="tag in ['Manual Override', 'Per-Student', '24 параметра', 'Reset to Global']" :key="tag" class="text-[8px] font-bold px-2 py-1 rounded-md" style="background: rgba(162, 89, 255, 0.06); color: rgba(162, 89, 255, 0.7); border: 1px solid rgba(162, 89, 255, 0.1);">{{ tag }}</span>
+              <span
+                v-for="tag in ['Manual Override', 'Per-Student', '24 параметра', 'Reset to Global']"
+                :key="tag"
+                class="text-[8px] font-bold px-2 py-1 rounded-md"
+                style="background: rgba(162, 89, 255, 0.06); color: rgba(162, 89, 255, 0.7); border: 1px solid rgba(162, 89, 255, 0.1);"
+              >{{ tag }}</span>
             </div>
           </div>
         </div>
@@ -2350,10 +3496,18 @@ const archiveKernelLabels: Record<string, string> = {
     <!-- ============================== -->
     <!--  PRICING SECTION               -->
     <!-- ============================== -->
-    <section id="pricing" ref="pricingRef" class="relative py-32 px-6" style="background: #0F151D;">
+    <section
+      id="pricing"
+      ref="pricingRef"
+      class="relative py-32 px-6"
+      style="background: #0F151D;"
+    >
       <div class="max-w-5xl mx-auto">
         <div class="text-center mb-16">
-          <span class="text-xs font-bold uppercase tracking-widest" style="color: #FBBC05;">Стоимость</span>
+          <span
+            class="text-xs font-bold uppercase tracking-widest"
+            style="color: #FBBC05;"
+          >Стоимость</span>
           <h2 class="text-4xl md:text-5xl font-bold text-white mt-4 tracking-tight">
             Масштабируемая честность.<br>
             <span class="pricing-gradient-text">Прозрачные цены.</span>
@@ -2370,10 +3524,20 @@ const archiveKernelLabels: Record<string, string> = {
           style="background: #1A2130; border-color: rgba(251, 188, 5, 0.15);"
         >
           <!-- Calculator header -->
-          <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: rgba(255,255,255,0.06);">
+          <div
+            class="flex items-center justify-between px-6 py-4 border-b"
+            style="border-color: rgba(255,255,255,0.06);"
+          >
             <div class="flex items-center gap-3">
-              <div class="flex items-center justify-center size-8 rounded-lg" style="background: rgba(251, 188, 5, 0.1);">
-                <UIcon name="i-lucide-calculator" class="size-4" style="color: #FBBC05;" />
+              <div
+                class="flex items-center justify-center size-8 rounded-lg"
+                style="background: rgba(251, 188, 5, 0.1);"
+              >
+                <UIcon
+                  name="i-lucide-calculator"
+                  class="size-4"
+                  style="color: #FBBC05;"
+                />
               </div>
               <span class="text-sm font-bold text-white">Калькулятор стоимости</span>
             </div>
@@ -2389,7 +3553,9 @@ const archiveKernelLabels: Record<string, string> = {
             <!-- Student count slider -->
             <div class="mb-8">
               <div class="flex items-center justify-between mb-3">
-                <p class="text-sm font-medium text-white/80">Количество студентов</p>
+                <p class="text-sm font-medium text-white/80">
+                  Количество студентов
+                </p>
                 <span class="text-2xl font-bold tabular-nums text-white">{{ studentCount.toLocaleString() }}</span>
               </div>
               <input
@@ -2412,47 +3578,132 @@ const archiveKernelLabels: Record<string, string> = {
 
             <!-- Price display -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <div class="text-center p-5 rounded-xl" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">
-                <p class="text-[10px] text-white/40 uppercase tracking-wider mb-1">Цена за студента</p>
+              <div
+                class="text-center p-5 rounded-xl"
+                style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);"
+              >
+                <p class="text-[10px] text-white/40 uppercase tracking-wider mb-1">
+                  Цена за студента
+                </p>
                 <p class="text-3xl font-bold text-white">
                   $<span class="tabular-nums">{{ pricePerStudent.toFixed(2) }}</span>
                 </p>
-                <p class="text-[10px] text-white/30 mt-1">за экзаменационный цикл</p>
+                <p class="text-[10px] text-white/30 mt-1">
+                  за экзаменационный цикл
+                </p>
               </div>
-              <div class="text-center p-5 rounded-xl" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">
-                <p class="text-[10px] text-white/40 uppercase tracking-wider mb-1">Итого</p>
-                <p class="text-3xl font-bold tabular-nums" :style="{ color: pricingTierColor }">
+              <div
+                class="text-center p-5 rounded-xl"
+                style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);"
+              >
+                <p class="text-[10px] text-white/40 uppercase tracking-wider mb-1">
+                  Итого
+                </p>
+                <p
+                  class="text-3xl font-bold tabular-nums"
+                  :style="{ color: pricingTierColor }"
+                >
                   ${{ totalCost }}
                 </p>
-                <p class="text-[10px] text-white/30 mt-1">за экзаменационный цикл</p>
+                <p class="text-[10px] text-white/30 mt-1">
+                  за экзаменационный цикл
+                </p>
               </div>
-              <div class="text-center p-5 rounded-xl relative overflow-hidden" :style="{ background: studentCount > 5000 ? hexToRgba('#34A853', 0.06) : 'rgba(255,255,255,0.03)', border: studentCount > 5000 ? '1px solid rgba(52, 168, 83, 0.2)' : '1px solid rgba(255,255,255,0.06)' }">
-                <div v-if="studentCount > 5000" class="absolute top-0 right-0 px-2 py-0.5 text-[7px] font-bold rounded-bl" style="background: #34A853; color: white;">BEST VALUE</div>
-                <p class="text-[10px] text-white/40 uppercase tracking-wider mb-1">Экономия</p>
-                <p class="text-3xl font-bold tabular-nums" style="color: #34A853;">
+              <div
+                class="text-center p-5 rounded-xl relative overflow-hidden"
+                :style="{ background: studentCount > 5000 ? hexToRgba('#34A853', 0.06) : 'rgba(255,255,255,0.03)', border: studentCount > 5000 ? '1px solid rgba(52, 168, 83, 0.2)' : '1px solid rgba(255,255,255,0.06)' }"
+              >
+                <div
+                  v-if="studentCount > 5000"
+                  class="absolute top-0 right-0 px-2 py-0.5 text-[7px] font-bold rounded-bl"
+                  style="background: #34A853; color: white;"
+                >
+                  BEST VALUE
+                </div>
+                <p class="text-[10px] text-white/40 uppercase tracking-wider mb-1">
+                  Экономия
+                </p>
+                <p
+                  class="text-3xl font-bold tabular-nums"
+                  style="color: #34A853;"
+                >
                   {{ Math.round((1 - pricePerStudent / 2.50) * 100) }}%
                 </p>
-                <p class="text-[10px] text-white/30 mt-1">от базовой цены</p>
+                <p class="text-[10px] text-white/30 mt-1">
+                  от базовой цены
+                </p>
               </div>
             </div>
 
             <!-- Tier indicators -->
             <div class="grid grid-cols-4 gap-2 mb-8">
-              <div class="px-3 py-2 rounded-lg text-center" :style="{ background: studentCount <= 500 ? 'rgba(251,188,5,0.08)' : 'rgba(255,255,255,0.02)', border: studentCount <= 500 ? '1px solid rgba(251,188,5,0.2)' : '1px solid rgba(255,255,255,0.04)' }">
-                <p class="text-[9px] font-bold" :style="{ color: studentCount <= 500 ? '#FBBC05' : 'rgba(255,255,255,0.3)' }">100–500</p>
-                <p class="text-xs font-bold mt-0.5" :style="{ color: studentCount <= 500 ? 'white' : 'rgba(255,255,255,0.2)' }">$2.50</p>
+              <div
+                class="px-3 py-2 rounded-lg text-center"
+                :style="{ background: studentCount <= 500 ? 'rgba(251,188,5,0.08)' : 'rgba(255,255,255,0.02)', border: studentCount <= 500 ? '1px solid rgba(251,188,5,0.2)' : '1px solid rgba(255,255,255,0.04)' }"
+              >
+                <p
+                  class="text-[9px] font-bold"
+                  :style="{ color: studentCount <= 500 ? '#FBBC05' : 'rgba(255,255,255,0.3)' }"
+                >
+                  100–500
+                </p>
+                <p
+                  class="text-xs font-bold mt-0.5"
+                  :style="{ color: studentCount <= 500 ? 'white' : 'rgba(255,255,255,0.2)' }"
+                >
+                  $2.50
+                </p>
               </div>
-              <div class="px-3 py-2 rounded-lg text-center" :style="{ background: studentCount > 500 && studentCount <= 2000 ? 'rgba(162,89,255,0.08)' : 'rgba(255,255,255,0.02)', border: studentCount > 500 && studentCount <= 2000 ? '1px solid rgba(162,89,255,0.2)' : '1px solid rgba(255,255,255,0.04)' }">
-                <p class="text-[9px] font-bold" :style="{ color: studentCount > 500 && studentCount <= 2000 ? '#A259FF' : 'rgba(255,255,255,0.3)' }">501–2,000</p>
-                <p class="text-xs font-bold mt-0.5" :style="{ color: studentCount > 500 && studentCount <= 2000 ? 'white' : 'rgba(255,255,255,0.2)' }">$1.80</p>
+              <div
+                class="px-3 py-2 rounded-lg text-center"
+                :style="{ background: studentCount > 500 && studentCount <= 2000 ? 'rgba(162,89,255,0.08)' : 'rgba(255,255,255,0.02)', border: studentCount > 500 && studentCount <= 2000 ? '1px solid rgba(162,89,255,0.2)' : '1px solid rgba(255,255,255,0.04)' }"
+              >
+                <p
+                  class="text-[9px] font-bold"
+                  :style="{ color: studentCount > 500 && studentCount <= 2000 ? '#A259FF' : 'rgba(255,255,255,0.3)' }"
+                >
+                  501–2,000
+                </p>
+                <p
+                  class="text-xs font-bold mt-0.5"
+                  :style="{ color: studentCount > 500 && studentCount <= 2000 ? 'white' : 'rgba(255,255,255,0.2)' }"
+                >
+                  $1.80
+                </p>
               </div>
-              <div class="px-3 py-2 rounded-lg text-center" :style="{ background: studentCount > 2000 && studentCount <= 5000 ? 'rgba(66,133,244,0.08)' : 'rgba(255,255,255,0.02)', border: studentCount > 2000 && studentCount <= 5000 ? '1px solid rgba(66,133,244,0.2)' : '1px solid rgba(255,255,255,0.04)' }">
-                <p class="text-[9px] font-bold" :style="{ color: studentCount > 2000 && studentCount <= 5000 ? '#4285F4' : 'rgba(255,255,255,0.3)' }">2,001–5,000</p>
-                <p class="text-xs font-bold mt-0.5" :style="{ color: studentCount > 2000 && studentCount <= 5000 ? 'white' : 'rgba(255,255,255,0.2)' }">$1.20</p>
+              <div
+                class="px-3 py-2 rounded-lg text-center"
+                :style="{ background: studentCount > 2000 && studentCount <= 5000 ? 'rgba(66,133,244,0.08)' : 'rgba(255,255,255,0.02)', border: studentCount > 2000 && studentCount <= 5000 ? '1px solid rgba(66,133,244,0.2)' : '1px solid rgba(255,255,255,0.04)' }"
+              >
+                <p
+                  class="text-[9px] font-bold"
+                  :style="{ color: studentCount > 2000 && studentCount <= 5000 ? '#4285F4' : 'rgba(255,255,255,0.3)' }"
+                >
+                  2,001–5,000
+                </p>
+                <p
+                  class="text-xs font-bold mt-0.5"
+                  :style="{ color: studentCount > 2000 && studentCount <= 5000 ? 'white' : 'rgba(255,255,255,0.2)' }"
+                >
+                  $1.20
+                </p>
               </div>
-              <div class="px-3 py-2 rounded-lg text-center" :style="{ background: studentCount > 5000 ? 'rgba(52,168,83,0.08)' : 'rgba(255,255,255,0.02)', border: studentCount > 5000 ? '1px solid rgba(52,168,83,0.2)' : '1px solid rgba(255,255,255,0.04)' }">
-                <p class="text-[9px] font-bold" :style="{ color: studentCount > 5000 ? '#34A853' : 'rgba(255,255,255,0.3)' }">5,000+</p>
-                <p class="text-xs font-bold mt-0.5" :style="{ color: studentCount > 5000 ? 'white' : 'rgba(255,255,255,0.2)' }">$1.00</p>
+              <div
+                class="px-3 py-2 rounded-lg text-center"
+                :style="{ background: studentCount > 5000 ? 'rgba(52,168,83,0.08)' : 'rgba(255,255,255,0.02)', border: studentCount > 5000 ? '1px solid rgba(52,168,83,0.2)' : '1px solid rgba(255,255,255,0.04)' }"
+              >
+                <p
+                  class="text-[9px] font-bold"
+                  :style="{ color: studentCount > 5000 ? '#34A853' : 'rgba(255,255,255,0.3)' }"
+                >
+                  5,000+
+                </p>
+                <p
+                  class="text-xs font-bold mt-0.5"
+                  :style="{ color: studentCount > 5000 ? 'white' : 'rgba(255,255,255,0.2)' }"
+                >
+                  $1.00
+                </p>
               </div>
             </div>
 
@@ -2465,12 +3716,27 @@ const archiveKernelLabels: Record<string, string> = {
                 style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);"
               >
                 <div class="flex items-center gap-2 mb-3">
-                  <UIcon :name="feat.icon" class="size-4" :style="{ color: feat.color }" />
-                  <span class="text-[10px] font-bold uppercase tracking-wider" :style="{ color: feat.color }">{{ feat.category }}</span>
+                  <UIcon
+                    :name="feat.icon"
+                    class="size-4"
+                    :style="{ color: feat.color }"
+                  />
+                  <span
+                    class="text-[10px] font-bold uppercase tracking-wider"
+                    :style="{ color: feat.color }"
+                  >{{ feat.category }}</span>
                 </div>
                 <ul class="space-y-1.5">
-                  <li v-for="item in feat.items" :key="item" class="flex items-start gap-1.5">
-                    <UIcon name="i-lucide-check" class="size-3 mt-0.5 shrink-0" style="color: #34A853;" />
+                  <li
+                    v-for="item in feat.items"
+                    :key="item"
+                    class="flex items-start gap-1.5"
+                  >
+                    <UIcon
+                      name="i-lucide-check"
+                      class="size-3 mt-0.5 shrink-0"
+                      style="color: #34A853;"
+                    />
                     <span class="text-[10px] text-white/60 leading-tight">{{ item }}</span>
                   </li>
                 </ul>
@@ -2486,20 +3752,38 @@ const archiveKernelLabels: Record<string, string> = {
           </div>
 
           <!-- API callout -->
-          <div class="px-6 py-4 border-t" style="border-color: rgba(255,255,255,0.06); background: rgba(66, 133, 244, 0.03);">
+          <div
+            class="px-6 py-4 border-t"
+            style="border-color: rgba(255,255,255,0.06); background: rgba(66, 133, 244, 0.03);"
+          >
             <div class="flex items-center gap-3">
-              <div class="flex items-center justify-center size-8 rounded-lg shrink-0" style="background: rgba(66, 133, 244, 0.1);">
-                <UIcon name="i-lucide-code-2" class="size-4" style="color: #4285F4;" />
+              <div
+                class="flex items-center justify-center size-8 rounded-lg shrink-0"
+                style="background: rgba(66, 133, 244, 0.1);"
+              >
+                <UIcon
+                  name="i-lucide-code-2"
+                  class="size-4"
+                  style="color: #4285F4;"
+                />
               </div>
               <div>
-                <p class="text-xs font-semibold text-white/80">Developer API</p>
+                <p class="text-xs font-semibold text-white/80">
+                  Developer API
+                </p>
                 <p class="text-[10px] text-white/40">
                   Интегрируйте Argus AI в свою платформу по API. Гибкая тарификация: платите только за реальные сессии.
                 </p>
               </div>
-              <button class="scanner-btn scanner-btn-inline shrink-0 px-3 py-1.5 rounded-lg text-[10px] font-bold" style="color: #4285F4;">
+              <button
+                class="scanner-btn scanner-btn-inline shrink-0 px-3 py-1.5 rounded-lg text-[10px] font-bold"
+                style="color: #4285F4;"
+              >
                 <span class="flex items-center gap-1.5">
-                  <UIcon name="i-lucide-plug-zap" class="size-3" />
+                  <UIcon
+                    name="i-lucide-plug-zap"
+                    class="size-3"
+                  />
                   Интегрировать по API
                 </span>
               </button>
@@ -2512,7 +3796,11 @@ const archiveKernelLabels: Record<string, string> = {
     <!-- ============================== -->
     <!--  FINAL CTA                     -->
     <!-- ============================== -->
-    <section ref="ctaRef" class="relative py-32 px-6" style="background: #121820;">
+    <section
+      ref="ctaRef"
+      class="relative py-32 px-6"
+      style="background: #121820;"
+    >
       <div
         class="max-w-4xl mx-auto text-center transition-all duration-1000"
         :class="ctaVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'"
@@ -2533,14 +3821,19 @@ const archiveKernelLabels: Record<string, string> = {
           </button>
         </div>
 
-        <p class="text-xs text-white/30 mt-6">14 дней бесплатно · Без привязки карты · Полный доступ</p>
+        <p class="text-xs text-white/30 mt-6">
+          14 дней бесплатно · Без привязки карты · Полный доступ
+        </p>
       </div>
     </section>
 
     <!-- ============================== -->
     <!--  FOOTER                        -->
     <!-- ============================== -->
-    <footer class="border-t px-6 py-12" style="border-color: rgba(255,255,255,0.06); background: #0A0E14;">
+    <footer
+      class="border-t px-6 py-12"
+      style="border-color: rgba(255,255,255,0.06); background: #0A0E14;"
+    >
       <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
         <div class="flex items-center gap-3">
           <ArgusLogo :size="28" />
@@ -2552,10 +3845,16 @@ const archiveKernelLabels: Record<string, string> = {
           <a class="text-xs text-white/30 hover:text-white/60 transition-colors cursor-pointer">Политика конфиденциальности</a>
           <a class="text-xs text-white/30 hover:text-white/60 transition-colors cursor-pointer">Условия использования</a>
           <a class="text-xs text-white/30 hover:text-white/60 transition-colors cursor-pointer">Статус системы</a>
-          <NuxtLink v-if="authStore.isLoggedIn" to="/" class="text-xs text-white/30 hover:text-white/60 transition-colors">Дашборд</NuxtLink>
+          <NuxtLink
+            v-if="authStore.isLoggedIn"
+            to="/"
+            class="text-xs text-white/30 hover:text-white/60 transition-colors"
+          >Дашборд</NuxtLink>
         </div>
 
-        <p class="text-xs text-white/20">&copy; 2026 Argus AI. Все права защищены.</p>
+        <p class="text-xs text-white/20">
+          &copy; 2026 Argus AI. Все права защищены.
+        </p>
       </div>
     </footer>
 

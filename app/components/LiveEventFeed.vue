@@ -113,7 +113,10 @@ const isEventModalOpen = computed({
       v-if="feedStore.lastCriticalEvent"
       class="px-4 py-2 bg-red-500/10 border-b border-red-500/20 flex items-center gap-2"
     >
-      <UIcon name="i-lucide-alert-triangle" class="text-red-500 w-4 h-4 flex-shrink-0" />
+      <UIcon
+        name="i-lucide-alert-triangle"
+        class="text-red-500 w-4 h-4 flex-shrink-0"
+      />
       <span class="text-xs text-red-400 truncate">
         {{ feedStore.lastCriticalEvent.eventTypeLabel }} — {{ feedStore.lastCriticalEvent.label }}
       </span>
@@ -128,12 +131,18 @@ const isEventModalOpen = computed({
         v-if="feedStore.visibleEvents.length === 0"
         class="flex flex-col items-center justify-center h-full text-[var(--argus-text-dimmed)]"
       >
-        <UIcon name="i-lucide-radio" class="w-8 h-8 mb-2 opacity-40" />
+        <UIcon
+          name="i-lucide-radio"
+          class="w-8 h-8 mb-2 opacity-40"
+        />
         <span class="text-sm">Ожидание событий...</span>
         <span class="text-xs mt-1 opacity-60">Подключитесь к серверу для получения данных</span>
       </div>
 
-      <div v-else class="divide-y divide-[var(--argus-border-subtle)]">
+      <div
+        v-else
+        class="divide-y divide-[var(--argus-border-subtle)]"
+      >
         <div
           v-for="event in feedStore.visibleEvents"
           :key="event.id"
@@ -180,10 +189,16 @@ const isEventModalOpen = computed({
               </p>
 
               <div class="flex items-center gap-2 mt-1 text-[10px] text-[var(--argus-text-dimmed)]">
-                <span class="truncate max-w-[100px]" :title="event.sessionId">
+                <span
+                  class="truncate max-w-[100px]"
+                  :title="event.sessionId"
+                >
                   {{ event.sessionId.substring(0, 8) }}...
                 </span>
-                <span v-if="event.confidence < 1" class="tabular-nums">
+                <span
+                  v-if="event.confidence < 1"
+                  class="tabular-nums"
+                >
                   {{ (event.confidence * 100).toFixed(0) }}%
                 </span>
               </div>
@@ -202,7 +217,10 @@ const isEventModalOpen = computed({
     <!-- Event Detail Modal -->
     <UModal v-model:open="isEventModalOpen">
       <template #default>
-        <div v-if="selectedEvent" class="p-6">
+        <div
+          v-if="selectedEvent"
+          class="p-6"
+        >
           <div class="flex items-center gap-3 mb-4">
             <span
               class="px-2 py-1 rounded text-xs font-medium border"
@@ -219,33 +237,47 @@ const isEventModalOpen = computed({
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <span class="text-[var(--argus-text-dimmed)]">ID события</span>
-                <p class="text-[var(--argus-text)] font-mono text-xs mt-0.5">{{ selectedEvent.id }}</p>
+                <p class="text-[var(--argus-text)] font-mono text-xs mt-0.5">
+                  {{ selectedEvent.id }}
+                </p>
               </div>
               <div>
                 <span class="text-[var(--argus-text-dimmed)]">Время</span>
-                <p class="text-[var(--argus-text)] mt-0.5">{{ formatTime(selectedEvent.timestamp) }}</p>
+                <p class="text-[var(--argus-text)] mt-0.5">
+                  {{ formatTime(selectedEvent.timestamp) }}
+                </p>
               </div>
               <div>
                 <span class="text-[var(--argus-text-dimmed)]">Сессия</span>
-                <p class="text-[var(--argus-text)] font-mono text-xs mt-0.5">{{ selectedEvent.sessionId }}</p>
+                <p class="text-[var(--argus-text)] font-mono text-xs mt-0.5">
+                  {{ selectedEvent.sessionId }}
+                </p>
               </div>
               <div>
                 <span class="text-[var(--argus-text-dimmed)]">Студент</span>
-                <p class="text-[var(--argus-text)] mt-0.5">{{ selectedEvent.studentId }}</p>
+                <p class="text-[var(--argus-text)] mt-0.5">
+                  {{ selectedEvent.studentId }}
+                </p>
               </div>
               <div>
                 <span class="text-[var(--argus-text-dimmed)]">Категория</span>
-                <p class="text-[var(--argus-text)] mt-0.5 capitalize">{{ selectedEvent.category }}</p>
+                <p class="text-[var(--argus-text)] mt-0.5 capitalize">
+                  {{ selectedEvent.category }}
+                </p>
               </div>
               <div>
                 <span class="text-[var(--argus-text-dimmed)]">Точность</span>
-                <p class="text-[var(--argus-text)] mt-0.5">{{ (selectedEvent.confidence * 100).toFixed(1) }}%</p>
+                <p class="text-[var(--argus-text)] mt-0.5">
+                  {{ (selectedEvent.confidence * 100).toFixed(1) }}%
+                </p>
               </div>
             </div>
 
             <div v-if="selectedEvent.label">
               <span class="text-[var(--argus-text-dimmed)]">Описание</span>
-              <p class="text-[var(--argus-text)] mt-0.5">{{ selectedEvent.label }}</p>
+              <p class="text-[var(--argus-text)] mt-0.5">
+                {{ selectedEvent.label }}
+              </p>
             </div>
           </div>
         </div>

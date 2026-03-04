@@ -81,7 +81,10 @@ function getAlertIcon(alert: CriticalAlert): string {
 
         <!-- Alert message -->
         <div class="flex-1 min-w-0">
-          <span class="text-sm font-medium" :class="hasCritical ? 'text-red-400' : 'text-amber-400'">
+          <span
+            class="text-sm font-medium"
+            :class="hasCritical ? 'text-red-400' : 'text-amber-400'"
+          >
             {{ unreadCount }} {{ unreadCount === 1 ? 'новое оповещение' : 'новых оповещений' }}
           </span>
           <span
@@ -149,7 +152,10 @@ function getAlertIcon(alert: CriticalAlert): string {
             <!-- Content -->
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="text-xs font-medium" :class="alert.severity === 3 ? 'text-red-400' : 'text-amber-400'">
+                <span
+                  class="text-xs font-medium"
+                  :class="alert.severity === 3 ? 'text-red-400' : 'text-amber-400'"
+                >
                   {{ alert.eventTypeLabel }}
                 </span>
                 <span class="text-[10px] text-[var(--argus-text-dimmed)] tabular-nums">
@@ -174,7 +180,10 @@ function getAlertIcon(alert: CriticalAlert): string {
               title="Прочитано"
               @click.stop="acknowledgeAlert(alert.id)"
             >
-              <UIcon name="i-lucide-check" class="w-3.5 h-3.5" />
+              <UIcon
+                name="i-lucide-check"
+                class="w-3.5 h-3.5"
+              />
             </button>
             <UIcon
               v-else

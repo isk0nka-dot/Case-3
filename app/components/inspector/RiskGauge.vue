@@ -44,7 +44,9 @@ const trackColor = computed(() => {
   >
     <!-- Background arc -->
     <circle
-      cx="18" cy="18" :r="radius"
+      cx="18"
+      cy="18"
+      :r="radius"
       fill="none"
       :stroke="trackColor"
       :stroke-width="strokeWidth"
@@ -55,7 +57,9 @@ const trackColor = computed(() => {
     />
     <!-- Filled arc -->
     <circle
-      cx="18" cy="18" :r="radius"
+      cx="18"
+      cy="18"
+      :r="radius"
       fill="none"
       :stroke="color"
       :stroke-width="strokeWidth"
@@ -67,7 +71,8 @@ const trackColor = computed(() => {
     />
     <!-- Score text -->
     <text
-      x="18" y="19"
+      x="18"
+      y="19"
       text-anchor="middle"
       dominant-baseline="central"
       :fill="color"

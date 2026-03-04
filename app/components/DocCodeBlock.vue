@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const props = defineProps<{
-  tabs: Array<{ label: string; language: string; code: string }>
+  tabs: Array<{ label: string, language: string, code: string }>
 }>()
 
 const activeTab = ref(0)
@@ -44,7 +44,10 @@ function copyCode() {
         :style="{ color: copied ? 'var(--argus-success)' : 'var(--argus-text-dimmed)' }"
         @click="copyCode"
       >
-        <UIcon :name="copied ? 'i-lucide-check' : 'i-lucide-copy'" class="size-3.5" />
+        <UIcon
+          :name="copied ? 'i-lucide-check' : 'i-lucide-copy'"
+          class="size-3.5"
+        />
         {{ copied ? 'Copied!' : 'Copy' }}
       </button>
     </div>

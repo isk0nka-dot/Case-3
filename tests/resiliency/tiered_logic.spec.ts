@@ -169,7 +169,7 @@ test.describe('Tiered Degradation Logic', () => {
       let currentTier: Tier = 'A'
       let consecutiveDown = 0
       let consecutiveUp = 0
-      const log: { proposed: Tier; actual: Tier; downCount: number; upCount: number }[] = []
+      const log: { proposed: Tier, actual: Tier, downCount: number, upCount: number }[] = []
 
       function applyHysteresis(proposed: Tier) {
         const currentRank = tierRank[currentTier]
@@ -434,12 +434,12 @@ test.describe('Sidecam Disconnect Recovery', () => {
       }
 
       // Simulate lifecycle
-      updatePhase('pending')      // idle → pairing
-      updatePhase('connected')    // pairing → calibrating
-      updatePhase('calibrating')  // stays calibrating
-      updatePhase('ready')        // calibrating → ready
+      updatePhase('pending') // idle → pairing
+      updatePhase('connected') // pairing → calibrating
+      updatePhase('calibrating') // stays calibrating
+      updatePhase('ready') // calibrating → ready
       updatePhase('disconnected') // ready → disconnected
-      updatePhase('ready')        // disconnected → ready (recovery!)
+      updatePhase('ready') // disconnected → ready (recovery!)
 
       return { history, finalPhase: phase }
     })

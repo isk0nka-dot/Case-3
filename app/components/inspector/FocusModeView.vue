@@ -90,7 +90,10 @@ function formatStudentName(studentId: string): string {
 <template>
   <div class="flex h-full focus-mode-container">
     <!-- Left Filmstrip -->
-    <div class="w-20 shrink-0 border-r border-[var(--argus-border)] overflow-y-auto filmstrip-scroll" style="background: var(--argus-bg-deep);">
+    <div
+      class="w-20 shrink-0 border-r border-[var(--argus-border)] overflow-y-auto filmstrip-scroll"
+      style="background: var(--argus-bg-deep);"
+    >
       <div class="p-1.5 space-y-1.5">
         <div
           v-for="fs in filmstripSessions"
@@ -102,11 +105,20 @@ function formatStudentName(studentId: string): string {
           :style="{ background: 'var(--argus-bg-card)' }"
           @click="switchFocus(fs.sessionId)"
         >
-          <div class="aspect-video overflow-hidden" style="background: var(--argus-bg-deep);">
-            <VideoPlayer :session-id="fs.sessionId" :compact="true" />
+          <div
+            class="aspect-video overflow-hidden"
+            style="background: var(--argus-bg-deep);"
+          >
+            <VideoPlayer
+              :session-id="fs.sessionId"
+              :compact="true"
+            />
           </div>
           <div class="px-1 py-0.5">
-            <p class="text-[7px] font-medium truncate" style="color: var(--argus-text-dimmed);">
+            <p
+              class="text-[7px] font-medium truncate"
+              style="color: var(--argus-text-dimmed);"
+            >
               {{ fs.sessionId.substring(0, 8) }}
             </p>
           </div>
@@ -117,21 +129,33 @@ function formatStudentName(studentId: string): string {
     <!-- Main Expanded View -->
     <div class="flex-1 flex flex-col overflow-hidden">
       <!-- Header bar -->
-      <div class="flex items-center justify-between px-4 py-2 border-b border-[var(--argus-border)]" style="background: var(--argus-bg-card);">
+      <div
+        class="flex items-center justify-between px-4 py-2 border-b border-[var(--argus-border)]"
+        style="background: var(--argus-bg-card);"
+      >
         <div class="flex items-center gap-3">
           <button
             class="flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-all cursor-pointer"
             style="color: var(--argus-text-dimmed); background: var(--argus-bg-elevated);"
             @click="exitFocus"
           >
-            <UIcon name="i-lucide-arrow-left" class="size-3.5" />
+            <UIcon
+              name="i-lucide-arrow-left"
+              class="size-3.5"
+            />
             Назад
           </button>
           <div>
-            <h3 class="text-sm font-semibold" style="color: var(--argus-text);">
+            <h3
+              class="text-sm font-semibold"
+              style="color: var(--argus-text);"
+            >
               {{ formatStudentName(session.studentId) }}
             </h3>
-            <p class="text-[10px]" style="color: var(--argus-text-dimmed);">
+            <p
+              class="text-[10px]"
+              style="color: var(--argus-text-dimmed);"
+            >
               {{ session.sessionId }} · {{ session.examId }}
             </p>
           </div>
@@ -139,7 +163,10 @@ function formatStudentName(studentId: string): string {
 
         <div class="flex items-center gap-2">
           <!-- Risk gauge -->
-          <RiskGauge :score="riskScore.composite" :size="32" />
+          <RiskGauge
+            :score="riskScore.composite"
+            :size="32"
+          />
 
           <!-- Evidence capture -->
           <button
@@ -148,8 +175,16 @@ function formatStudentName(studentId: string): string {
             :disabled="capturing"
             @click="handleCapture"
           >
-            <UIcon v-if="!capturing" name="i-lucide-camera" class="size-3.5" />
-            <span v-else class="size-3.5 animate-spin rounded-full border border-t-transparent" style="border-color: var(--argus-accent);" />
+            <UIcon
+              v-if="!capturing"
+              name="i-lucide-camera"
+              class="size-3.5"
+            />
+            <span
+              v-else
+              class="size-3.5 animate-spin rounded-full border border-t-transparent"
+              style="border-color: var(--argus-accent);"
+            />
             Захват ({{ inspectorStore.getEvidenceCount(session.sessionId) }})
           </button>
 
@@ -161,7 +196,10 @@ function formatStudentName(studentId: string): string {
             :disabled="actionLoading['warn']"
             @click="handleWarn"
           >
-            <UIcon name="i-lucide-alert-triangle" class="size-3.5" />
+            <UIcon
+              name="i-lucide-alert-triangle"
+              class="size-3.5"
+            />
             Предупредить
           </button>
           <button
@@ -171,7 +209,10 @@ function formatStudentName(studentId: string): string {
             :disabled="actionLoading['terminate']"
             @click="handleTerminate"
           >
-            <UIcon name="i-lucide-ban" class="size-3.5" />
+            <UIcon
+              name="i-lucide-ban"
+              class="size-3.5"
+            />
             Завершить
           </button>
         </div>
@@ -181,8 +222,15 @@ function formatStudentName(studentId: string): string {
       <div class="flex-1 flex gap-4 p-4 overflow-hidden">
         <!-- Large video player -->
         <div class="flex-1 flex flex-col gap-3">
-          <div class="relative rounded-xl overflow-hidden flex-1" style="background: var(--argus-bg-deep);">
-            <VideoPlayer ref="mainPlayerRef" :session-id="session.sessionId" :compact="false" />
+          <div
+            class="relative rounded-xl overflow-hidden flex-1"
+            style="background: var(--argus-bg-deep);"
+          >
+            <VideoPlayer
+              ref="mainPlayerRef"
+              :session-id="session.sessionId"
+              :compact="false"
+            />
             <!-- AI Overlay (read-only mode — no local inference in monitoring) -->
             <AIOverlay
               :vision-frame="null"
@@ -196,7 +244,10 @@ function formatStudentName(studentId: string): string {
           <!-- Sparkline + stats row -->
           <div class="flex items-center gap-4">
             <div class="glass-card rounded-lg px-3 py-2 flex items-center gap-3">
-              <span class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">Тренд риска</span>
+              <span
+                class="text-[10px] font-medium"
+                style="color: var(--argus-text-dimmed);"
+              >Тренд риска</span>
               <RiskSparkline
                 v-if="riskScore.trend.length >= 2"
                 :data="riskScore.trend"
@@ -208,24 +259,60 @@ function formatStudentName(studentId: string): string {
 
             <div class="flex items-center gap-3">
               <div class="glass-card rounded-lg px-3 py-2 text-center">
-                <div class="text-sm font-bold tabular-nums" style="color: var(--argus-error);">{{ session.criticalCount }}</div>
-                <div class="text-[9px]" style="color: var(--argus-text-dimmed);">Критических</div>
+                <div
+                  class="text-sm font-bold tabular-nums"
+                  style="color: var(--argus-error);"
+                >
+                  {{ session.criticalCount }}
+                </div>
+                <div
+                  class="text-[9px]"
+                  style="color: var(--argus-text-dimmed);"
+                >
+                  Критических
+                </div>
               </div>
               <div class="glass-card rounded-lg px-3 py-2 text-center">
-                <div class="text-sm font-bold tabular-nums" style="color: var(--argus-warning);">{{ session.warningCount }}</div>
-                <div class="text-[9px]" style="color: var(--argus-text-dimmed);">Предупр.</div>
+                <div
+                  class="text-sm font-bold tabular-nums"
+                  style="color: var(--argus-warning);"
+                >
+                  {{ session.warningCount }}
+                </div>
+                <div
+                  class="text-[9px]"
+                  style="color: var(--argus-text-dimmed);"
+                >
+                  Предупр.
+                </div>
               </div>
               <div class="glass-card rounded-lg px-3 py-2 text-center">
-                <div class="text-sm font-bold tabular-nums" style="color: var(--argus-text);">{{ session.totalEvents }}</div>
-                <div class="text-[9px]" style="color: var(--argus-text-dimmed);">Событий</div>
+                <div
+                  class="text-sm font-bold tabular-nums"
+                  style="color: var(--argus-text);"
+                >
+                  {{ session.totalEvents }}
+                </div>
+                <div
+                  class="text-[9px]"
+                  style="color: var(--argus-text-dimmed);"
+                >
+                  Событий
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Evidence history panel -->
-        <div v-if="evidence.length > 0" class="w-48 shrink-0 overflow-y-auto space-y-2">
-          <h4 class="text-[10px] font-semibold uppercase tracking-wider px-1" style="color: var(--argus-text-dimmed);">
+        <div
+          v-if="evidence.length > 0"
+          class="w-48 shrink-0 overflow-y-auto space-y-2"
+        >
+          <h4
+            class="text-[10px] font-semibold uppercase tracking-wider px-1"
+            style="color: var(--argus-text-dimmed);"
+          >
             Доказательства ({{ evidence.length }})
           </h4>
           <div
@@ -233,17 +320,31 @@ function formatStudentName(studentId: string): string {
             :key="ev.id"
             class="glass-card rounded-lg overflow-hidden"
           >
-            <img :src="ev.frameDataUrl" :alt="`Evidence ${ev.id}`" class="w-full aspect-video object-cover" />
+            <img
+              :src="ev.frameDataUrl"
+              :alt="`Evidence ${ev.id}`"
+              class="w-full aspect-video object-cover"
+            >
             <div class="px-2 py-1.5 space-y-0.5">
               <div class="flex items-center justify-between">
-                <span class="text-[8px] font-bold tabular-nums" :style="{ color: riskColorValue }">
+                <span
+                  class="text-[8px] font-bold tabular-nums"
+                  :style="{ color: riskColorValue }"
+                >
                   Риск: {{ ev.aiMetadata.riskScore }}
                 </span>
-                <span class="text-[8px] tabular-nums" style="color: var(--argus-text-dimmed);">
+                <span
+                  class="text-[8px] tabular-nums"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   {{ new Date(ev.timestamp).toLocaleTimeString('ru-RU') }}
                 </span>
               </div>
-              <div class="text-[7px] font-mono truncate" style="color: var(--argus-text-dimmed);" :title="ev.frameSha256">
+              <div
+                class="text-[7px] font-mono truncate"
+                style="color: var(--argus-text-dimmed);"
+                :title="ev.frameSha256"
+              >
                 SHA: {{ ev.frameSha256.substring(0, 16) }}...
               </div>
             </div>

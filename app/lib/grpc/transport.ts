@@ -258,13 +258,13 @@ export class GrpcWebTransport {
         const transportError = err instanceof TransportError
           ? err
           : new TransportError(
-            `Unexpected error: ${(err as Error).message}`,
-            TransportErrorCode.NETWORK,
-            undefined,
-            undefined,
-            true,
-            err as Error
-          )
+              `Unexpected error: ${(err as Error).message}`,
+              TransportErrorCode.NETWORK,
+              undefined,
+              undefined,
+              true,
+              err as Error
+            )
 
         lastError = transportError
 

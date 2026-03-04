@@ -547,7 +547,8 @@ export function useProctoringSession(config: SessionConfig) {
   // -------------------------------------------------------------------------
 
   const metrics: ComputedRef<SessionMetrics> = computed(() => {
-    const durationSec = status.value === 'idle' ? 0
+    const durationSec = status.value === 'idle'
+      ? 0
       : (Date.now() - startedAt.value) / 1000
 
     return {

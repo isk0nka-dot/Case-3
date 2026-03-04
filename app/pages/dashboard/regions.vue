@@ -38,7 +38,7 @@ const maxStudents = computed(() =>
 // Top violations across all regions
 const topViolationCounts = computed(() => {
   const counts: Record<string, number> = {}
-  store.regions.forEach(r => {
+  store.regions.forEach((r) => {
     counts[r.topViolation] = (counts[r.topViolation] ?? 0) + 1
   })
   return Object.entries(counts)
@@ -51,10 +51,16 @@ const topViolationCounts = computed(() => {
   <div class="p-6 space-y-6">
     <!-- Page header -->
     <div>
-      <h1 class="text-2xl font-bold" style="color: var(--argus-text);">
+      <h1
+        class="text-2xl font-bold"
+        style="color: var(--argus-text);"
+      >
         Regional Analysis
       </h1>
-      <p class="text-sm mt-1" style="color: var(--argus-text-dimmed);">
+      <p
+        class="text-sm mt-1"
+        style="color: var(--argus-text-dimmed);"
+      >
         Распределение студентов по регионам Казахстана и анализ нарушений
       </p>
     </div>
@@ -62,49 +68,85 @@ const topViolationCounts = computed(() => {
     <!-- Summary KPI cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       <div class="glass-card rounded-xl p-5">
-        <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-[11px] font-medium uppercase tracking-wider"
+          style="color: var(--argus-text-dimmed);"
+        >
           Всего студентов
         </p>
-        <p class="text-3xl font-bold mt-2" style="color: var(--argus-text);">
+        <p
+          class="text-3xl font-bold mt-2"
+          style="color: var(--argus-text);"
+        >
           {{ store.totalStudentsAllRegions.toLocaleString() }}
         </p>
-        <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-xs mt-1.5"
+          style="color: var(--argus-text-dimmed);"
+        >
           {{ store.regions.length }} регионов
         </p>
       </div>
 
       <div class="glass-card rounded-xl p-5">
-        <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-[11px] font-medium uppercase tracking-wider"
+          style="color: var(--argus-text-dimmed);"
+        >
           Средний уровень нарушений
         </p>
-        <p class="text-3xl font-bold mt-2" :style="{ color: Number(store.avgViolationRateAllRegions) >= 3.5 ? 'var(--argus-warning)' : 'var(--argus-success)' }">
+        <p
+          class="text-3xl font-bold mt-2"
+          :style="{ color: Number(store.avgViolationRateAllRegions) >= 3.5 ? 'var(--argus-warning)' : 'var(--argus-success)' }"
+        >
           {{ store.avgViolationRateAllRegions }}%
         </p>
-        <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-xs mt-1.5"
+          style="color: var(--argus-text-dimmed);"
+        >
           Среднее по всем регионам
         </p>
       </div>
 
       <div class="glass-card rounded-xl p-5">
-        <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-[11px] font-medium uppercase tracking-wider"
+          style="color: var(--argus-text-dimmed);"
+        >
           Активные сессии
         </p>
-        <p class="text-3xl font-bold mt-2" style="color: var(--argus-text);">
+        <p
+          class="text-3xl font-bold mt-2"
+          style="color: var(--argus-text);"
+        >
           {{ store.regions.reduce((s, r) => s + r.activeSessions, 0) }}
         </p>
-        <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-xs mt-1.5"
+          style="color: var(--argus-text-dimmed);"
+        >
           По всем регионам
         </p>
       </div>
 
       <div class="glass-card rounded-xl p-5">
-        <p class="text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-[11px] font-medium uppercase tracking-wider"
+          style="color: var(--argus-text-dimmed);"
+        >
           Топ нарушение
         </p>
-        <p class="text-lg font-bold mt-2" style="color: var(--argus-error);">
+        <p
+          class="text-lg font-bold mt-2"
+          style="color: var(--argus-error);"
+        >
           {{ topViolationCounts[0]?.type ?? '—' }}
         </p>
-        <p class="text-xs mt-1.5" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-xs mt-1.5"
+          style="color: var(--argus-text-dimmed);"
+        >
           В {{ topViolationCounts[0]?.count ?? 0 }} регионах
         </p>
       </div>
@@ -114,14 +156,27 @@ const topViolationCounts = computed(() => {
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
       <!-- Student Distribution (bar chart representation) -->
       <div class="xl:col-span-2 glass-card rounded-xl overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+        <div
+          class="flex items-center justify-between px-5 py-4 border-b"
+          style="border-color: var(--argus-border);"
+        >
           <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-bar-chart-3" class="size-4" style="color: var(--argus-text-dimmed);" />
-            <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+            <UIcon
+              name="i-lucide-bar-chart-3"
+              class="size-4"
+              style="color: var(--argus-text-dimmed);"
+            />
+            <h2
+              class="text-sm font-semibold"
+              style="color: var(--argus-text);"
+            >
               Распределение студентов
             </h2>
           </div>
-          <span class="text-[10px] font-medium px-2 py-1 rounded-full" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
+          <span
+            class="text-[10px] font-medium px-2 py-1 rounded-full"
+            :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+          >
             {{ store.totalStudentsAllRegions.toLocaleString() }} всего
           </span>
         </div>
@@ -132,10 +187,16 @@ const topViolationCounts = computed(() => {
             :key="region.id"
             class="flex items-center gap-3"
           >
-            <span class="text-xs font-medium w-32 truncate text-right" style="color: var(--argus-text-muted);">
+            <span
+              class="text-xs font-medium w-32 truncate text-right"
+              style="color: var(--argus-text-muted);"
+            >
               {{ region.name }}
             </span>
-            <div class="flex-1 h-5 rounded overflow-hidden relative" style="background: var(--argus-bg-hover);">
+            <div
+              class="flex-1 h-5 rounded overflow-hidden relative"
+              style="background: var(--argus-bg-hover);"
+            >
               <div
                 class="h-full rounded transition-all duration-700 flex items-center"
                 :style="{
@@ -161,10 +222,20 @@ const topViolationCounts = computed(() => {
 
       <!-- Top Violations by Region -->
       <div class="glass-card rounded-xl overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+        <div
+          class="flex items-center justify-between px-5 py-4 border-b"
+          style="border-color: var(--argus-border);"
+        >
           <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-shield-alert" class="size-4" style="color: var(--argus-error);" />
-            <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+            <UIcon
+              name="i-lucide-shield-alert"
+              class="size-4"
+              style="color: var(--argus-error);"
+            />
+            <h2
+              class="text-sm font-semibold"
+              style="color: var(--argus-text);"
+            >
               Типы нарушений
             </h2>
           </div>
@@ -176,7 +247,10 @@ const topViolationCounts = computed(() => {
             :key="item.type"
             class="flex items-center justify-between"
           >
-            <span class="text-sm" style="color: var(--argus-text);">{{ item.type }}</span>
+            <span
+              class="text-sm"
+              style="color: var(--argus-text);"
+            >{{ item.type }}</span>
             <div class="flex items-center gap-2">
               <div class="flex">
                 <div
@@ -186,7 +260,10 @@ const topViolationCounts = computed(() => {
                   :style="{ background: 'var(--argus-accent)' }"
                 />
               </div>
-              <span class="text-xs font-medium" style="color: var(--argus-text-dimmed);">
+              <span
+                class="text-xs font-medium"
+                style="color: var(--argus-text-dimmed);"
+              >
                 {{ item.count }} рег.
               </span>
             </div>
@@ -194,22 +271,46 @@ const topViolationCounts = computed(() => {
         </div>
 
         <!-- Integrity score legend -->
-        <div class="px-5 py-4 border-t" style="border-color: var(--argus-border);">
-          <p class="text-[10px] font-medium uppercase tracking-wider mb-3" style="color: var(--argus-text-dimmed);">
+        <div
+          class="px-5 py-4 border-t"
+          style="border-color: var(--argus-border);"
+        >
+          <p
+            class="text-[10px] font-medium uppercase tracking-wider mb-3"
+            style="color: var(--argus-text-dimmed);"
+          >
             Шкала честности
           </p>
           <div class="space-y-2">
             <div class="flex items-center gap-2">
-              <div class="w-8 h-1.5 rounded-full" :style="{ background: isDark ? 'linear-gradient(90deg, #34D399, #10B981)' : 'linear-gradient(90deg, #10A34A, #0D8A3E)' }" />
-              <span class="text-[11px]" style="color: var(--argus-text-dimmed);">85%+ — Отлично</span>
+              <div
+                class="w-8 h-1.5 rounded-full"
+                :style="{ background: isDark ? 'linear-gradient(90deg, #34D399, #10B981)' : 'linear-gradient(90deg, #10A34A, #0D8A3E)' }"
+              />
+              <span
+                class="text-[11px]"
+                style="color: var(--argus-text-dimmed);"
+              >85%+ — Отлично</span>
             </div>
             <div class="flex items-center gap-2">
-              <div class="w-8 h-1.5 rounded-full" :style="{ background: isDark ? 'linear-gradient(90deg, #38BDF8, #0EA5E9)' : 'linear-gradient(90deg, #2563EB, #1D4ED8)' }" />
-              <span class="text-[11px]" style="color: var(--argus-text-dimmed);">80–84% — Хорошо</span>
+              <div
+                class="w-8 h-1.5 rounded-full"
+                :style="{ background: isDark ? 'linear-gradient(90deg, #38BDF8, #0EA5E9)' : 'linear-gradient(90deg, #2563EB, #1D4ED8)' }"
+              />
+              <span
+                class="text-[11px]"
+                style="color: var(--argus-text-dimmed);"
+              >80–84% — Хорошо</span>
             </div>
             <div class="flex items-center gap-2">
-              <div class="w-8 h-1.5 rounded-full" :style="{ background: isDark ? 'linear-gradient(90deg, #FBBF24, #F59E0B)' : 'linear-gradient(90deg, #E67E22, #C96E1A)' }" />
-              <span class="text-[11px]" style="color: var(--argus-text-dimmed);">Ниже 80% — Внимание</span>
+              <div
+                class="w-8 h-1.5 rounded-full"
+                :style="{ background: isDark ? 'linear-gradient(90deg, #FBBF24, #F59E0B)' : 'linear-gradient(90deg, #E67E22, #C96E1A)' }"
+              />
+              <span
+                class="text-[11px]"
+                style="color: var(--argus-text-dimmed);"
+              >Ниже 80% — Внимание</span>
             </div>
           </div>
         </div>
@@ -218,10 +319,20 @@ const topViolationCounts = computed(() => {
 
     <!-- Detailed Regions Table -->
     <div class="glass-card rounded-xl overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-4 border-b" style="border-color: var(--argus-border);">
+      <div
+        class="flex items-center justify-between px-5 py-4 border-b"
+        style="border-color: var(--argus-border);"
+      >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-map" class="size-4" style="color: var(--argus-text-dimmed);" />
-          <h2 class="text-sm font-semibold" style="color: var(--argus-text);">
+          <UIcon
+            name="i-lucide-map"
+            class="size-4"
+            style="color: var(--argus-text-dimmed);"
+          />
+          <h2
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
             Данные по регионам
           </h2>
         </div>
@@ -231,13 +342,48 @@ const topViolationCounts = computed(() => {
         <table class="w-full text-sm">
           <thead>
             <tr style="border-bottom: 1px solid var(--argus-border);">
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Регион</th>
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Область</th>
-              <th class="text-right px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Студенты</th>
-              <th class="text-right px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Сессии</th>
-              <th class="text-right px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Нарушения</th>
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Честность</th>
-              <th class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Топ нарушение</th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Регион
+              </th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Область
+              </th>
+              <th
+                class="text-right px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Студенты
+              </th>
+              <th
+                class="text-right px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Сессии
+              </th>
+              <th
+                class="text-right px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Нарушения
+              </th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Честность
+              </th>
+              <th
+                class="text-left px-5 py-3 text-[11px] font-medium uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Топ нарушение
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -249,12 +395,28 @@ const topViolationCounts = computed(() => {
               @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--argus-bg-hover)'"
               @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
             >
-              <td class="px-5 py-3 font-medium" style="color: var(--argus-text);">{{ region.name }}</td>
-              <td class="px-5 py-3 text-xs" style="color: var(--argus-text-dimmed);">{{ region.nameKz }}</td>
-              <td class="px-5 py-3 text-right font-mono tabular-nums" style="color: var(--argus-text-muted);">
+              <td
+                class="px-5 py-3 font-medium"
+                style="color: var(--argus-text);"
+              >
+                {{ region.name }}
+              </td>
+              <td
+                class="px-5 py-3 text-xs"
+                style="color: var(--argus-text-dimmed);"
+              >
+                {{ region.nameKz }}
+              </td>
+              <td
+                class="px-5 py-3 text-right font-mono tabular-nums"
+                style="color: var(--argus-text-muted);"
+              >
                 {{ region.students.toLocaleString() }}
               </td>
-              <td class="px-5 py-3 text-right font-mono tabular-nums" style="color: var(--argus-text-muted);">
+              <td
+                class="px-5 py-3 text-right font-mono tabular-nums"
+                style="color: var(--argus-text-muted);"
+              >
                 {{ region.activeSessions }}
               </td>
               <td class="px-5 py-3 text-right">
@@ -267,16 +429,25 @@ const topViolationCounts = computed(() => {
               </td>
               <td class="px-5 py-3">
                 <div class="flex items-center gap-2 min-w-28">
-                  <div class="flex-1 h-1.5 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
+                  <div
+                    class="flex-1 h-1.5 rounded-full overflow-hidden"
+                    style="background: var(--argus-bg-hover);"
+                  >
                     <div
                       class="h-full rounded-full transition-all duration-500"
                       :style="{ width: `${region.avgIntegrity}%`, background: integrityGradient(region.avgIntegrity) }"
                     />
                   </div>
-                  <span class="text-xs font-mono tabular-nums" style="color: var(--argus-text-dimmed);">{{ region.avgIntegrity }}%</span>
+                  <span
+                    class="text-xs font-mono tabular-nums"
+                    style="color: var(--argus-text-dimmed);"
+                  >{{ region.avgIntegrity }}%</span>
                 </div>
               </td>
-              <td class="px-5 py-3 text-xs" style="color: var(--argus-text-dimmed);">
+              <td
+                class="px-5 py-3 text-xs"
+                style="color: var(--argus-text-dimmed);"
+              >
                 {{ region.topViolation }}
               </td>
             </tr>

@@ -140,7 +140,10 @@ onUnmounted(() => {
         @click.self="close"
       >
         <!-- Backdrop -->
-        <div class="absolute inset-0" style="background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px);" />
+        <div
+          class="absolute inset-0"
+          style="background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px);"
+        />
 
         <!-- Modal Panel -->
         <div
@@ -160,7 +163,10 @@ onUnmounted(() => {
             class="absolute top-4 right-4 flex items-center justify-center size-8 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/5 transition-all"
             @click="close"
           >
-            <UIcon name="i-lucide-x" class="size-5" />
+            <UIcon
+              name="i-lucide-x"
+              class="size-5"
+            />
           </button>
 
           <!-- Header -->
@@ -168,12 +174,19 @@ onUnmounted(() => {
             <div class="inline-flex items-center justify-center mb-4">
               <ArgusLogo :size="40" />
             </div>
-            <h2 class="text-xl font-bold text-white">Вход в систему</h2>
-            <p class="text-sm text-white/40 mt-1">Argus AI — Панель прокторинга</p>
+            <h2 class="text-xl font-bold text-white">
+              Вход в систему
+            </h2>
+            <p class="text-sm text-white/40 mt-1">
+              Argus AI — Панель прокторинга
+            </p>
           </div>
 
           <!-- Form -->
-          <form class="space-y-5" @submit.prevent="handleSubmit">
+          <form
+            class="space-y-5"
+            @submit.prevent="handleSubmit"
+          >
             <!-- Phone field -->
             <div>
               <label class="block text-sm font-medium text-white/60 mb-2">Номер телефона</label>
@@ -196,7 +209,7 @@ onUnmounted(() => {
                   autocomplete="tel"
                   class="flex-1 bg-transparent px-4 py-3 text-sm text-white placeholder-white/20 outline-none"
                   @input="onPhoneInput"
-                />
+                >
               </div>
             </div>
 
@@ -209,7 +222,7 @@ onUnmounted(() => {
                 placeholder="Введите пароль"
                 autocomplete="current-password"
                 class="login-input w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 outline-none transition-all"
-              />
+              >
             </div>
 
             <!-- Error message -->
@@ -219,7 +232,10 @@ onUnmounted(() => {
                 class="flex items-center gap-2 px-4 py-3 rounded-xl text-sm"
                 style="background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.2); color: #F87171;"
               >
-                <UIcon name="i-lucide-alert-circle" class="size-4 shrink-0" />
+                <UIcon
+                  name="i-lucide-alert-circle"
+                  class="size-4 shrink-0"
+                />
                 <span>{{ errorMessage }}</span>
               </div>
             </Transition>

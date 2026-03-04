@@ -746,7 +746,7 @@ export interface SidecamPairingSession {
   state: SidecamPairingState
   pairingToken: string
   pairingCode: string
-  deviceToken?: string  // Fix 12: Post-pairing device auth token
+  deviceToken?: string // Fix 12: Post-pairing device auth token
   createdAt: string
   expiresAt: string
   connectedAt?: string
@@ -884,7 +884,7 @@ export function useAdminAPI() {
     path: string,
     body?: unknown,
     requireAuth = true,
-    extraHeaders?: Record<string, string>,
+    extraHeaders?: Record<string, string>
   ): Promise<T> {
     const url = `${baseURL.value}${path}`
     const cacheKey = `${method}:${url}`
@@ -955,11 +955,11 @@ export function useAdminAPI() {
     url: string,
     body?: unknown,
     requireAuth = true,
-    extraHeaders?: Record<string, string>,
+    extraHeaders?: Record<string, string>
   ): Promise<T> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...extraHeaders, // Fix 12: Support device token headers
+      ...extraHeaders // Fix 12: Support device token headers
     }
 
     if (requireAuth) {
@@ -1179,16 +1179,16 @@ export function useAdminAPI() {
     return request<ActiveSessionsResponse>('GET', `/api/v1/monitoring/active-sessions${qs ? `?${qs}` : ''}`)
   }
 
-  async function warnSession(sessionId: string, message?: string): Promise<{ status: string; sessionId: string; message: string }> {
-    return request<{ status: string; sessionId: string; message: string }>(
+  async function warnSession(sessionId: string, message?: string): Promise<{ status: string, sessionId: string, message: string }> {
+    return request<{ status: string, sessionId: string, message: string }>(
       'POST',
       `/api/v1/monitoring/sessions/${sessionId}/warn`,
       { message: message || 'Проктор отправил предупреждение студенту' }
     )
   }
 
-  async function terminateSession(sessionId: string, reason?: string): Promise<{ status: string; sessionId: string; reason: string }> {
-    return request<{ status: string; sessionId: string; reason: string }>(
+  async function terminateSession(sessionId: string, reason?: string): Promise<{ status: string, sessionId: string, reason: string }> {
+    return request<{ status: string, sessionId: string, reason: string }>(
       'POST',
       `/api/v1/monitoring/sessions/${sessionId}/terminate`,
       { reason: reason || 'Сессия завершена проктором' }
@@ -1249,8 +1249,8 @@ export function useAdminAPI() {
     return request<ReviewDecision>('POST', `/api/v1/archive/sessions/${sessionId}/review`, data)
   }
 
-  async function getReview(sessionId: string): Promise<ReviewDecision | { sessionId: string; status: string; message: string }> {
-    return request<ReviewDecision | { sessionId: string; status: string; message: string }>(
+  async function getReview(sessionId: string): Promise<ReviewDecision | { sessionId: string, status: string, message: string }> {
+    return request<ReviewDecision | { sessionId: string, status: string, message: string }>(
       'GET', `/api/v1/archive/sessions/${sessionId}/review`
     )
   }
@@ -1283,7 +1283,7 @@ export function useAdminAPI() {
     return request('GET', '/api/v1/export')
   }
 
-  async function createExportJob(sessionIds: string[]): Promise<{ id: string; status: string }> {
+  async function createExportJob(sessionIds: string[]): Promise<{ id: string, status: string }> {
     return request('POST', '/api/v1/export/bulk', { sessionIds })
   }
 
@@ -1333,14 +1333,14 @@ export function useAdminAPI() {
     examId: string
     studentId: string
     reason: string
-  }): Promise<{ id: string; status: string }> {
+  }): Promise<{ id: string, status: string }> {
     return request('POST', '/api/v1/appeals', data)
   }
 
   async function reviewAppeal(appealId: string, data: {
     status: 'under_review' | 'upheld' | 'overturned' | 'withdrawn'
     reviewerNotes?: string
-  }): Promise<{ id: string; status: string }> {
+  }): Promise<{ id: string, status: string }> {
     return request('PUT', `/api/v1/appeals/${appealId}/review`, data)
   }
 
@@ -1426,7 +1426,7 @@ export function useAdminAPI() {
     sessionId: string
     pairingToken: string
     device: SidecamMobileDevice
-  }): Promise<{ status: string; session: SidecamPairingSession }> {
+  }): Promise<{ status: string, session: SidecamPairingSession }> {
     return request('POST', '/api/v1/sidecam/pair/complete', data)
   }
 
@@ -1454,7 +1454,7 @@ export function useAdminAPI() {
       sessionId,
       clientTs: new Date().toISOString(),
       frameRate,
-      droppedFrames,
+      droppedFrames
     }, false, hdrs)
   }
 
@@ -1473,16 +1473,16 @@ export function useAdminAPI() {
 
   // ── Media (WebRTC / LiveKit) ────────────────────────────────────────────
 
-  async function getMediaToken(sessionId: string, role: 'student' | 'proctor' = 'proctor'): Promise<{ token: string; wsUrl: string; room: string }> {
-    return request<{ token: string; wsUrl: string; room: string }>(
+  async function getMediaToken(sessionId: string, role: 'student' | 'proctor' = 'proctor'): Promise<{ token: string, wsUrl: string, room: string }> {
+    return request<{ token: string, wsUrl: string, room: string }>(
       'POST',
       '/api/v1/media/token',
       { sessionId, role }
     )
   }
 
-  async function getMediaRooms(): Promise<{ livekitUrl: string; apiKey: string; status: string }> {
-    return request<{ livekitUrl: string; apiKey: string; status: string }>(
+  async function getMediaRooms(): Promise<{ livekitUrl: string, apiKey: string, status: string }> {
+    return request<{ livekitUrl: string, apiKey: string, status: string }>(
       'GET',
       '/api/v1/media/rooms'
     )
@@ -1535,7 +1535,7 @@ export function useAdminAPI() {
     return request<IPWhitelistEntry[]>('GET', `/api/v1/admin/organizations/${orgId}/ip-whitelist`)
   }
 
-  async function addIPWhitelist(orgId: string, data: { ip: string; label: string }): Promise<IPWhitelistEntry> {
+  async function addIPWhitelist(orgId: string, data: { ip: string, label: string }): Promise<IPWhitelistEntry> {
     return request<IPWhitelistEntry>('POST', `/api/v1/admin/organizations/${orgId}/ip-whitelist`, data)
   }
 

@@ -43,7 +43,10 @@ const steps = [
   <div class="my-8">
     <!-- Desktop: horizontal flow -->
     <div class="hidden md:flex items-start justify-between gap-2">
-      <template v-for="(step, i) in steps" :key="step.number">
+      <template
+        v-for="(step, i) in steps"
+        :key="step.number"
+      >
         <!-- Step card -->
         <button
           class="flex-1 rounded-xl border p-5 transition-all cursor-pointer group"
@@ -60,7 +63,11 @@ const steps = [
               class="flex items-center justify-center size-10 rounded-lg shrink-0"
               :style="{ background: `${step.color}15`, border: `1px solid ${step.color}30` }"
             >
-              <UIcon :name="step.icon" class="size-5" :style="{ color: step.color }" />
+              <UIcon
+                :name="step.icon"
+                class="size-5"
+                :style="{ color: step.color }"
+              />
             </div>
             <span
               class="text-[11px] font-bold uppercase tracking-wider"
@@ -69,10 +76,16 @@ const steps = [
               Step {{ step.number }}
             </span>
           </div>
-          <h4 class="text-sm font-semibold mb-1" style="color: var(--argus-text);">
+          <h4
+            class="text-sm font-semibold mb-1"
+            style="color: var(--argus-text);"
+          >
             {{ step.title }}
           </h4>
-          <p class="text-xs leading-relaxed" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-xs leading-relaxed"
+            style="color: var(--argus-text-dimmed);"
+          >
             {{ step.description }}
           </p>
         </button>
@@ -82,14 +95,21 @@ const steps = [
           v-if="i < steps.length - 1"
           class="flex items-center justify-center shrink-0 pt-8"
         >
-          <UIcon name="i-lucide-arrow-right" class="size-5" style="color: var(--argus-text-dimmed);" />
+          <UIcon
+            name="i-lucide-arrow-right"
+            class="size-5"
+            style="color: var(--argus-text-dimmed);"
+          />
         </div>
       </template>
     </div>
 
     <!-- Mobile: vertical flow -->
     <div class="md:hidden space-y-3">
-      <template v-for="(step, i) in steps" :key="step.number">
+      <template
+        v-for="(step, i) in steps"
+        :key="step.number"
+      >
         <button
           class="w-full rounded-xl border p-4 text-left transition-all cursor-pointer"
           :style="{
@@ -103,18 +123,31 @@ const steps = [
               class="flex items-center justify-center size-9 rounded-lg shrink-0"
               :style="{ background: `${step.color}15`, border: `1px solid ${step.color}30` }"
             >
-              <UIcon :name="step.icon" class="size-4" :style="{ color: step.color }" />
+              <UIcon
+                :name="step.icon"
+                class="size-4"
+                :style="{ color: step.color }"
+              />
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-0.5">
-                <span class="text-[10px] font-bold uppercase tracking-wider" :style="{ color: step.color }">
+                <span
+                  class="text-[10px] font-bold uppercase tracking-wider"
+                  :style="{ color: step.color }"
+                >
                   Step {{ step.number }}
                 </span>
-                <span class="text-sm font-semibold" style="color: var(--argus-text);">
+                <span
+                  class="text-sm font-semibold"
+                  style="color: var(--argus-text);"
+                >
                   {{ step.title }}
                 </span>
               </div>
-              <p class="text-xs" style="color: var(--argus-text-dimmed);">
+              <p
+                class="text-xs"
+                style="color: var(--argus-text-dimmed);"
+              >
                 {{ step.description }}
               </p>
             </div>
@@ -122,8 +155,15 @@ const steps = [
         </button>
 
         <!-- Vertical arrow -->
-        <div v-if="i < steps.length - 1" class="flex justify-center">
-          <UIcon name="i-lucide-arrow-down" class="size-4" style="color: var(--argus-text-dimmed);" />
+        <div
+          v-if="i < steps.length - 1"
+          class="flex justify-center"
+        >
+          <UIcon
+            name="i-lucide-arrow-down"
+            class="size-4"
+            style="color: var(--argus-text-dimmed);"
+          />
         </div>
       </template>
     </div>

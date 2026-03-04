@@ -11,14 +11,14 @@ export default withNuxt(
   // -------------------------------------------------------------------------
   {
     plugins: {
-      'argus': {
+      argus: {
         rules: {
-          'no-duplicate-utils': noDuplicateUtils,
-        },
-      },
+          'no-duplicate-utils': noDuplicateUtils
+        }
+      }
     },
     rules: {
-      'argus/no-duplicate-utils': 'error',
-    },
+      'argus/no-duplicate-utils': 'error'
+    }
   }
 )

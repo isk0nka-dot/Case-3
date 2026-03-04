@@ -53,8 +53,7 @@ export default defineNuxtRouteMiddleware((to) => {
           return // Allow access — user is authenticated
         }
       }
-    }
-    catch {
+    } catch {
       // Fall through to redirect
     }
   }

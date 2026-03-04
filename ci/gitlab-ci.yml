@@ -97,7 +97,6 @@ deploy-production:
     - job: lint
     - job: typecheck
   before_script:
-    - apk add --no-cache openssh-client
     # Load SSH key from GitLab CI File variable
     - eval $(ssh-agent -s)
     - chmod 600 "${DEPLOY_SSH_KEY}"

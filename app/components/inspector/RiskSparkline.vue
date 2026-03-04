@@ -91,8 +91,8 @@ onMounted(draw)
     ref="canvasRef"
     :style="{
       '--sparkline-color': color,
-      width: `${width}px`,
-      height: `${height}px`
+      'width': `${width}px`,
+      'height': `${height}px`
     }"
     class="block"
   />

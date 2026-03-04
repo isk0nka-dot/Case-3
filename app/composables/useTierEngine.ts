@@ -41,9 +41,9 @@ export interface TierVideoConfig {
   // When burstEnabled=true, the system captures at burstFps for
   // burstDurationSec every burstIntervalSec.
   burstEnabled?: boolean
-  burstFps?: number          // FPS during burst window (default: 1)
-  burstIntervalSec?: number  // seconds between burst starts (default: 30)
-  burstDurationSec?: number  // seconds each burst lasts (default: 5)
+  burstFps?: number // FPS during burst window (default: 1)
+  burstIntervalSec?: number // seconds between burst starts (default: 30)
+  burstDurationSec?: number // seconds each burst lasts (default: 5)
 }
 
 /** AI inference configuration per tier. */

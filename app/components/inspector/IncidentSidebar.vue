@@ -67,15 +67,24 @@ function clearFilter() {
 </script>
 
 <template>
-  <div class="flex flex-col h-full border-l border-[var(--argus-border)]" style="width: 320px; min-width: 320px;">
+  <div
+    class="flex flex-col h-full border-l border-[var(--argus-border)]"
+    style="width: 320px; min-width: 320px;"
+  >
     <!-- Header -->
     <div class="flex items-center justify-between px-4 py-3 border-b border-[var(--argus-border)]">
       <div class="flex items-center gap-2">
         <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-        <h3 class="text-sm font-semibold" style="color: var(--argus-text);">
+        <h3
+          class="text-sm font-semibold"
+          style="color: var(--argus-text);"
+        >
           Инциденты
         </h3>
-        <span class="text-xs tabular-nums" style="color: var(--argus-text-dimmed);">
+        <span
+          class="text-xs tabular-nums"
+          style="color: var(--argus-text-dimmed);"
+        >
           {{ feedStore.stats.eventsPerSecond }}/сек
         </span>
       </div>
@@ -91,7 +100,10 @@ function clearFilter() {
           }"
           @click="inspectorStore.toggleSilence()"
         >
-          <UIcon :name="inspectorStore.silenceMode ? 'i-lucide-bell-off' : 'i-lucide-bell'" class="size-3" />
+          <UIcon
+            :name="inspectorStore.silenceMode ? 'i-lucide-bell-off' : 'i-lucide-bell'"
+            class="size-3"
+          />
           {{ inspectorStore.silenceMode ? 'Тишина' : 'Звук' }}
         </button>
       </div>
@@ -103,8 +115,15 @@ function clearFilter() {
       class="px-4 py-2 border-b border-[var(--argus-border)] flex items-center gap-2"
       style="background: var(--argus-bg-elevated);"
     >
-      <UIcon name="i-lucide-filter" class="size-3" style="color: var(--argus-accent);" />
-      <span class="text-[10px] font-medium truncate" style="color: var(--argus-accent);">
+      <UIcon
+        name="i-lucide-filter"
+        class="size-3"
+        style="color: var(--argus-accent);"
+      />
+      <span
+        class="text-[10px] font-medium truncate"
+        style="color: var(--argus-accent);"
+      >
         {{ inspectorStore.sidebarFilterSessionId.substring(0, 12) }}...
       </span>
       <button
@@ -139,11 +158,17 @@ function clearFilter() {
         class="flex flex-col items-center justify-center h-full"
         style="color: var(--argus-text-dimmed);"
       >
-        <UIcon name="i-lucide-radio" class="w-8 h-8 mb-2 opacity-40" />
+        <UIcon
+          name="i-lucide-radio"
+          class="w-8 h-8 mb-2 opacity-40"
+        />
         <span class="text-sm">Ожидание событий...</span>
       </div>
 
-      <div v-else class="divide-y divide-[var(--argus-border-subtle)]">
+      <div
+        v-else
+        class="divide-y divide-[var(--argus-border-subtle)]"
+      >
         <div
           v-for="event in events"
           :key="event.id"
@@ -178,7 +203,10 @@ function clearFilter() {
                 >
                   {{ event.eventTypeLabel }}
                 </span>
-                <span class="text-[9px] tabular-nums" style="color: var(--argus-text-dimmed);">
+                <span
+                  class="text-[9px] tabular-nums"
+                  style="color: var(--argus-text-dimmed);"
+                >
                   {{ formatTimeAgoMs(event.receivedAt) }}
                 </span>
               </div>
@@ -191,11 +219,20 @@ function clearFilter() {
                 {{ event.label }}
               </p>
 
-              <div class="flex items-center gap-1.5 mt-0.5 text-[9px]" style="color: var(--argus-text-dimmed);">
-                <span class="truncate max-w-[80px]" :title="event.sessionId">
+              <div
+                class="flex items-center gap-1.5 mt-0.5 text-[9px]"
+                style="color: var(--argus-text-dimmed);"
+              >
+                <span
+                  class="truncate max-w-[80px]"
+                  :title="event.sessionId"
+                >
                   {{ event.sessionId.substring(0, 8) }}
                 </span>
-                <span v-if="event.confidence < 1" class="tabular-nums">
+                <span
+                  v-if="event.confidence < 1"
+                  class="tabular-nums"
+                >
                   {{ (event.confidence * 100).toFixed(0) }}%
                 </span>
               </div>
@@ -206,7 +243,10 @@ function clearFilter() {
     </div>
 
     <!-- Footer -->
-    <div class="px-4 py-2 border-t border-[var(--argus-border)] flex items-center justify-between text-[10px]" style="color: var(--argus-text-dimmed);">
+    <div
+      class="px-4 py-2 border-t border-[var(--argus-border)] flex items-center justify-between text-[10px]"
+      style="color: var(--argus-text-dimmed);"
+    >
       <span>{{ feedStore.stats.totalDisplayed.toLocaleString() }} событий</span>
       <span>{{ feedStore.stats.totalTelemetryAggregated.toLocaleString() }} тел.</span>
     </div>

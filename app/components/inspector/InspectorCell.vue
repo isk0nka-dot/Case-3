@@ -102,7 +102,10 @@ function formatStudentName(studentId: string): string {
     @mouseleave="hovered = false"
   >
     <!-- Video Feed -->
-    <div class="relative aspect-video overflow-hidden" style="background: var(--argus-bg-deep);">
+    <div
+      class="relative aspect-video overflow-hidden"
+      style="background: var(--argus-bg-deep);"
+    >
       <VideoPlayer
         ref="playerRef"
         :session-id="session.sessionId"
@@ -133,8 +136,14 @@ function formatStudentName(studentId: string): string {
 
       <!-- Risk Gauge (top-right) -->
       <div class="absolute top-1.5 right-1.5 z-10">
-        <div class="rounded-md p-0.5" :style="{ background: badgeBg }">
-          <RiskGauge :score="riskScore.composite" :size="compact ? 28 : 36" />
+        <div
+          class="rounded-md p-0.5"
+          :style="{ background: badgeBg }"
+        >
+          <RiskGauge
+            :score="riskScore.composite"
+            :size="compact ? 28 : 36"
+          />
         </div>
       </div>
 
@@ -145,7 +154,10 @@ function formatStudentName(studentId: string): string {
           class="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold"
           :style="{ background: badgeBg, color: 'var(--argus-error)' }"
         >
-          <UIcon name="i-lucide-shield-alert" class="size-2.5" />
+          <UIcon
+            name="i-lucide-shield-alert"
+            class="size-2.5"
+          />
           {{ session.criticalCount }}
         </div>
         <div
@@ -153,7 +165,10 @@ function formatStudentName(studentId: string): string {
           class="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold"
           :style="{ background: badgeBg, color: 'var(--argus-warning)' }"
         >
-          <UIcon name="i-lucide-alert-triangle" class="size-2.5" />
+          <UIcon
+            name="i-lucide-alert-triangle"
+            class="size-2.5"
+          />
           {{ session.warningCount }}
         </div>
       </div>
@@ -167,8 +182,16 @@ function formatStudentName(studentId: string): string {
           :disabled="capturing"
           @click.stop="handleCapture"
         >
-          <UIcon v-if="!capturing" name="i-lucide-camera" class="size-3" />
-          <span v-else class="size-3 animate-spin rounded-full border border-t-transparent" style="border-color: var(--argus-accent);" />
+          <UIcon
+            v-if="!capturing"
+            name="i-lucide-camera"
+            class="size-3"
+          />
+          <span
+            v-else
+            class="size-3 animate-spin rounded-full border border-t-transparent"
+            style="border-color: var(--argus-accent);"
+          />
           <template v-if="evidenceCount > 0">
             {{ evidenceCount }}
           </template>
@@ -177,13 +200,22 @@ function formatStudentName(studentId: string): string {
     </div>
 
     <!-- Card Footer (hidden in compact mode) -->
-    <div v-if="!compact" class="px-2.5 py-2 space-y-1.5">
+    <div
+      v-if="!compact"
+      class="px-2.5 py-2 space-y-1.5"
+    >
       <div class="flex items-center justify-between gap-1.5">
         <div class="min-w-0 flex-1">
-          <p class="text-xs font-semibold truncate" style="color: var(--argus-text);">
+          <p
+            class="text-xs font-semibold truncate"
+            style="color: var(--argus-text);"
+          >
             {{ formatStudentName(session.studentId) }}
           </p>
-          <p class="text-[9px] mt-0.5 truncate" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-[9px] mt-0.5 truncate"
+            style="color: var(--argus-text-dimmed);"
+          >
             {{ session.sessionId.substring(0, 12) }}...
           </p>
         </div>

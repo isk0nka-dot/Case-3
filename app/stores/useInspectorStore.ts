@@ -28,22 +28,22 @@ export type GridDensity = '2x2' | '3x3' | '4x4' | '5x5'
 
 export interface RiskScore {
   sessionId: string
-  composite: number        // 0-100 final score
-  violationWeight: number  // 0-30
-  severityWeight: number   // 0-25
-  recencyWeight: number    // 0-25
+  composite: number // 0-100 final score
+  violationWeight: number // 0-30
+  severityWeight: number // 0-25
+  recencyWeight: number // 0-25
   confidenceWeight: number // 0-20
-  trend: number[]          // last 12 values (5s intervals = 60s history)
+  trend: number[] // last 12 values (5s intervals = 60s history)
 }
 
 export interface EvidencePacket {
   id: string
   sessionId: string
   timestamp: number
-  frameDataUrl: string     // JPEG data URL from canvas capture
-  frameSha256: string      // integrity hash
+  frameDataUrl: string // JPEG data URL from canvas capture
+  frameSha256: string // integrity hash
   aiMetadata: {
-    headPose: { yaw: number; pitch: number; roll: number } | null
+    headPose: { yaw: number, pitch: number, roll: number } | null
     audioClass: string | null
     gazeDirection: string | null
     livenessScore: number | null
@@ -66,9 +66,11 @@ function computeRiskScore(
   const violationWeight = Math.min(30, session.criticalCount * 6 + session.warningCount * 2)
 
   // Weight 2: Severity max (0-25 points)
-  const severityWeight = session.criticalCount > 0 ? 25
-    : session.warningCount > 0 ? 12
-    : 0
+  const severityWeight = session.criticalCount > 0
+    ? 25
+    : session.warningCount > 0
+      ? 12
+      : 0
 
   // Weight 3: Recency — events in last 60 seconds (0-25 points)
   const recentCount = sessionEvents.filter(e => now - e.receivedAt < 60_000).length

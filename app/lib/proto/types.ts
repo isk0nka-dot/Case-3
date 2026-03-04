@@ -78,8 +78,8 @@ export enum EventType {
   // Engagement Risk Signals (50-52)
   // NOTE: Previously labeled "Psychometry events". Re-classified as
   // non-diagnostic engagement risk signals for privacy compliance (v2.1).
-  EMOTION_STRESS_SPIKE = 50,          // Legacy name retained for wire compat
-  ENGAGEMENT_RISK_ELEVATED = 50,      // v2.1 alias — preferred label
+  EMOTION_STRESS_SPIKE = 50, // Legacy name retained for wire compat
+  ENGAGEMENT_RISK_ELEVATED = 50, // v2.1 alias — preferred label
   FOCUS_LOSS_DETECTED = 51,
   BLINK_PATTERN_ANOMALY = 52,
 
@@ -334,36 +334,36 @@ export interface KernelPayload {
 
 /** Head pose estimation from 3D face landmark regression. */
 export interface HeadPosePayload {
-  yaw: number        // degrees, negative=left, positive=right
-  pitch: number      // degrees, negative=down, positive=up
-  roll: number       // degrees, negative=tilt left, positive=tilt right
-  faceX: number      // bbox normalized 0-1
+  yaw: number // degrees, negative=left, positive=right
+  pitch: number // degrees, negative=down, positive=up
+  roll: number // degrees, negative=tilt left, positive=tilt right
+  faceX: number // bbox normalized 0-1
   faceY: number
   faceW: number
   faceH: number
-  ipdPx: number      // inter-pupillary distance in pixels
+  ipdPx: number // inter-pupillary distance in pixels
   landmarkCount: number
   inferenceMs: number
 }
 
 /** Multi-factor liveness verification result. */
 export interface LivenessPayload {
-  livenessScore: number       // 0=spoof, 1=real
+  livenessScore: number // 0=spoof, 1=real
   blinkDetected: boolean
   blinkRatePerMin: number
-  textureScore: number        // detects photos/screen replays
-  depthScore: number          // detects flat surfaces
-  spoofVector: string         // "photo", "screen_replay", "mask", "deepfake", "none"
-  frameQuality: number        // 0-1
+  textureScore: number // detects photos/screen replays
+  depthScore: number // detects flat surfaces
+  spoofVector: string // "photo", "screen_replay", "mask", "deepfake", "none"
+  frameQuality: number // 0-1
 }
 
 /** 512-dim face embedding for continuous identity verification. */
 export interface FaceEmbeddingPayload {
-  embedding: number[]         // 512-dimensional vector
-  similarity: number          // cosine similarity to enrolled reference
-  identityMatch: boolean      // >0.65 threshold
+  embedding: number[] // 512-dimensional vector
+  similarity: number // cosine similarity to enrolled reference
+  identityMatch: boolean // >0.65 threshold
   modelVersion: string
-  alignmentQuality: number    // 0-1
+  alignmentQuality: number // 0-1
 }
 
 // ---------------------------------------------------------------------------
@@ -372,34 +372,34 @@ export interface FaceEmbeddingPayload {
 
 /** Audio analysis — SAD + anomaly classification. All processing is local. */
 export interface AudioAnalysisPayload {
-  rmsDb: number                     // A-weighted RMS dB
-  vadActive: boolean                // Voice Activity Detection
-  vadConfidence: number             // 0-1
-  spectralCentroidHz: number        // frequency centroid
-  zcr: number                       // zero-crossing rate
-  classification: string            // "silence"|"speech"|"whisper"|"music"|"keyboard"|"ambient"
-  classificationConfidence: number  // 0-1
+  rmsDb: number // A-weighted RMS dB
+  vadActive: boolean // Voice Activity Detection
+  vadConfidence: number // 0-1
+  spectralCentroidHz: number // frequency centroid
+  zcr: number // zero-crossing rate
+  classification: string // "silence"|"speech"|"whisper"|"music"|"keyboard"|"ambient"
+  classificationConfidence: number // 0-1
   speakerCount: number
-  speakerMatch: boolean             // matches enrolled voiceprint
-  speakerSimilarity: number         // cosine similarity to reference
+  speakerMatch: boolean // matches enrolled voiceprint
+  speakerSimilarity: number // cosine similarity to reference
   segmentDurationMs: number
 }
 
 /** Union type for all event payloads. */
-export type EventPayload =
-  | { type: 'gazeDeviation'; data: GazeDeviationPayload }
-  | { type: 'faceDetection'; data: FaceDetectionPayload }
-  | { type: 'objectDetection'; data: ObjectDetectionPayload }
-  | { type: 'audio'; data: AudioPayload }
-  | { type: 'browser'; data: BrowserPayload }
-  | { type: 'system'; data: SystemPayload }
-  | { type: 'psychometry'; data: PsychometryPayload }
-  | { type: 'network'; data: NetworkPayload }
-  | { type: 'kernel'; data: KernelPayload }
-  | { type: 'headPose'; data: HeadPosePayload }
-  | { type: 'liveness'; data: LivenessPayload }
-  | { type: 'faceEmbedding'; data: FaceEmbeddingPayload }
-  | { type: 'audioAnalysis'; data: AudioAnalysisPayload }
+export type EventPayload
+  = | { type: 'gazeDeviation', data: GazeDeviationPayload }
+    | { type: 'faceDetection', data: FaceDetectionPayload }
+    | { type: 'objectDetection', data: ObjectDetectionPayload }
+    | { type: 'audio', data: AudioPayload }
+    | { type: 'browser', data: BrowserPayload }
+    | { type: 'system', data: SystemPayload }
+    | { type: 'psychometry', data: PsychometryPayload }
+    | { type: 'network', data: NetworkPayload }
+    | { type: 'kernel', data: KernelPayload }
+    | { type: 'headPose', data: HeadPosePayload }
+    | { type: 'liveness', data: LivenessPayload }
+    | { type: 'faceEmbedding', data: FaceEmbeddingPayload }
+    | { type: 'audioAnalysis', data: AudioAnalysisPayload }
 
 // ---------------------------------------------------------------------------
 // Client Metadata

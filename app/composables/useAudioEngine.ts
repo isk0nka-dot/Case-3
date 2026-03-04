@@ -29,37 +29,37 @@ import type { AudioAnalysisPayload } from '~/lib/proto/types'
 
 export interface AudioFrame {
   timestamp: number
-  rmsDb: number                     // A-weighted RMS in dB
-  peakDb: number                    // peak amplitude in dB
-  vadActive: boolean                // Voice Activity Detection
-  vadConfidence: number             // 0-1
-  spectralCentroidHz: number        // frequency centroid
-  zcr: number                       // zero-crossing rate (normalized)
+  rmsDb: number // A-weighted RMS in dB
+  peakDb: number // peak amplitude in dB
+  vadActive: boolean // Voice Activity Detection
+  vadConfidence: number // 0-1
+  spectralCentroidHz: number // frequency centroid
+  zcr: number // zero-crossing rate (normalized)
   classification: AudioClass
   classificationConfidence: number
   speakerCount: number
   frequencyBands: FrequencyBands
-  waveform: Float32Array            // last 128 time-domain samples for visualization
+  waveform: Float32Array // last 128 time-domain samples for visualization
 }
 
 export type AudioClass = 'silence' | 'speech' | 'whisper' | 'music' | 'keyboard' | 'ambient'
 
 export interface FrequencyBands {
-  sub: number     // 20-200 Hz (rumble, bass)
-  low: number     // 200-500 Hz (voice fundamental)
-  mid: number     // 500-2000 Hz (voice formants)
-  high: number    // 2000-6000 Hz (consonants, harmonics)
+  sub: number // 20-200 Hz (rumble, bass)
+  low: number // 200-500 Hz (voice fundamental)
+  mid: number // 500-2000 Hz (voice formants)
+  high: number // 2000-6000 Hz (consonants, harmonics)
   presence: number // 6000-16000 Hz (sibilance, noise)
 }
 
 export interface AudioEngineConfig {
-  sampleRate?: number         // default 16000 (16kHz — sufficient for speech)
-  fftSize?: number            // default 2048
-  analysisHz?: number         // default 10
-  vadThresholdDb?: number     // default -40 (below = silence)
+  sampleRate?: number // default 16000 (16kHz — sufficient for speech)
+  fftSize?: number // default 2048
+  analysisHz?: number // default 10
+  vadThresholdDb?: number // default -40 (below = silence)
   whisperThresholdDb?: number // default -30 (speech below this = whisper)
-  speechThresholdDb?: number  // default -20 (clear speech above this)
-  noiseFloorDb?: number       // default -60
+  speechThresholdDb?: number // default -20 (clear speech above this)
+  noiseFloorDb?: number // default -60
 }
 
 export interface AudioEngineState {
@@ -92,10 +92,10 @@ function aWeightFactor(freqHz: number): number {
   if (freqHz < 20) return 0
   const f2 = freqHz * freqHz
   const num = 12194 * 12194 * f2 * f2
-  const den =
-    (f2 + 20.6 * 20.6) *
-    Math.sqrt((f2 + 107.7 * 107.7) * (f2 + 737.9 * 737.9)) *
-    (f2 + 12194 * 12194)
+  const den
+    = (f2 + 20.6 * 20.6)
+      * Math.sqrt((f2 + 107.7 * 107.7) * (f2 + 737.9 * 737.9))
+      * (f2 + 12194 * 12194)
   const ra = num / (den + 1e-20)
   return 20 * Math.log10(ra + 1e-20) + 2.0 // dB correction relative to 1kHz
 }
@@ -211,11 +211,7 @@ export function useAudioEngine(config: AudioEngineConfig = {}) {
     for (let i = 0; i < freqData.length; i++) {
       const freq = i * binHz
       const val = freqData[i] ?? -100
-      if (freq < 200) { bands.sub += val; counts.sub++ }
-      else if (freq < 500) { bands.low += val; counts.low++ }
-      else if (freq < 2000) { bands.mid += val; counts.mid++ }
-      else if (freq < 6000) { bands.high += val; counts.high++ }
-      else { bands.presence += val; counts.presence++ }
+      if (freq < 200) { bands.sub += val; counts.sub++ } else if (freq < 500) { bands.low += val; counts.low++ } else if (freq < 2000) { bands.mid += val; counts.mid++ } else if (freq < 6000) { bands.high += val; counts.high++ } else { bands.presence += val; counts.presence++ }
     }
 
     return {
@@ -236,7 +232,7 @@ export function useAudioEngine(config: AudioEngineConfig = {}) {
     zcr: number,
     centroidHz: number,
     bands: FrequencyBands
-  ): { classification: AudioClass; confidence: number } {
+  ): { classification: AudioClass, confidence: number } {
     // Below noise floor = silence
     if (rmsDb < calibratedNoiseFloor + 5) {
       return { classification: 'silence', confidence: 0.95 }
@@ -286,7 +282,7 @@ export function useAudioEngine(config: AudioEngineConfig = {}) {
     rmsDb: number,
     zcr: number,
     centroidHz: number
-  ): { active: boolean; confidence: number } {
+  ): { active: boolean, confidence: number } {
     // Energy gate
     if (rmsDb < vadThresholdDb) {
       return { active: false, confidence: 0.9 }
@@ -400,8 +396,8 @@ export function useAudioEngine(config: AudioEngineConfig = {}) {
           sampleRate: { ideal: sampleRate },
           channelCount: 1,
           echoCancellation: true,
-          noiseSuppression: false,  // We want raw audio for analysis
-          autoGainControl: false    // Preserve natural dynamics
+          noiseSuppression: false, // We want raw audio for analysis
+          autoGainControl: false // Preserve natural dynamics
         }
       })
 

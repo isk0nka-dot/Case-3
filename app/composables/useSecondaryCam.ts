@@ -21,7 +21,7 @@ import type {
   SidecamStreamHealth,
   SidecamDeviceDirective,
   SidecamMobileDevice,
-  SidecamQRPayload,
+  SidecamQRPayload
 } from '~/composables/useAdminAPI'
 
 // ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ export function useSecondaryCam() {
     phase: 'idle',
     lastDirective: null,
     streamHealth: null,
-    deviceToken: '',
+    deviceToken: ''
   })
 
   // Polling intervals
@@ -71,9 +71,9 @@ export function useSecondaryCam() {
   // ---------------------------------------------------------------------------
 
   const isConnected = computed(() =>
-    state.pairingSession?.state === 'connected' ||
-    state.pairingSession?.state === 'calibrating' ||
-    state.pairingSession?.state === 'ready'
+    state.pairingSession?.state === 'connected'
+    || state.pairingSession?.state === 'calibrating'
+    || state.pairingSession?.state === 'ready'
   )
 
   const isCalibrated = computed(() =>
@@ -359,7 +359,7 @@ export function useSecondaryCam() {
         }
       }
     },
-    { deep: true },
+    { deep: true }
   )
 
   // Cleanup on unmount
@@ -400,6 +400,6 @@ export function useSecondaryCam() {
     sendTelemetry,
     refreshSession,
     cleanup,
-    stopPolling,
+    stopPolling
   }
 }

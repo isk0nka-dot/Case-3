@@ -60,9 +60,9 @@ const orgAwareArchiveSessions = computed(() => {
   const q = store.archiveSearchQuery.trim().toLowerCase()
   if (q) {
     sessions = sessions.filter(s =>
-      s.studentName.toLowerCase().includes(q) ||
-      s.iin.includes(q) ||
-      s.phone.replace(/\s/g, '').includes(q.replace(/\s/g, ''))
+      s.studentName.toLowerCase().includes(q)
+      || s.iin.includes(q)
+      || s.phone.replace(/\s/g, '').includes(q.replace(/\s/g, ''))
     )
   }
 
@@ -308,13 +308,26 @@ onUnmounted(() => {
     <!-- Page Header -->
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <h1 class="text-2xl font-bold" style="color: var(--argus-text);">
+        <h1
+          class="text-2xl font-bold"
+          style="color: var(--argus-text);"
+        >
           Архив сессий
         </h1>
-        <p class="text-sm mt-1" style="color: var(--argus-text-dimmed);">
+        <p
+          class="text-sm mt-1"
+          style="color: var(--argus-text-dimmed);"
+        >
           Завершённые экзамены с записями и AI-анализом — {{ orgAwareArchiveStats.total }} сессий
-          <span v-if="store.archiveLoading" class="inline-flex items-center gap-1 ml-2 text-xs" style="color: var(--argus-accent);">
-            <span class="animate-spin inline-block size-3 border border-t-transparent rounded-full" style="border-color: var(--argus-accent); border-top-color: transparent;" />
+          <span
+            v-if="store.archiveLoading"
+            class="inline-flex items-center gap-1 ml-2 text-xs"
+            style="color: var(--argus-accent);"
+          >
+            <span
+              class="animate-spin inline-block size-3 border border-t-transparent rounded-full"
+              style="border-color: var(--argus-accent); border-top-color: transparent;"
+            />
             Загрузка...
           </span>
         </p>
@@ -322,16 +335,34 @@ onUnmounted(() => {
 
       <!-- Stats Badges -->
       <div class="flex items-center gap-3 flex-wrap">
-        <div class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full" :style="{ background: successBg(0.1), color: 'var(--argus-success)' }">
-          <UIcon name="i-lucide-check-circle" class="size-3.5" />
+        <div
+          class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full"
+          :style="{ background: successBg(0.1), color: 'var(--argus-success)' }"
+        >
+          <UIcon
+            name="i-lucide-check-circle"
+            class="size-3.5"
+          />
           {{ orgAwareArchiveStats.reviewed }} проверено
         </div>
-        <div class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full" :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }">
-          <UIcon name="i-lucide-clock" class="size-3.5" />
+        <div
+          class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full"
+          :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
+        >
+          <UIcon
+            name="i-lucide-clock"
+            class="size-3.5"
+          />
           {{ orgAwareArchiveStats.pending }} на проверке
         </div>
-        <div class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full" :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }">
-          <UIcon name="i-lucide-x-circle" class="size-3.5" />
+        <div
+          class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full"
+          :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }"
+        >
+          <UIcon
+            name="i-lucide-x-circle"
+            class="size-3.5"
+          />
           {{ orgAwareArchiveStats.voided }} аннулировано
         </div>
       </div>
@@ -341,7 +372,10 @@ onUnmounted(() => {
     <div class="glass-card rounded-xl px-4 py-3">
       <div class="flex items-center gap-3">
         <!-- Org Filter (Super Admin only) -->
-        <div v-if="authStore.isSuperAdmin" class="w-[18%] min-w-40 shrink-0">
+        <div
+          v-if="authStore.isSuperAdmin"
+          class="w-[18%] min-w-40 shrink-0"
+        >
           <div
             class="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs cursor-pointer"
             :style="{
@@ -350,7 +384,10 @@ onUnmounted(() => {
               color: authStore.selectedOrgId ? 'var(--argus-accent)' : 'var(--argus-text-dimmed)'
             }"
           >
-            <UIcon name="i-lucide-building-2" class="size-3.5 shrink-0" />
+            <UIcon
+              name="i-lucide-building-2"
+              class="size-3.5 shrink-0"
+            />
             <span class="truncate font-medium">
               {{ authStore.selectedOrgId ? store.getOrgName(authStore.selectedOrgId) : 'Все организации' }}
             </span>
@@ -377,7 +414,11 @@ onUnmounted(() => {
             boxShadow: searchFocused ? `0 0 0 3px ${accentBg(0.1)}` : 'none'
           }"
         >
-          <UIcon name="i-heroicons-magnifying-glass" class="size-4 shrink-0" :style="{ color: searchFocused ? 'var(--argus-accent)' : 'var(--argus-text-dimmed)' }" />
+          <UIcon
+            name="i-heroicons-magnifying-glass"
+            class="size-4 shrink-0"
+            :style="{ color: searchFocused ? 'var(--argus-accent)' : 'var(--argus-text-dimmed)' }"
+          />
           <input
             v-model="store.archiveSearchQuery"
             type="text"
@@ -387,7 +428,11 @@ onUnmounted(() => {
             @focus="searchFocused = true"
             @blur="searchFocused = false"
           >
-          <span v-if="store.archiveSearchQuery" class="text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
+          <span
+            v-if="store.archiveSearchQuery"
+            class="text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap"
+            :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+          >
             {{ orgAwareArchiveSessions.length }}
           </span>
         </div>
@@ -441,54 +486,136 @@ onUnmounted(() => {
       >
         <div class="flex items-start justify-between gap-2 mb-3">
           <div class="min-w-0 flex-1">
-            <p class="text-sm font-semibold truncate" style="color: var(--argus-text);">{{ exam.examName }}</p>
-            <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">{{ formatDate(exam.date) }}</p>
+            <p
+              class="text-sm font-semibold truncate"
+              style="color: var(--argus-text);"
+            >
+              {{ exam.examName }}
+            </p>
+            <p
+              class="text-[10px] mt-0.5"
+              style="color: var(--argus-text-dimmed);"
+            >
+              {{ formatDate(exam.date) }}
+            </p>
           </div>
           <div
             v-if="store.archiveSelectedExamId === exam.id"
             class="flex items-center justify-center size-5 rounded-full shrink-0"
             :style="{ background: accentBg(0.15) }"
           >
-            <UIcon name="i-lucide-check" class="size-3" style="color: var(--argus-accent);" />
+            <UIcon
+              name="i-lucide-check"
+              class="size-3"
+              style="color: var(--argus-accent);"
+            />
           </div>
         </div>
 
         <div class="grid grid-cols-3 gap-3">
           <div>
-            <p class="text-[9px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Участники</p>
-            <p class="text-sm font-bold mt-0.5" style="color: var(--argus-text);">{{ exam.participants }}</p>
+            <p
+              class="text-[9px] font-medium uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Участники
+            </p>
+            <p
+              class="text-sm font-bold mt-0.5"
+              style="color: var(--argus-text);"
+            >
+              {{ exam.participants }}
+            </p>
           </div>
           <div>
-            <p class="text-[9px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Честность</p>
-            <p class="text-sm font-bold mt-0.5" :style="{ color: integrityColor(exam.avgIntegrity) }">{{ exam.avgIntegrity }}%</p>
+            <p
+              class="text-[9px] font-medium uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Честность
+            </p>
+            <p
+              class="text-sm font-bold mt-0.5"
+              :style="{ color: integrityColor(exam.avgIntegrity) }"
+            >
+              {{ exam.avgIntegrity }}%
+            </p>
           </div>
           <div>
-            <p class="text-[9px] font-medium uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Нарушения</p>
-            <p class="text-sm font-bold mt-0.5" :style="{ color: exam.totalViolations > 30 ? 'var(--argus-error)' : 'var(--argus-text)' }">{{ exam.totalViolations }}</p>
+            <p
+              class="text-[9px] font-medium uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
+              Нарушения
+            </p>
+            <p
+              class="text-sm font-bold mt-0.5"
+              :style="{ color: exam.totalViolations > 30 ? 'var(--argus-error)' : 'var(--argus-text)' }"
+            >
+              {{ exam.totalViolations }}
+            </p>
           </div>
         </div>
 
         <!-- Status breakdown bar -->
-        <div class="mt-3 flex items-center gap-1 h-1.5 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
-          <div class="h-full rounded-full" :style="{ width: `${(exam.reviewed / exam.participants) * 100}%`, background: 'var(--argus-success)' }" />
-          <div class="h-full rounded-full" :style="{ width: `${(exam.pending / exam.participants) * 100}%`, background: 'var(--argus-warning)' }" />
-          <div v-if="exam.voided > 0" class="h-full rounded-full" :style="{ width: `${(exam.voided / exam.participants) * 100}%`, background: 'var(--argus-error)' }" />
+        <div
+          class="mt-3 flex items-center gap-1 h-1.5 rounded-full overflow-hidden"
+          style="background: var(--argus-bg-hover);"
+        >
+          <div
+            class="h-full rounded-full"
+            :style="{ width: `${(exam.reviewed / exam.participants) * 100}%`, background: 'var(--argus-success)' }"
+          />
+          <div
+            class="h-full rounded-full"
+            :style="{ width: `${(exam.pending / exam.participants) * 100}%`, background: 'var(--argus-warning)' }"
+          />
+          <div
+            v-if="exam.voided > 0"
+            class="h-full rounded-full"
+            :style="{ width: `${(exam.voided / exam.participants) * 100}%`, background: 'var(--argus-error)' }"
+          />
         </div>
         <div class="flex items-center gap-3 mt-1.5">
-          <span class="text-[8px] font-medium" style="color: var(--argus-success);">{{ exam.reviewed }} проверено</span>
-          <span class="text-[8px] font-medium" style="color: var(--argus-warning);">{{ exam.pending }} ожидает</span>
-          <span v-if="exam.voided > 0" class="text-[8px] font-medium" style="color: var(--argus-error);">{{ exam.voided }} аннул.</span>
+          <span
+            class="text-[8px] font-medium"
+            style="color: var(--argus-success);"
+          >{{ exam.reviewed }} проверено</span>
+          <span
+            class="text-[8px] font-medium"
+            style="color: var(--argus-warning);"
+          >{{ exam.pending }} ожидает</span>
+          <span
+            v-if="exam.voided > 0"
+            class="text-[8px] font-medium"
+            style="color: var(--argus-error);"
+          >{{ exam.voided }} аннул.</span>
         </div>
       </div>
     </div>
 
     <!-- ===== SESSION TABLE ===== -->
     <div class="glass-card rounded-xl overflow-hidden">
-      <div class="px-5 py-3.5 border-b flex items-center justify-between" style="border-color: var(--argus-border);">
+      <div
+        class="px-5 py-3.5 border-b flex items-center justify-between"
+        style="border-color: var(--argus-border);"
+      >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-archive" class="size-4" style="color: var(--argus-text-dimmed);" />
-          <h3 class="text-sm font-semibold" style="color: var(--argus-text);">Записи сессий</h3>
-          <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
+          <UIcon
+            name="i-lucide-archive"
+            class="size-4"
+            style="color: var(--argus-text-dimmed);"
+          />
+          <h3
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            Записи сессий
+          </h3>
+          <span
+            class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+            :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+          >
             {{ orgAwareArchiveSessions.length }} записей
           </span>
         </div>
@@ -498,14 +625,54 @@ onUnmounted(() => {
         <table class="w-full">
           <thead>
             <tr style="border-bottom: 1px solid var(--argus-border);">
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Студент</th>
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Экзамен</th>
-              <th class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Дата</th>
-              <th class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Длительность</th>
-              <th class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Честность</th>
-              <th class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Нарушения</th>
-              <th class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Статус</th>
-              <th class="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">Действия</th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Студент
+              </th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Экзамен
+              </th>
+              <th
+                class="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Дата
+              </th>
+              <th
+                class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Длительность
+              </th>
+              <th
+                class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Честность
+              </th>
+              <th
+                class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Нарушения
+              </th>
+              <th
+                class="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Статус
+              </th>
+              <th
+                class="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-wider"
+                style="color: var(--argus-text-dimmed);"
+              >
+                Действия
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -520,13 +687,28 @@ onUnmounted(() => {
             >
               <td class="px-5 py-3.5">
                 <div>
-                  <p class="text-sm font-medium" style="color: var(--argus-text);">{{ session.studentName }}</p>
-                  <p class="text-[10px] mt-0.5" style="color: var(--argus-text-dimmed);">ИИН: {{ session.iin }}</p>
+                  <p
+                    class="text-sm font-medium"
+                    style="color: var(--argus-text);"
+                  >
+                    {{ session.studentName }}
+                  </p>
+                  <p
+                    class="text-[10px] mt-0.5"
+                    style="color: var(--argus-text-dimmed);"
+                  >
+                    ИИН: {{ session.iin }}
+                  </p>
                 </div>
               </td>
               <td class="px-5 py-3.5">
                 <div class="flex items-center">
-                  <p class="text-xs font-medium truncate max-w-48" style="color: var(--argus-text-muted);">{{ session.examName }}</p>
+                  <p
+                    class="text-xs font-medium truncate max-w-48"
+                    style="color: var(--argus-text-muted);"
+                  >
+                    {{ session.examName }}
+                  </p>
                   <span
                     v-if="authStore.isSuperAdmin"
                     class="px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 ml-1"
@@ -541,16 +723,33 @@ onUnmounted(() => {
                 </div>
               </td>
               <td class="px-5 py-3.5">
-                <p class="text-xs" style="color: var(--argus-text-muted);">{{ formatDate(session.date) }}</p>
+                <p
+                  class="text-xs"
+                  style="color: var(--argus-text-muted);"
+                >
+                  {{ formatDate(session.date) }}
+                </p>
               </td>
               <td class="px-5 py-3.5 text-center">
-                <span class="text-xs font-medium" style="color: var(--argus-text);">{{ session.duration }}</span>
+                <span
+                  class="text-xs font-medium"
+                  style="color: var(--argus-text);"
+                >{{ session.duration }}</span>
               </td>
               <td class="px-5 py-3.5 text-center">
                 <div class="flex items-center justify-center gap-2">
-                  <span class="text-xs font-bold tabular-nums" :style="{ color: integrityColor(session.integrityScore) }">{{ session.integrityScore }}%</span>
-                  <div class="w-12 h-1 rounded-full overflow-hidden" style="background: var(--argus-bg-hover);">
-                    <div class="h-full rounded-full" :style="{ width: `${session.integrityScore}%`, background: integrityGradient(session.integrityScore) }" />
+                  <span
+                    class="text-xs font-bold tabular-nums"
+                    :style="{ color: integrityColor(session.integrityScore) }"
+                  >{{ session.integrityScore }}%</span>
+                  <div
+                    class="w-12 h-1 rounded-full overflow-hidden"
+                    style="background: var(--argus-bg-hover);"
+                  >
+                    <div
+                      class="h-full rounded-full"
+                      :style="{ width: `${session.integrityScore}%`, background: integrityGradient(session.integrityScore) }"
+                    />
                   </div>
                 </div>
               </td>
@@ -565,14 +764,21 @@ onUnmounted(() => {
                 >
                   {{ session.violationCount }}
                 </span>
-                <span v-else class="text-[10px] font-medium" style="color: var(--argus-text-dimmed);">0</span>
+                <span
+                  v-else
+                  class="text-[10px] font-medium"
+                  style="color: var(--argus-text-dimmed);"
+                >0</span>
               </td>
               <td class="px-5 py-3.5 text-center">
                 <span
                   class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full"
                   :style="{ background: statusBg(session.status, 0.1), color: statusColor(session.status) }"
                 >
-                  <UIcon :name="statusIcon(session.status)" class="size-3" />
+                  <UIcon
+                    :name="statusIcon(session.status)"
+                    class="size-3"
+                  />
                   {{ statusLabel(session.status) }}
                 </span>
               </td>
@@ -585,7 +791,10 @@ onUnmounted(() => {
                     @mouseleave="($event.currentTarget as HTMLElement).style.background = accentBg(0.08)"
                     @click.stop="openArchiveSession(session)"
                   >
-                    <UIcon name="i-lucide-play-circle" class="size-3" />
+                    <UIcon
+                      name="i-lucide-play-circle"
+                      class="size-3"
+                    />
                     Просмотр
                   </button>
                   <button
@@ -596,7 +805,10 @@ onUnmounted(() => {
                     @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
                     @click.stop="handleExportSession(session.id)"
                   >
-                    <UIcon name="i-lucide-download" class="size-3.5" />
+                    <UIcon
+                      name="i-lucide-download"
+                      class="size-3.5"
+                    />
                   </button>
                 </div>
               </td>
@@ -610,9 +822,23 @@ onUnmounted(() => {
         v-if="orgAwareArchiveSessions.length === 0"
         class="flex flex-col items-center justify-center py-16"
       >
-        <UIcon name="i-lucide-archive-x" class="size-12 mb-3" style="color: var(--argus-text-dimmed);" />
-        <p class="text-sm font-medium" style="color: var(--argus-text);">Нет записей по заданному фильтру</p>
-        <p class="text-xs mt-1" style="color: var(--argus-text-dimmed);">Измените критерии поиска или сбросьте фильтр</p>
+        <UIcon
+          name="i-lucide-archive-x"
+          class="size-12 mb-3"
+          style="color: var(--argus-text-dimmed);"
+        />
+        <p
+          class="text-sm font-medium"
+          style="color: var(--argus-text);"
+        >
+          Нет записей по заданному фильтру
+        </p>
+        <p
+          class="text-xs mt-1"
+          style="color: var(--argus-text-dimmed);"
+        >
+          Измените критерии поиска или сбросьте фильтр
+        </p>
         <button
           class="mt-4 px-4 py-2 rounded-lg text-xs font-medium transition-all"
           :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
@@ -643,18 +869,32 @@ onUnmounted(() => {
             :style="{ background: 'var(--argus-bg-card)', borderColor: 'var(--argus-border)' }"
           >
             <!-- Modal Header -->
-            <div class="flex items-center justify-between px-6 py-4 border-b shrink-0" style="border-color: var(--argus-border);">
+            <div
+              class="flex items-center justify-between px-6 py-4 border-b shrink-0"
+              style="border-color: var(--argus-border);"
+            >
               <div class="flex items-center gap-3">
                 <span
                   class="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
                   :style="{ background: statusBg(expandedArchive.status, 0.1), color: statusColor(expandedArchive.status) }"
                 >
-                  <UIcon :name="statusIcon(expandedArchive.status)" class="size-3.5" />
+                  <UIcon
+                    :name="statusIcon(expandedArchive.status)"
+                    class="size-3.5"
+                  />
                   <span class="text-[10px] font-bold uppercase">{{ statusLabel(expandedArchive.status) }}</span>
                 </span>
                 <div>
-                  <h2 class="text-lg font-bold" style="color: var(--argus-text);">{{ expandedArchive.studentName }}</h2>
-                  <p class="text-xs" style="color: var(--argus-text-dimmed);">
+                  <h2
+                    class="text-lg font-bold"
+                    style="color: var(--argus-text);"
+                  >
+                    {{ expandedArchive.studentName }}
+                  </h2>
+                  <p
+                    class="text-xs"
+                    style="color: var(--argus-text-dimmed);"
+                  >
                     ИИН: {{ expandedArchive.iin }} · {{ expandedArchive.phone }} · {{ expandedArchive.examName }}
                   </p>
                 </div>
@@ -668,7 +908,10 @@ onUnmounted(() => {
                   @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
                   @click="handleExportSession(expandedArchive.id)"
                 >
-                  <UIcon name="i-lucide-download" class="size-3.5" />
+                  <UIcon
+                    name="i-lucide-download"
+                    class="size-3.5"
+                  />
                   Скачать отчёт (JSON)
                 </button>
                 <button
@@ -678,7 +921,10 @@ onUnmounted(() => {
                   @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
                   @click="closeArchiveSession"
                 >
-                  <UIcon name="i-lucide-x" class="size-5" />
+                  <UIcon
+                    name="i-lucide-x"
+                    class="size-5"
+                  />
                 </button>
               </div>
             </div>
@@ -689,7 +935,10 @@ onUnmounted(() => {
                 <!-- Left: Video + Audio (5 cols) -->
                 <div class="lg:col-span-5 p-6 space-y-4">
                   <!-- Dual Camera Playback with Swap + Fullscreen -->
-                  <div class="flex gap-3" :class="camerasSwapped ? 'flex-row-reverse' : ''">
+                  <div
+                    class="flex gap-3"
+                    :class="camerasSwapped ? 'flex-row-reverse' : ''"
+                  >
                     <!-- PRIMARY: Webcam recording — fullscreenable -->
                     <div
                       ref="webcamRef"
@@ -704,13 +953,23 @@ onUnmounted(() => {
                     >
                       <div class="absolute inset-0 flex items-center justify-center">
                         <div class="flex flex-col items-center gap-3 opacity-25">
-                          <UIcon name="i-lucide-film" class="size-14" style="color: var(--argus-text-dimmed);" />
-                          <span class="text-xs font-medium" style="color: var(--argus-text-dimmed);">{{ camerasSwapped ? 'БОКОВАЯ КАМЕРА' : 'ЗАПИСЬ ВЕБ-КАМЕРЫ' }}</span>
+                          <UIcon
+                            name="i-lucide-film"
+                            class="size-14"
+                            style="color: var(--argus-text-dimmed);"
+                          />
+                          <span
+                            class="text-xs font-medium"
+                            style="color: var(--argus-text-dimmed);"
+                          >{{ camerasSwapped ? 'БОКОВАЯ КАМЕРА' : 'ЗАПИСЬ ВЕБ-КАМЕРЫ' }}</span>
                         </div>
                       </div>
 
                       <!-- Playback controls overlay -->
-                      <div class="absolute bottom-0 left-0 right-0 p-3 flex flex-col gap-2" :style="{ background: isDark ? 'linear-gradient(transparent, rgba(0,0,0,0.85))' : 'linear-gradient(transparent, rgba(0,0,0,0.55))' }">
+                      <div
+                        class="absolute bottom-0 left-0 right-0 p-3 flex flex-col gap-2"
+                        :style="{ background: isDark ? 'linear-gradient(transparent, rgba(0,0,0,0.85))' : 'linear-gradient(transparent, rgba(0,0,0,0.55))' }"
+                      >
                         <!-- Seek bar with event markers -->
                         <div class="relative">
                           <input
@@ -746,13 +1005,28 @@ onUnmounted(() => {
                               style="color: white; background: rgba(255,255,255,0.12);"
                               @click="togglePlayback"
                             >
-                              <UIcon :name="isPlaying ? 'i-lucide-pause' : 'i-lucide-play'" class="size-4" />
+                              <UIcon
+                                :name="isPlaying ? 'i-lucide-pause' : 'i-lucide-play'"
+                                class="size-4"
+                              />
                             </button>
-                            <button class="flex items-center justify-center size-7 rounded-md transition-all" style="color: rgba(255,255,255,0.7);">
-                              <UIcon name="i-lucide-skip-back" class="size-3.5" />
+                            <button
+                              class="flex items-center justify-center size-7 rounded-md transition-all"
+                              style="color: rgba(255,255,255,0.7);"
+                            >
+                              <UIcon
+                                name="i-lucide-skip-back"
+                                class="size-3.5"
+                              />
                             </button>
-                            <button class="flex items-center justify-center size-7 rounded-md transition-all" style="color: rgba(255,255,255,0.7);">
-                              <UIcon name="i-lucide-skip-forward" class="size-3.5" />
+                            <button
+                              class="flex items-center justify-center size-7 rounded-md transition-all"
+                              style="color: rgba(255,255,255,0.7);"
+                            >
+                              <UIcon
+                                name="i-lucide-skip-forward"
+                                class="size-3.5"
+                              />
                             </button>
                             <span class="text-[10px] font-mono text-white/60 ml-1">
                               {{ formatVideoTimestamp(Math.floor(seekPosition / 100 * sessionDurationSec)) }} / {{ expandedArchive.duration }}
@@ -765,8 +1039,15 @@ onUnmounted(() => {
                               class="flex items-center gap-1 px-2 py-1 rounded-md mr-1"
                               style="background: rgba(56, 189, 248, 0.2);"
                             >
-                              <UIcon name="i-lucide-audio-waveform" class="size-3" style="color: var(--argus-accent);" />
-                              <span class="text-[8px] font-bold" style="color: var(--argus-accent);">Синхронизация звука</span>
+                              <UIcon
+                                name="i-lucide-audio-waveform"
+                                class="size-3"
+                                style="color: var(--argus-accent);"
+                              />
+                              <span
+                                class="text-[8px] font-bold"
+                                style="color: var(--argus-accent);"
+                              >Синхронизация звука</span>
                             </div>
                             <button
                               class="flex items-center justify-center size-7 rounded-md transition-all"
@@ -774,7 +1055,10 @@ onUnmounted(() => {
                               :title="isMuted ? 'Включить звук' : 'Выключить звук'"
                               @click="isMuted = !isMuted"
                             >
-                              <UIcon :name="isMuted ? 'i-lucide-volume-x' : 'i-lucide-volume-2'" class="size-3.5" />
+                              <UIcon
+                                :name="isMuted ? 'i-lucide-volume-x' : 'i-lucide-volume-2'"
+                                class="size-3.5"
+                              />
                             </button>
                             <button
                               class="flex items-center justify-center size-7 rounded-md transition-all"
@@ -782,7 +1066,10 @@ onUnmounted(() => {
                               :title="isFullscreen && fullscreenTarget === 'webcam' ? 'Выйти из полноэкранного режима' : camerasSwapped ? 'Во весь экран (Боковая камера)' : 'Во весь экран (Веб-камера)'"
                               @click.stop="toggleFullscreenWebcam"
                             >
-                              <UIcon :name="isFullscreen && fullscreenTarget === 'webcam' ? 'i-lucide-minimize' : 'i-lucide-maximize'" class="size-3.5" />
+                              <UIcon
+                                :name="isFullscreen && fullscreenTarget === 'webcam' ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+                                class="size-3.5"
+                              />
                             </button>
                           </div>
                         </div>
@@ -793,8 +1080,15 @@ onUnmounted(() => {
                         class="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 rounded-lg ai-badge"
                         :style="{ background: isDark ? 'rgba(11, 15, 20, 0.8)' : 'rgba(255, 255, 255, 0.9)' }"
                       >
-                        <UIcon name="i-lucide-circle-dot" class="size-3" style="color: var(--argus-text-dimmed);" />
-                        <span class="text-[9px] font-bold uppercase" style="color: var(--argus-text-dimmed);">REC</span>
+                        <UIcon
+                          name="i-lucide-circle-dot"
+                          class="size-3"
+                          style="color: var(--argus-text-dimmed);"
+                        />
+                        <span
+                          class="text-[9px] font-bold uppercase"
+                          style="color: var(--argus-text-dimmed);"
+                        >REC</span>
                       </div>
 
                       <!-- Integrity badge + Fullscreen -->
@@ -803,7 +1097,10 @@ onUnmounted(() => {
                           class="px-2.5 py-1.5 rounded-lg ai-badge"
                           :style="{ background: isDark ? 'rgba(11, 15, 20, 0.8)' : 'rgba(255, 255, 255, 0.9)' }"
                         >
-                          <span class="text-base font-bold tabular-nums" :style="{ color: integrityColor(expandedArchive.integrityScore) }">
+                          <span
+                            class="text-base font-bold tabular-nums"
+                            :style="{ color: integrityColor(expandedArchive.integrityScore) }"
+                          >
                             {{ expandedArchive.integrityScore }}%
                           </span>
                         </div>
@@ -827,8 +1124,15 @@ onUnmounted(() => {
                     >
                       <div class="absolute inset-0 flex items-center justify-center">
                         <div class="flex flex-col items-center gap-2 opacity-25">
-                          <UIcon name="i-lucide-camera" class="size-8" style="color: var(--argus-text-dimmed);" />
-                          <span class="text-[9px] font-medium text-center px-2" style="color: var(--argus-text-dimmed);">{{ camerasSwapped ? 'ВЕБ-КАМЕРА' : 'БОКОВАЯ КАМЕРА' }}</span>
+                          <UIcon
+                            name="i-lucide-camera"
+                            class="size-8"
+                            style="color: var(--argus-text-dimmed);"
+                          />
+                          <span
+                            class="text-[9px] font-medium text-center px-2"
+                            style="color: var(--argus-text-dimmed);"
+                          >{{ camerasSwapped ? 'ВЕБ-КАМЕРА' : 'БОКОВАЯ КАМЕРА' }}</span>
                         </div>
                       </div>
 
@@ -842,7 +1146,10 @@ onUnmounted(() => {
                           @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--argus-text-muted)'"
                           @click.stop="toggleFullscreenSide"
                         >
-                          <UIcon :name="isFullscreen && fullscreenTarget === 'side' ? 'i-lucide-minimize' : 'i-lucide-maximize'" class="size-3.5" />
+                          <UIcon
+                            :name="isFullscreen && fullscreenTarget === 'side' ? 'i-lucide-minimize' : 'i-lucide-maximize'"
+                            class="size-3.5"
+                          />
                         </button>
                       </div>
 
@@ -851,8 +1158,15 @@ onUnmounted(() => {
                         class="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded ai-badge"
                         :style="{ background: isDark ? 'rgba(11, 15, 20, 0.75)' : 'rgba(255, 255, 255, 0.85)' }"
                       >
-                        <UIcon name="i-lucide-circle-dot" class="size-2.5" style="color: var(--argus-text-dimmed);" />
-                        <span class="text-[7px] font-bold uppercase" style="color: var(--argus-text-dimmed);">REC</span>
+                        <UIcon
+                          name="i-lucide-circle-dot"
+                          class="size-2.5"
+                          style="color: var(--argus-text-dimmed);"
+                        />
+                        <span
+                          class="text-[7px] font-bold uppercase"
+                          style="color: var(--argus-text-dimmed);"
+                        >REC</span>
                       </div>
                     </div>
                   </div>
@@ -863,10 +1177,20 @@ onUnmounted(() => {
                     :style="{ background: 'var(--argus-bg-elevated)', borderColor: 'var(--argus-border)' }"
                   >
                     <!-- Audio Header -->
-                    <div class="flex items-center justify-between px-4 py-2.5 border-b" style="border-color: var(--argus-border);">
+                    <div
+                      class="flex items-center justify-between px-4 py-2.5 border-b"
+                      style="border-color: var(--argus-border);"
+                    >
                       <div class="flex items-center gap-2">
-                        <UIcon name="i-lucide-audio-waveform" class="size-4" style="color: var(--argus-accent);" />
-                        <span class="text-xs font-semibold" style="color: var(--argus-text);">Уровень звука</span>
+                        <UIcon
+                          name="i-lucide-audio-waveform"
+                          class="size-4"
+                          style="color: var(--argus-accent);"
+                        />
+                        <span
+                          class="text-xs font-semibold"
+                          style="color: var(--argus-text);"
+                        >Уровень звука</span>
                         <span
                           class="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                           :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
@@ -888,8 +1212,14 @@ onUnmounted(() => {
                       <div class="flex items-center gap-3">
                         <!-- Noise level indicator -->
                         <div class="flex items-center gap-1.5">
-                          <span class="text-[9px] font-medium" style="color: var(--argus-text-dimmed);">Уровень шума:</span>
-                          <span class="text-[10px] font-bold tabular-nums" :style="{ color: noiseLevelColor(noiseLevel) }">
+                          <span
+                            class="text-[9px] font-medium"
+                            style="color: var(--argus-text-dimmed);"
+                          >Уровень шума:</span>
+                          <span
+                            class="text-[10px] font-bold tabular-nums"
+                            :style="{ color: noiseLevelColor(noiseLevel) }"
+                          >
                             {{ noiseLevel }} дБ
                           </span>
                           <span
@@ -941,7 +1271,10 @@ onUnmounted(() => {
                           @mouseleave="($event.currentTarget as HTMLElement).style.background = isMuted ? 'transparent' : accentBg(0.1)"
                           @click="isMuted = !isMuted"
                         >
-                          <UIcon :name="isMuted ? 'i-lucide-volume-x' : audioVolume > 50 ? 'i-lucide-volume-2' : 'i-lucide-volume-1'" class="size-4" />
+                          <UIcon
+                            :name="isMuted ? 'i-lucide-volume-x' : audioVolume > 50 ? 'i-lucide-volume-2' : 'i-lucide-volume-1'"
+                            class="size-4"
+                          />
                         </button>
 
                         <div class="flex items-center gap-2 w-24">
@@ -957,7 +1290,10 @@ onUnmounted(() => {
                             }"
                             :disabled="isMuted"
                           >
-                          <span class="text-[9px] font-bold tabular-nums w-7 text-right" :style="{ color: isMuted ? 'var(--argus-text-dimmed)' : 'var(--argus-text-muted)' }">
+                          <span
+                            class="text-[9px] font-bold tabular-nums w-7 text-right"
+                            :style="{ color: isMuted ? 'var(--argus-text-dimmed)' : 'var(--argus-text-muted)' }"
+                          >
                             {{ isMuted ? '—' : `${audioVolume}%` }}
                           </span>
                         </div>
@@ -969,17 +1305,44 @@ onUnmounted(() => {
                   <div class="flex items-center justify-between gap-3">
                     <!-- Session Summary (inline) -->
                     <div class="flex items-center gap-3">
-                      <div class="flex items-center gap-1.5 px-3 py-2 rounded-lg" :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)' }">
-                        <span class="text-[9px] font-medium" style="color: var(--argus-text-dimmed);">Дата:</span>
-                        <span class="text-[10px] font-bold" style="color: var(--argus-text);">{{ formatDate(expandedArchive.date) }}</span>
+                      <div
+                        class="flex items-center gap-1.5 px-3 py-2 rounded-lg"
+                        :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)' }"
+                      >
+                        <span
+                          class="text-[9px] font-medium"
+                          style="color: var(--argus-text-dimmed);"
+                        >Дата:</span>
+                        <span
+                          class="text-[10px] font-bold"
+                          style="color: var(--argus-text);"
+                        >{{ formatDate(expandedArchive.date) }}</span>
                       </div>
-                      <div class="flex items-center gap-1.5 px-3 py-2 rounded-lg" :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)' }">
-                        <span class="text-[9px] font-medium" style="color: var(--argus-text-dimmed);">Длительность:</span>
-                        <span class="text-[10px] font-bold" style="color: var(--argus-text);">{{ expandedArchive.duration }}</span>
+                      <div
+                        class="flex items-center gap-1.5 px-3 py-2 rounded-lg"
+                        :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)' }"
+                      >
+                        <span
+                          class="text-[9px] font-medium"
+                          style="color: var(--argus-text-dimmed);"
+                        >Длительность:</span>
+                        <span
+                          class="text-[10px] font-bold"
+                          style="color: var(--argus-text);"
+                        >{{ expandedArchive.duration }}</span>
                       </div>
-                      <div class="flex items-center gap-1.5 px-3 py-2 rounded-lg" :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)' }">
-                        <span class="text-[9px] font-medium" style="color: var(--argus-text-dimmed);">Нарушения:</span>
-                        <span class="text-[10px] font-bold" :style="{ color: expandedArchive.violationCount > 3 ? 'var(--argus-error)' : 'var(--argus-text)' }">{{ expandedArchive.violationCount }}</span>
+                      <div
+                        class="flex items-center gap-1.5 px-3 py-2 rounded-lg"
+                        :style="{ background: 'var(--argus-bg-elevated)', border: '1px solid var(--argus-border)' }"
+                      >
+                        <span
+                          class="text-[9px] font-medium"
+                          style="color: var(--argus-text-dimmed);"
+                        >Нарушения:</span>
+                        <span
+                          class="text-[10px] font-bold"
+                          :style="{ color: expandedArchive.violationCount > 3 ? 'var(--argus-error)' : 'var(--argus-text)' }"
+                        >{{ expandedArchive.violationCount }}</span>
                       </div>
                     </div>
 
@@ -996,21 +1359,42 @@ onUnmounted(() => {
                       @mouseleave="($event.currentTarget as HTMLElement).style.background = camerasSwapped ? accentBg(0.1) : 'transparent'"
                       @click="swapCameras"
                     >
-                      <UIcon name="i-lucide-arrow-left-right" class="size-3.5" />
+                      <UIcon
+                        name="i-lucide-arrow-left-right"
+                        class="size-3.5"
+                      />
                       Поменять камеры
                     </button>
                   </div>
                 </div>
 
                 <!-- Right: Event Log + Evidence + Review (2 cols) -->
-                <div class="lg:col-span-2 border-l flex flex-col" style="border-color: var(--argus-border);">
-                  <div class="px-5 py-4 border-b shrink-0" style="border-color: var(--argus-border);">
+                <div
+                  class="lg:col-span-2 border-l flex flex-col"
+                  style="border-color: var(--argus-border);"
+                >
+                  <div
+                    class="px-5 py-4 border-b shrink-0"
+                    style="border-color: var(--argus-border);"
+                  >
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-2">
-                        <UIcon name="i-lucide-activity" class="size-4" style="color: var(--argus-text-dimmed);" />
-                        <h3 class="text-sm font-semibold" style="color: var(--argus-text);">Журнал событий</h3>
+                        <UIcon
+                          name="i-lucide-activity"
+                          class="size-4"
+                          style="color: var(--argus-text-dimmed);"
+                        />
+                        <h3
+                          class="text-sm font-semibold"
+                          style="color: var(--argus-text);"
+                        >
+                          Журнал событий
+                        </h3>
                       </div>
-                      <span class="text-[10px] font-medium px-2 py-0.5 rounded-full" :style="{ background: expandedArchive.events.length > 3 ? errorBg(0.1) : accentBg(0.1), color: expandedArchive.events.length > 3 ? 'var(--argus-error)' : 'var(--argus-accent)' }">
+                      <span
+                        class="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                        :style="{ background: expandedArchive.events.length > 3 ? errorBg(0.1) : accentBg(0.1), color: expandedArchive.events.length > 3 ? 'var(--argus-error)' : 'var(--argus-accent)' }"
+                      >
                         {{ expandedArchive.events.length }} событий
                       </span>
                     </div>
@@ -1020,21 +1404,30 @@ onUnmounted(() => {
                         class="inline-flex items-center gap-1 text-[8px] font-medium px-1.5 py-0.5 rounded"
                         :style="{ background: accentBg(0.06), color: 'var(--argus-accent)' }"
                       >
-                        <UIcon name="i-lucide-video" class="size-2.5" />
+                        <UIcon
+                          name="i-lucide-video"
+                          class="size-2.5"
+                        />
                         {{ expandedArchive.events.filter(e => e.source === 'webcam').length }} веб
                       </span>
                       <span
                         class="inline-flex items-center gap-1 text-[8px] font-medium px-1.5 py-0.5 rounded"
                         :style="{ background: isDark ? 'rgba(167, 139, 250, 0.08)' : 'rgba(139, 92, 246, 0.06)', color: isDark ? '#a78bfa' : '#7c3aed' }"
                       >
-                        <UIcon name="i-lucide-camera" class="size-2.5" />
+                        <UIcon
+                          name="i-lucide-camera"
+                          class="size-2.5"
+                        />
                         {{ expandedArchive.events.filter(e => e.source === 'side').length }} бок.
                       </span>
                       <span
                         class="inline-flex items-center gap-1 text-[8px] font-medium px-1.5 py-0.5 rounded"
                         :style="{ background: 'var(--argus-bg-hover)', color: 'var(--argus-text-dimmed)' }"
                       >
-                        <UIcon name="i-lucide-monitor" class="size-2.5" />
+                        <UIcon
+                          name="i-lucide-monitor"
+                          class="size-2.5"
+                        />
                         {{ expandedArchive.events.filter(e => e.source === 'system').length }} сист.
                       </span>
                     </div>
@@ -1045,9 +1438,19 @@ onUnmounted(() => {
                         class="flex items-center gap-1.5 mt-2 px-2 py-1 rounded-md"
                         :style="{ background: errorBg(0.08), border: `1px solid ${errorBg(0.15)}` }"
                       >
-                        <UIcon name="i-lucide-radio" class="size-3" style="color: var(--argus-error);" />
-                        <span class="text-[9px] font-bold" style="color: var(--argus-error);">Синхронизация потоков</span>
-                        <span class="text-[8px] ml-auto" style="color: var(--argus-text-dimmed);">
+                        <UIcon
+                          name="i-lucide-radio"
+                          class="size-3"
+                          style="color: var(--argus-error);"
+                        />
+                        <span
+                          class="text-[9px] font-bold"
+                          style="color: var(--argus-error);"
+                        >Синхронизация потоков</span>
+                        <span
+                          class="text-[8px] ml-auto"
+                          style="color: var(--argus-text-dimmed);"
+                        >
                           Источник: {{ highlightedCamera === 'side' ? 'Боковая камера' : 'Веб-камера' }}
                         </span>
                       </div>
@@ -1057,11 +1460,25 @@ onUnmounted(() => {
                   <!-- Events Timeline -->
                   <div class="flex-1 overflow-y-auto">
                     <!-- Loading indicator -->
-                    <div v-if="loadingEvents" class="flex flex-col items-center justify-center py-12 px-4">
-                      <div class="animate-spin rounded-full size-8 border-2 border-t-transparent mb-3" style="border-color: var(--argus-accent); border-top-color: transparent;" />
-                      <p class="text-xs font-medium" style="color: var(--argus-text-dimmed);">Загрузка событий...</p>
+                    <div
+                      v-if="loadingEvents"
+                      class="flex flex-col items-center justify-center py-12 px-4"
+                    >
+                      <div
+                        class="animate-spin rounded-full size-8 border-2 border-t-transparent mb-3"
+                        style="border-color: var(--argus-accent); border-top-color: transparent;"
+                      />
+                      <p
+                        class="text-xs font-medium"
+                        style="color: var(--argus-text-dimmed);"
+                      >
+                        Загрузка событий...
+                      </p>
                     </div>
-                    <div v-else-if="expandedArchive.events.length > 0" class="px-5 py-3 space-y-0">
+                    <div
+                      v-else-if="expandedArchive.events.length > 0"
+                      class="px-5 py-3 space-y-0"
+                    >
                       <div
                         v-for="(event, idx) in expandedArchive.events"
                         :key="event.id"
@@ -1076,7 +1493,10 @@ onUnmounted(() => {
                               color: severityColor(event.severity)
                             }"
                           >
-                            <UIcon :name="eventIcon(event.type)" class="size-3.5" />
+                            <UIcon
+                              :name="eventIcon(event.type)"
+                              class="size-3.5"
+                            />
                           </div>
                           <div
                             v-if="idx < expandedArchive.events.length - 1"
@@ -1086,7 +1506,12 @@ onUnmounted(() => {
                         </div>
                         <div class="flex-1 min-w-0 pt-0.5">
                           <div class="flex items-start justify-between gap-2">
-                            <p class="text-xs font-medium" style="color: var(--argus-text);">{{ event.label }}</p>
+                            <p
+                              class="text-xs font-medium"
+                              style="color: var(--argus-text);"
+                            >
+                              {{ event.label }}
+                            </p>
                             <span
                               class="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 uppercase"
                               :style="{ background: severityBgLocal(event.severity, 0.1), color: severityColor(event.severity) }"
@@ -1097,8 +1522,14 @@ onUnmounted(() => {
 
                           <!-- Source attribution + timestamp -->
                           <div class="flex items-center gap-2 mt-0.5">
-                            <span class="text-[10px]" style="color: var(--argus-text-dimmed);">{{ formatTime(event.timestamp) }}</span>
-                            <span class="text-[8px]" style="color: var(--argus-border);">·</span>
+                            <span
+                              class="text-[10px]"
+                              style="color: var(--argus-text-dimmed);"
+                            >{{ formatTime(event.timestamp) }}</span>
+                            <span
+                              class="text-[8px]"
+                              style="color: var(--argus-border);"
+                            >·</span>
                             <span
                               class="inline-flex items-center gap-1 text-[8px] font-semibold px-1.5 py-0.5 rounded"
                               :style="{
@@ -1106,7 +1537,10 @@ onUnmounted(() => {
                                 color: sourceColor(event.source)
                               }"
                             >
-                              <UIcon :name="sourceIcon(event.source)" class="size-2.5" />
+                              <UIcon
+                                :name="sourceIcon(event.source)"
+                                class="size-2.5"
+                              />
                               {{ sourceLabel(event.source) }}
                             </span>
                           </div>
@@ -1120,10 +1554,16 @@ onUnmounted(() => {
                               class="inline-flex items-center gap-1 text-[7px] font-bold px-1.5 py-0.5 rounded-full uppercase"
                               :style="{ background: accentBg(0.1), color: 'var(--argus-accent)', border: `1px solid ${accentBg(0.2)}` }"
                             >
-                              <UIcon name="i-lucide-cpu" class="size-2" />
+                              <UIcon
+                                name="i-lucide-cpu"
+                                class="size-2"
+                              />
                               Kernel-данные
                             </span>
-                            <span class="text-[8px] font-medium" style="color: var(--argus-accent);">Поведенческий анализ</span>
+                            <span
+                              class="text-[8px] font-medium"
+                              style="color: var(--argus-accent);"
+                            >Поведенческий анализ</span>
                           </div>
 
                           <!-- Audio event tag -->
@@ -1131,8 +1571,15 @@ onUnmounted(() => {
                             v-if="isAudioEvent(event.type)"
                             class="flex items-center gap-1 mt-1"
                           >
-                            <UIcon name="i-lucide-audio-waveform" class="size-2.5" style="color: var(--argus-accent);" />
-                            <span class="text-[8px] font-medium" style="color: var(--argus-accent);">Аудио событие</span>
+                            <UIcon
+                              name="i-lucide-audio-waveform"
+                              class="size-2.5"
+                              style="color: var(--argus-accent);"
+                            />
+                            <span
+                              class="text-[8px] font-medium"
+                              style="color: var(--argus-accent);"
+                            >Аудио событие</span>
                           </div>
 
                           <!-- Seek + audio sync + camera highlight button -->
@@ -1146,7 +1593,10 @@ onUnmounted(() => {
                             @mouseleave="($event.currentTarget as HTMLElement).style.opacity = '1'"
                             @click="seekToEvent(event.videoTimestamp, event.source)"
                           >
-                            <UIcon :name="isAudioEvent(event.type) ? 'i-lucide-audio-waveform' : isSideEvent(event.source) ? 'i-lucide-camera' : 'i-lucide-play'" class="size-2.5" />
+                            <UIcon
+                              :name="isAudioEvent(event.type) ? 'i-lucide-audio-waveform' : isSideEvent(event.source) ? 'i-lucide-camera' : 'i-lucide-play'"
+                              class="size-2.5"
+                            />
                             {{ isAudioEvent(event.type) ? 'Синхр. звук' : 'Перейти' }} к {{ formatVideoTimestamp(event.videoTimestamp) }}
                           </button>
                         </div>
@@ -1154,30 +1604,59 @@ onUnmounted(() => {
                     </div>
 
                     <!-- No events -->
-                    <div v-else class="flex flex-col items-center justify-center py-12 px-4">
-                      <UIcon name="i-lucide-check-circle" class="size-10 mb-3" style="color: var(--argus-success);" />
-                      <p class="text-sm font-medium" style="color: var(--argus-text);">Нет нарушений</p>
-                      <p class="text-xs mt-1 text-center" style="color: var(--argus-text-dimmed);">Сессия прошла без инцидентов</p>
+                    <div
+                      v-else
+                      class="flex flex-col items-center justify-center py-12 px-4"
+                    >
+                      <UIcon
+                        name="i-lucide-check-circle"
+                        class="size-10 mb-3"
+                        style="color: var(--argus-success);"
+                      />
+                      <p
+                        class="text-sm font-medium"
+                        style="color: var(--argus-text);"
+                      >
+                        Нет нарушений
+                      </p>
+                      <p
+                        class="text-xs mt-1 text-center"
+                        style="color: var(--argus-text-dimmed);"
+                      >
+                        Сессия прошла без инцидентов
+                      </p>
                     </div>
                   </div>
 
                   <!-- Consent Status -->
-                  <div class="px-5 py-4 border-t" style="border-color: var(--argus-border);">
+                  <div
+                    class="px-5 py-4 border-t"
+                    style="border-color: var(--argus-border);"
+                  >
                     <ConsentStatus :session-id="expandedArchive.id" />
                   </div>
 
                   <!-- Evidence Viewer -->
-                  <div class="px-5 py-4 border-t" style="border-color: var(--argus-border);">
+                  <div
+                    class="px-5 py-4 border-t"
+                    style="border-color: var(--argus-border);"
+                  >
                     <EvidenceViewer :session-id="expandedArchive.id" />
                   </div>
 
                   <!-- Forensic Ledger / Integrity Verification -->
-                  <div class="px-5 py-4 border-t" style="border-color: var(--argus-border);">
+                  <div
+                    class="px-5 py-4 border-t"
+                    style="border-color: var(--argus-border);"
+                  >
                     <IntegrityReport :session-id="expandedArchive.id" />
                   </div>
 
                   <!-- Review Panel -->
-                  <div class="px-5 py-4 border-t" style="border-color: var(--argus-border);">
+                  <div
+                    class="px-5 py-4 border-t"
+                    style="border-color: var(--argus-border);"
+                  >
                     <ReviewPanel
                       :session-id="expandedArchive.id"
                       :integrity-score="expandedArchive.integrityScore"
@@ -1192,12 +1671,24 @@ onUnmounted(() => {
                     style="border-color: var(--argus-border);"
                   >
                     <div class="flex items-center gap-2 mb-3">
-                      <UIcon name="i-lucide-scale" class="size-4" style="color: var(--argus-text-dimmed);" />
-                      <h4 class="text-sm font-semibold" style="color: var(--argus-text);">Апелляция</h4>
+                      <UIcon
+                        name="i-lucide-scale"
+                        class="size-4"
+                        style="color: var(--argus-text-dimmed);"
+                      />
+                      <h4
+                        class="text-sm font-semibold"
+                        style="color: var(--argus-text);"
+                      >
+                        Апелляция
+                      </h4>
                     </div>
 
                     <!-- Appeal form (collapsed by default) -->
-                    <div v-if="!appealFormOpen" class="flex items-center gap-3">
+                    <div
+                      v-if="!appealFormOpen"
+                      class="flex items-center gap-3"
+                    >
                       <button
                         class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all border"
                         :style="{
@@ -1209,16 +1700,25 @@ onUnmounted(() => {
                         @mouseleave="($event.currentTarget as HTMLElement).style.background = warningBg(0.08)"
                         @click="appealFormOpen = true"
                       >
-                        <UIcon name="i-lucide-message-square-plus" class="size-3.5" />
+                        <UIcon
+                          name="i-lucide-message-square-plus"
+                          class="size-3.5"
+                        />
                         Подать апелляцию
                       </button>
-                      <span class="text-[10px]" style="color: var(--argus-text-dimmed);">
+                      <span
+                        class="text-[10px]"
+                        style="color: var(--argus-text-dimmed);"
+                      >
                         Студент может оспорить результат проверки
                       </span>
                     </div>
 
                     <!-- Expanded appeal form -->
-                    <div v-else class="space-y-3">
+                    <div
+                      v-else
+                      class="space-y-3"
+                    >
                       <textarea
                         v-model="appealReason"
                         rows="3"
@@ -1243,8 +1743,16 @@ onUnmounted(() => {
                           }"
                           @click="handleSubmitAppeal"
                         >
-                          <UIcon v-if="appealSubmitting" name="i-lucide-loader" class="size-3.5 animate-spin" />
-                          <UIcon v-else name="i-lucide-send" class="size-3.5" />
+                          <UIcon
+                            v-if="appealSubmitting"
+                            name="i-lucide-loader"
+                            class="size-3.5 animate-spin"
+                          />
+                          <UIcon
+                            v-else
+                            name="i-lucide-send"
+                            class="size-3.5"
+                          />
                           {{ appealSubmitting ? 'Отправка...' : 'Отправить' }}
                         </button>
                         <button
@@ -1257,10 +1765,18 @@ onUnmounted(() => {
                           Отмена
                         </button>
                       </div>
-                      <p v-if="appealError" class="text-[10px]" style="color: var(--argus-error);">
+                      <p
+                        v-if="appealError"
+                        class="text-[10px]"
+                        style="color: var(--argus-error);"
+                      >
                         {{ appealError }}
                       </p>
-                      <p v-if="appealSuccess" class="text-[10px]" style="color: var(--argus-success);">
+                      <p
+                        v-if="appealSuccess"
+                        class="text-[10px]"
+                        style="color: var(--argus-success);"
+                      >
                         Апелляция успешно подана
                       </p>
                     </div>

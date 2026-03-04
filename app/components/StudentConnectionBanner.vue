@@ -153,12 +153,21 @@ const pendingLabel = computed(() => {
           style="background: var(--argus-bg-card); border-color: var(--argus-border);"
         >
           <div class="flex items-center gap-2 mb-1.5">
-            <div class="w-2 h-2 rounded-full" :class="tierDisplay.dotClass" />
-            <span class="text-xs font-semibold" style="color: var(--argus-text);">
+            <div
+              class="w-2 h-2 rounded-full"
+              :class="tierDisplay.dotClass"
+            />
+            <span
+              class="text-xs font-semibold"
+              style="color: var(--argus-text);"
+            >
               {{ tierDisplay.label }}
             </span>
           </div>
-          <p class="text-[10px] leading-relaxed" style="color: var(--argus-text-dimmed);">
+          <p
+            class="text-[10px] leading-relaxed"
+            style="color: var(--argus-text-dimmed);"
+          >
             {{ tierDisplay.sublabel }}
           </p>
 
@@ -168,8 +177,18 @@ const pendingLabel = computed(() => {
             class="mt-2 pt-2 border-t flex items-center gap-1.5"
             style="border-color: var(--argus-border);"
           >
-            <svg class="w-3 h-3 text-sky-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-2.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            <svg
+              class="w-3 h-3 text-sky-400 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-2.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+              />
             </svg>
             <span class="text-[10px] text-sky-400 tabular-nums">{{ pendingLabel }}</span>
           </div>
@@ -194,7 +213,10 @@ const pendingLabel = computed(() => {
         style="background: var(--argus-bg-card); border-color: var(--argus-border); color: var(--argus-text);"
       >
         <div class="flex items-start gap-2">
-          <div class="w-2 h-2 rounded-full mt-1 flex-shrink-0" :class="tierDisplay.dotClass" />
+          <div
+            class="w-2 h-2 rounded-full mt-1 flex-shrink-0"
+            :class="tierDisplay.dotClass"
+          />
           <span>{{ toastMessage }}</span>
         </div>
       </div>

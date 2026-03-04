@@ -258,7 +258,7 @@ async function batchWriteTx(
  * Returns the auto-generated ID (IDBValidKey).
  */
 export async function addEvent(event: Omit<QueuedEvent, 'id'>): Promise<number> {
-  const id = await writeTx<IDBValidKey>(STORE_EVENTS, (store) =>
+  const id = await writeTx<IDBValidKey>(STORE_EVENTS, store =>
     store.add(event)
   )
   return id as number
@@ -438,7 +438,7 @@ export async function addSnapshot(snapshot: Omit<QueuedSnapshot, 'id'>): Promise
     }
   }
 
-  const id = await writeTx<IDBValidKey>(STORE_SNAPSHOTS, (store) =>
+  const id = await writeTx<IDBValidKey>(STORE_SNAPSHOTS, store =>
     store.add(record)
   )
   return id as number
@@ -586,7 +586,7 @@ export async function removeSnapshots(ids: number[]): Promise<void> {
  * Set a metadata value.
  */
 export async function setMeta(key: string, value: string | number): Promise<void> {
-  await writeTx(STORE_METADATA, (store) =>
+  await writeTx(STORE_METADATA, store =>
     store.put({ key, value } as QueueMeta)
   )
 }
@@ -595,7 +595,7 @@ export async function setMeta(key: string, value: string | number): Promise<void
  * Get a metadata value.
  */
 export async function getMeta(key: string): Promise<string | number | null> {
-  const result = await readTx<QueueMeta | undefined>(STORE_METADATA, (store) =>
+  const result = await readTx<QueueMeta | undefined>(STORE_METADATA, store =>
     store.get(key)
   )
   return result?.value ?? null

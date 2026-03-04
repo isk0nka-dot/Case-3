@@ -71,9 +71,9 @@ export interface SessionTelemetry {
   /** Gaze heatmap grid (10×10 = 100 cells). */
   heatmap: HeatmapCell[]
   /** Current gaze position. */
-  currentGaze: { x: number; y: number } | null
+  currentGaze: { x: number, y: number } | null
   /** Current mouse position. */
-  currentMouse: { x: number; y: number } | null
+  currentMouse: { x: number, y: number } | null
   /** Focus score history (last 60 data points = 2 minutes at 2Hz). */
   focusHistory: number[]
   /** Typing speed history (last 60 data points). */
@@ -197,10 +197,10 @@ export const useTelemetryStore = defineStore('telemetry', () => {
   // Per-session buffers: sessionId → { gazeBuffer, heatmap, ... }
   const gazeBuffers = new Map<string, GazeBuffer>()
   const heatmapAccumulators = new Map<string, HeatmapAccumulator>()
-  const mousePositions = new Map<string, { x: number; y: number }>()
+  const mousePositions = new Map<string, { x: number, y: number }>()
   const focusHistories = new Map<string, number[]>()
   const typingHistories = new Map<string, number[]>()
-  const sampleCounts = new Map<string, { gaze: number; mouse: number; keyboard: number }>()
+  const sampleCounts = new Map<string, { gaze: number, mouse: number, keyboard: number }>()
 
   // Session start times for timestamp offset calculation.
   const sessionStartTimes = new Map<string, number>()

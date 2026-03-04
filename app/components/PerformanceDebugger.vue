@@ -149,9 +149,16 @@ const _tick = computed(() => tick.value)
         }"
       >
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-activity" class="size-4" style="color: var(--argus-accent);" />
+          <UIcon
+            name="i-lucide-activity"
+            class="size-4"
+            style="color: var(--argus-accent);"
+          />
           <span class="text-sm font-bold tracking-tight">Performance Debugger</span>
-          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded" :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }">
+          <span
+            class="text-[10px] font-mono px-1.5 py-0.5 rounded"
+            :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
+          >
             LIVE
           </span>
         </div>
@@ -162,31 +169,69 @@ const _tick = computed(() => tick.value)
           @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
           @click="emit('close')"
         >
-          <UIcon name="i-lucide-x" class="size-4" />
+          <UIcon
+            name="i-lucide-x"
+            class="size-4"
+          />
         </button>
       </div>
 
       <!-- No Session State -->
-      <div v-if="!hasSession" class="px-4 py-8 text-center">
-        <UIcon name="i-lucide-monitor-off" class="size-10 mx-auto mb-3" style="color: var(--argus-text-muted);" />
-        <p class="text-sm font-medium" style="color: var(--argus-text-dimmed);">No Active Proctoring Session</p>
-        <p class="text-xs mt-1" style="color: var(--argus-text-muted);">Start a session to see performance metrics.</p>
+      <div
+        v-if="!hasSession"
+        class="px-4 py-8 text-center"
+      >
+        <UIcon
+          name="i-lucide-monitor-off"
+          class="size-10 mx-auto mb-3"
+          style="color: var(--argus-text-muted);"
+        />
+        <p
+          class="text-sm font-medium"
+          style="color: var(--argus-text-dimmed);"
+        >
+          No Active Proctoring Session
+        </p>
+        <p
+          class="text-xs mt-1"
+          style="color: var(--argus-text-muted);"
+        >
+          Start a session to see performance metrics.
+        </p>
       </div>
 
       <!-- Metrics Sections -->
-      <div v-else class="divide-y" :style="{ borderColor: 'var(--argus-border)' }" :data-tick="_tick">
+      <div
+        v-else
+        class="divide-y"
+        :style="{ borderColor: 'var(--argus-border)' }"
+        :data-tick="_tick"
+      >
         <!-- Section 1: Health Governor -->
-        <div v-if="hasGovernor" class="px-4 py-3">
+        <div
+          v-if="hasGovernor"
+          class="px-4 py-3"
+        >
           <div class="flex items-center gap-2 mb-2">
-            <UIcon name="i-lucide-heart-pulse" class="size-3.5" style="color: var(--argus-accent);" />
-            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+            <UIcon
+              name="i-lucide-heart-pulse"
+              class="size-3.5"
+              style="color: var(--argus-accent);"
+            />
+            <span
+              class="text-[11px] font-bold uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
               Health Governor
             </span>
           </div>
 
           <!-- Score bar -->
           <div class="flex items-center gap-3 mb-2">
-            <div class="flex-1 h-2 rounded-full overflow-hidden" :style="{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }">
+            <div
+              class="flex-1 h-2 rounded-full overflow-hidden"
+              :style="{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }"
+            >
               <div
                 class="h-full rounded-full transition-all duration-500"
                 :style="{
@@ -241,17 +286,30 @@ const _tick = computed(() => tick.value)
           </div>
 
           <!-- Hysteresis -->
-          <div class="flex gap-4 mt-1.5 text-[10px] font-mono" style="color: var(--argus-text-muted);">
+          <div
+            class="flex gap-4 mt-1.5 text-[10px] font-mono"
+            style="color: var(--argus-text-muted);"
+          >
             <span>Consecutive ↓ {{ debugHealthGovernor!.consecutiveDowngradeSamples.value }}</span>
             <span>Consecutive ↑ {{ debugHealthGovernor!.consecutiveUpgradeSamples.value }}</span>
           </div>
         </div>
 
         <!-- Section 2: Vision Engine -->
-        <div v-if="hasVision" class="px-4 py-3">
+        <div
+          v-if="hasVision"
+          class="px-4 py-3"
+        >
           <div class="flex items-center gap-2 mb-2">
-            <UIcon name="i-lucide-eye" class="size-3.5" style="color: var(--argus-brand-purple, var(--argus-accent));" />
-            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+            <UIcon
+              name="i-lucide-eye"
+              class="size-3.5"
+              style="color: var(--argus-brand-purple, var(--argus-accent));"
+            />
+            <span
+              class="text-[11px] font-bold uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
               Vision Engine
             </span>
           </div>
@@ -259,7 +317,10 @@ const _tick = computed(() => tick.value)
           <div class="grid grid-cols-3 gap-x-3 gap-y-1 text-xs font-mono">
             <div>
               <span style="color: var(--argus-text-muted);">Model</span>
-              <span class="ml-1 font-semibold" :style="{ color: debugVisionEngine!.isModelLoaded.value ? 'var(--argus-success)' : 'var(--argus-error)' }">
+              <span
+                class="ml-1 font-semibold"
+                :style="{ color: debugVisionEngine!.isModelLoaded.value ? 'var(--argus-success)' : 'var(--argus-error)' }"
+              >
                 {{ debugVisionEngine!.isModelLoaded.value ? '✓' : '✗' }}
               </span>
             </div>
@@ -286,7 +347,10 @@ const _tick = computed(() => tick.value)
           </div>
 
           <!-- Vision stats detail -->
-          <div class="flex gap-4 mt-1.5 text-[10px] font-mono" style="color: var(--argus-text-muted);">
+          <div
+            class="flex gap-4 mt-1.5 text-[10px] font-mono"
+            style="color: var(--argus-text-muted);"
+          >
             <span>Gaze dev: {{ debugVisionEngine!.stats.value.totalGazeDeviations }}</span>
             <span>Head anom: {{ debugVisionEngine!.stats.value.totalHeadPoseAnomalies }}</span>
             <span>Blinks: {{ debugVisionEngine!.stats.value.totalBlinks }}</span>
@@ -294,18 +358,35 @@ const _tick = computed(() => tick.value)
         </div>
 
         <!-- Section 3: Tier History -->
-        <div v-if="hasGovernor" class="px-4 py-3">
+        <div
+          v-if="hasGovernor"
+          class="px-4 py-3"
+        >
           <div class="flex items-center gap-2 mb-2">
-            <UIcon name="i-lucide-git-branch" class="size-3.5" style="color: var(--argus-warning);" />
-            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+            <UIcon
+              name="i-lucide-git-branch"
+              class="size-3.5"
+              style="color: var(--argus-warning);"
+            />
+            <span
+              class="text-[11px] font-bold uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
               Tier History
             </span>
           </div>
 
-          <div v-if="tierHistory.length === 0" class="text-xs font-mono" style="color: var(--argus-text-muted);">
+          <div
+            v-if="tierHistory.length === 0"
+            class="text-xs font-mono"
+            style="color: var(--argus-text-muted);"
+          >
             No transitions recorded yet
           </div>
-          <div v-else class="space-y-1">
+          <div
+            v-else
+            class="space-y-1"
+          >
             <div
               v-for="(entry, i) in tierHistory.slice(-5).reverse()"
               :key="i"
@@ -320,7 +401,11 @@ const _tick = computed(() => tick.value)
               <span style="color: var(--argus-text-muted);">
                 {{ new Date(entry.timestamp).toLocaleTimeString() }}
               </span>
-              <span v-if="i === 0" class="text-[10px]" style="color: var(--argus-text-dimmed);">
+              <span
+                v-if="i === 0"
+                class="text-[10px]"
+                style="color: var(--argus-text-dimmed);"
+              >
                 ({{ currentTierDuration }})
               </span>
             </div>
@@ -328,10 +413,20 @@ const _tick = computed(() => tick.value)
         </div>
 
         <!-- Section 4: Connection & Queue -->
-        <div v-if="hasResilience" class="px-4 py-3">
+        <div
+          v-if="hasResilience"
+          class="px-4 py-3"
+        >
           <div class="flex items-center gap-2 mb-2">
-            <UIcon name="i-lucide-wifi" class="size-3.5" style="color: var(--argus-success);" />
-            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+            <UIcon
+              name="i-lucide-wifi"
+              class="size-3.5"
+              style="color: var(--argus-success);"
+            />
+            <span
+              class="text-[11px] font-bold uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
               Connection & Queue
             </span>
           </div>
@@ -370,17 +465,33 @@ const _tick = computed(() => tick.value)
           </div>
 
           <!-- Server directive -->
-          <div class="flex gap-4 mt-1.5 text-[10px] font-mono" style="color: var(--argus-text-muted);">
+          <div
+            class="flex gap-4 mt-1.5 text-[10px] font-mono"
+            style="color: var(--argus-text-muted);"
+          >
             <span>Directive: {{ debugResilience!.serverDirective.value?.telemetryMode ?? 'NORMAL' }}</span>
-            <span v-if="debugResilience!.isDegraded.value" style="color: var(--argus-warning);">DEGRADED</span>
+            <span
+              v-if="debugResilience!.isDegraded.value"
+              style="color: var(--argus-warning);"
+            >DEGRADED</span>
           </div>
         </div>
 
         <!-- Section 5: Session Throughput -->
-        <div v-if="hasSession" class="px-4 py-3">
+        <div
+          v-if="hasSession"
+          class="px-4 py-3"
+        >
           <div class="flex items-center gap-2 mb-2">
-            <UIcon name="i-lucide-send" class="size-3.5" style="color: var(--argus-accent);" />
-            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--argus-text-dimmed);">
+            <UIcon
+              name="i-lucide-send"
+              class="size-3.5"
+              style="color: var(--argus-accent);"
+            />
+            <span
+              class="text-[11px] font-bold uppercase tracking-wider"
+              style="color: var(--argus-text-dimmed);"
+            >
               Event Throughput
             </span>
           </div>
@@ -429,7 +540,10 @@ const _tick = computed(() => tick.value)
         class="px-4 py-2 border-t text-center"
         :style="{ borderColor: 'var(--argus-border)' }"
       >
-        <span class="text-[10px] font-mono" style="color: var(--argus-text-muted);">
+        <span
+          class="text-[10px] font-mono"
+          style="color: var(--argus-text-muted);"
+        >
           Ctrl+Shift+D to toggle • 1Hz refresh
         </span>
       </div>

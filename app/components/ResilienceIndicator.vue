@@ -119,7 +119,10 @@ const showQueue = computed(() => {
       >
         <!-- Status dot -->
         <div class="relative">
-          <div class="w-2 h-2 rounded-full" :class="tierConfig.dotColor" />
+          <div
+            class="w-2 h-2 rounded-full"
+            :class="tierConfig.dotColor"
+          />
           <div
             v-if="tier === 'A'"
             class="absolute inset-0 w-2 h-2 rounded-full animate-ping opacity-50"
@@ -128,7 +131,10 @@ const showQueue = computed(() => {
         </div>
 
         <!-- Tier label -->
-        <span class="text-[11px] font-semibold" :class="tierConfig.textColor">
+        <span
+          class="text-[11px] font-semibold"
+          :class="tierConfig.textColor"
+        >
           {{ tierConfig.label }}
         </span>
         <span class="text-[10px] text-[var(--argus-text-dimmed)]">
@@ -151,8 +157,18 @@ const showQueue = computed(() => {
         class="flex items-center gap-1 px-2 py-1 rounded-md bg-sky-500/10 border border-sky-500/30"
       >
         <!-- Queue icon (inbox) -->
-        <svg class="w-3 h-3 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-2.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+        <svg
+          class="w-3 h-3 text-sky-400"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-2.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+          />
         </svg>
         <span class="text-[10px] text-sky-400 tabular-nums">
           {{ pendingLabel }}
@@ -180,8 +196,18 @@ const showQueue = computed(() => {
         stroke="currentColor"
         stroke-width="2"
       >
-        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 5.636a9 9 0 010 12.728M5.636 18.364a9 9 0 010-12.728M8.464 15.536a5 5 0 010-7.072M15.536 8.464a5 5 0 010 7.072" />
-        <line x1="4" y1="4" x2="20" y2="20" stroke-linecap="round" />
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M18.364 5.636a9 9 0 010 12.728M5.636 18.364a9 9 0 010-12.728M8.464 15.536a5 5 0 010-7.072M15.536 8.464a5 5 0 010 7.072"
+        />
+        <line
+          x1="4"
+          y1="4"
+          x2="20"
+          y2="20"
+          stroke-linecap="round"
+        />
       </svg>
       <!-- Warning icon -->
       <svg
@@ -192,7 +218,11 @@ const showQueue = computed(() => {
         stroke="currentColor"
         stroke-width="2"
       >
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+        />
       </svg>
       <span>{{ connectionMessage }}</span>
     </div>

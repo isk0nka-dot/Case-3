@@ -23,15 +23,15 @@ export default {
     type: 'problem',
     docs: {
       description: 'Disallow local re-declaration of centralized utility functions',
-      recommended: true,
+      recommended: true
     },
     messages: {
       duplicateName:
         'Function "{{name}}" is a centralized utility in {{source}}. Import it instead of redefining locally.',
       fuzzyMatch:
-        'Function "{{name}}" matches the pattern of centralized utility "{{pattern}}" ({{source}}). Use the composable import instead.',
+        'Function "{{name}}" matches the pattern of centralized utility "{{pattern}}" ({{source}}). Use the composable import instead.'
     },
-    schema: [],
+    schema: []
   },
 
   create(context) {
@@ -86,7 +86,7 @@ export default {
       ['reviewDecisionIcon', 'useStatusHelpers'],
 
       // useColors
-      ['makeAccentColor', 'useColors'],
+      ['makeAccentColor', 'useColors']
     ])
 
     // -----------------------------------------------------------------
@@ -97,61 +97,61 @@ export default {
         pattern: 'date-formatter',
         source: 'useFormatters',
         // Detects: new Intl.DateTimeFormat or toLocaleDateString('ru
-        test: (src) =>
-          /Intl\.DateTimeFormat/.test(src) ||
-          /toLocaleDateString\s*\(\s*['"]ru/.test(src) ||
-          /toLocaleString\s*\(\s*['"]ru/.test(src),
+        test: src =>
+          /Intl\.DateTimeFormat/.test(src)
+          || /toLocaleDateString\s*\(\s*['"]ru/.test(src)
+          || /toLocaleString\s*\(\s*['"]ru/.test(src)
       },
       {
         pattern: 'time-ago',
         source: 'useFormatters',
         // Detects: Date.now() - ... / 1000 with "назад" string
-        test: (src) =>
-          /Date\.now\(\)/.test(src) && /назад/.test(src),
+        test: src =>
+          /Date\.now\(\)/.test(src) && /назад/.test(src)
       },
       {
         pattern: 'file-size',
         source: 'useFormatters',
         // Detects: bytes / 1024 patterns with KB/MB/GB
-        test: (src) =>
-          /1024/.test(src) && /(KB|MB|GB)/.test(src),
+        test: src =>
+          /1024/.test(src) && /(KB|MB|GB)/.test(src)
       },
       {
         pattern: 'compact-number',
         source: 'useFormatters',
         // Detects: n >= 1_000_000 or n / 1000000 with M/K suffix
-        test: (src) =>
-          (/1[_,]?000[_,]?000/.test(src) || /1e6/.test(src)) &&
-          /['"](M|K)['"]/.test(src),
+        test: src =>
+          (/1[_,]?000[_,]?000/.test(src) || /1e6/.test(src))
+          && /['"](M|K)['"]/.test(src)
       },
       {
         pattern: 'status-switch',
         source: 'useStatusHelpers',
         // Detects: switch with case 'reviewed'/'pending'/'confirmed'/'dismissed'/'escalated'
-        test: (src) =>
-          /switch\s*\(/.test(src) &&
-          (
-            (/['"]reviewed['"]/.test(src) && /['"]pending['"]/.test(src)) ||
-            (/['"]confirmed['"]/.test(src) && /['"]dismissed['"]/.test(src)) ||
-            (/['"]submitted['"]/.test(src) && /['"]under_review['"]/.test(src)) ||
-            (/['"]critical['"]/.test(src) && /['"]warning['"]/.test(src) && /var\(--argus/.test(src))
-          ),
+        test: src =>
+          /switch\s*\(/.test(src)
+          && (
+            (/['"]reviewed['"]/.test(src) && /['"]pending['"]/.test(src))
+            || (/['"]confirmed['"]/.test(src) && /['"]dismissed['"]/.test(src))
+            || (/['"]submitted['"]/.test(src) && /['"]under_review['"]/.test(src))
+            || (/['"]critical['"]/.test(src) && /['"]warning['"]/.test(src) && /var\(--argus/.test(src))
+          )
       },
       {
         pattern: 'noise-level',
         source: 'useStatusHelpers',
         // Detects: dB threshold checks with argus color variables
-        test: (src) =>
-          />\s*(35|40|45|50|55|60)/.test(src) &&
-          (/var\(--argus/.test(src) || /Высокий|Средний|Тихо/.test(src)),
+        test: src =>
+          />\s*(35|40|45|50|55|60)/.test(src)
+          && (/var\(--argus/.test(src) || /Высокий|Средний|Тихо/.test(src))
       },
       {
         pattern: 'integrity-color',
         source: 'useStatusHelpers',
         // Detects: score < 50 / score < 70 with argus color vars
-        test: (src) =>
-          /<\s*(50|70)/.test(src) && /var\(--argus/.test(src),
-      },
+        test: src =>
+          /<\s*(50|70)/.test(src) && /var\(--argus/.test(src)
+      }
     ]
 
     // -----------------------------------------------------------------
@@ -186,7 +186,7 @@ export default {
         context.report({
           node,
           messageId: 'duplicateName',
-          data: { name, source: PROTECTED_NAMES.get(name) },
+          data: { name, source: PROTECTED_NAMES.get(name) }
         })
         return
       }
@@ -200,7 +200,7 @@ export default {
           context.report({
             node,
             messageId: 'fuzzyMatch',
-            data: { name, pattern: fp.pattern, source: fp.source },
+            data: { name, pattern: fp.pattern, source: fp.source }
           })
           return
         }
@@ -221,9 +221,9 @@ export default {
       // const formatDate = function(...) { }
       VariableDeclarator(node) {
         if (
-          node.id?.type === 'Identifier' &&
-          (node.init?.type === 'ArrowFunctionExpression' ||
-            node.init?.type === 'FunctionExpression')
+          node.id?.type === 'Identifier'
+          && (node.init?.type === 'ArrowFunctionExpression'
+            || node.init?.type === 'FunctionExpression')
         ) {
           checkFunction(node.init, node.id.name)
         }
@@ -242,7 +242,7 @@ export default {
         if (node.key?.type === 'Identifier' && node.value?.type === 'FunctionExpression') {
           checkFunction(node.value, node.key.name)
         }
-      },
+      }
     }
-  },
+  }
 }

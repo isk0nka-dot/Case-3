@@ -126,7 +126,10 @@ defineProps<{
                 color: var(--argus-text, #e0e0e8);
               "
             >
-              <p class="font-semibold mb-2" style="color: var(--argus-error, #ef4444)">
+              <p
+                class="font-semibold mb-2"
+                style="color: var(--argus-error, #ef4444)"
+              >
                 Хранилище браузера почти заполнено.
               </p>
               <p>

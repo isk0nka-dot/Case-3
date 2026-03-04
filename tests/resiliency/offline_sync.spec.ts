@@ -414,11 +414,11 @@ test.describe('Offline Sync — IndexedDB Persistence', () => {
       })
 
       // Read all pending events and sort by priority (matching drain logic)
-      const allEvents = await new Promise<{ priority: string; createdAt: number }[]>((resolve, reject) => {
+      const allEvents = await new Promise<{ priority: string, createdAt: number }[]>((resolve, reject) => {
         const tx = db.transaction('events', 'readonly')
         const store = tx.objectStore('events')
         const index = store.index('status')
-        const results: { priority: string; createdAt: number }[] = []
+        const results: { priority: string, createdAt: number }[] = []
         const request = index.openCursor(IDBKeyRange.only('pending'))
         request.onsuccess = (event) => {
           const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result

@@ -36,7 +36,7 @@ onMounted(async () => {
     studentId: props.studentId,
     examId: props.examId,
     orgId: props.orgId,
-    policy: props.policy,
+    policy: props.policy
   })
   emit('pairingStarted')
 })
@@ -141,7 +141,7 @@ async function retryPairing() {
     studentId: props.studentId,
     examId: props.examId,
     orgId: props.orgId,
-    policy: props.policy,
+    policy: props.policy
   })
 }
 
@@ -159,7 +159,10 @@ onUnmounted(() => {
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
         <div :class="[phaseIcon, phaseColor, 'w-5 h-5']" />
-        <span class="font-semibold text-sm" :class="phaseColor">{{ phaseLabel }}</span>
+        <span
+          class="font-semibold text-sm"
+          :class="phaseColor"
+        >{{ phaseLabel }}</span>
       </div>
       <span
         v-if="props.policy === 'mandatory'"
@@ -178,13 +181,19 @@ onUnmounted(() => {
     </div>
 
     <!-- Loading -->
-    <div v-if="sidecam.isLoading.value" class="flex items-center justify-center py-6">
+    <div
+      v-if="sidecam.isLoading.value"
+      class="flex items-center justify-center py-6"
+    >
       <div class="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
       <span class="ml-2 text-xs opacity-60">Инициализация...</span>
     </div>
 
     <!-- QR Code Phase -->
-    <div v-else-if="sidecam.phase.value === 'pairing'" class="space-y-3">
+    <div
+      v-else-if="sidecam.phase.value === 'pairing'"
+      class="space-y-3"
+    >
       <div
         class="mx-auto w-48 h-48 rounded-lg flex items-center justify-center"
         :class="isDark ? 'bg-white' : 'bg-white border border-gray-200'"
@@ -208,7 +217,10 @@ onUnmounted(() => {
     </div>
 
     <!-- Calibrating Phase -->
-    <div v-else-if="sidecam.phase.value === 'calibrating'" class="space-y-3">
+    <div
+      v-else-if="sidecam.phase.value === 'calibrating'"
+      class="space-y-3"
+    >
       <div
         class="rounded-lg p-3"
         :class="isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'"
@@ -216,7 +228,9 @@ onUnmounted(() => {
         <div class="flex items-start gap-2">
           <div class="i-lucide-scan-eye w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
           <div class="space-y-1">
-            <p class="text-xs font-medium">Калибровка камеры</p>
+            <p class="text-xs font-medium">
+              Калибровка камеры
+            </p>
             <p class="text-[10px] opacity-70">
               {{ sidecam.calibration.value?.message || 'Расположите камеру под углом 45-60° к монитору' }}
             </p>
@@ -270,7 +284,10 @@ onUnmounted(() => {
     </div>
 
     <!-- Ready Phase -->
-    <div v-else-if="sidecam.phase.value === 'ready'" class="space-y-3">
+    <div
+      v-else-if="sidecam.phase.value === 'ready'"
+      class="space-y-3"
+    >
       <!-- Stream Health Bar -->
       <div
         class="flex items-center justify-between p-2 rounded-lg"
@@ -280,39 +297,71 @@ onUnmounted(() => {
           <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
           <span class="text-xs font-medium text-green-400">Трансляция</span>
         </div>
-        <span class="text-[10px]" :class="qualityColor">{{ qualityLabel }}</span>
+        <span
+          class="text-[10px]"
+          :class="qualityColor"
+        >{{ qualityLabel }}</span>
       </div>
 
       <!-- Device Stats Grid -->
       <div class="grid grid-cols-3 gap-2">
         <!-- Battery -->
-        <div class="text-center p-2 rounded-lg" :class="isDark ? 'bg-white/5' : 'bg-gray-50'">
+        <div
+          class="text-center p-2 rounded-lg"
+          :class="isDark ? 'bg-white/5' : 'bg-gray-50'"
+        >
           <div :class="[batteryIcon, batteryColor, 'w-4 h-4 mx-auto mb-1']" />
-          <span class="text-xs font-mono" :class="batteryColor">{{ batteryPercent }}%</span>
+          <span
+            class="text-xs font-mono"
+            :class="batteryColor"
+          >{{ batteryPercent }}%</span>
         </div>
         <!-- Thermal -->
-        <div class="text-center p-2 rounded-lg" :class="isDark ? 'bg-white/5' : 'bg-gray-50'">
+        <div
+          class="text-center p-2 rounded-lg"
+          :class="isDark ? 'bg-white/5' : 'bg-gray-50'"
+        >
           <div :class="[thermalIcon, thermalColor, 'w-4 h-4 mx-auto mb-1']" />
-          <span class="text-xs font-mono" :class="thermalColor">
+          <span
+            class="text-xs font-mono"
+            :class="thermalColor"
+          >
             {{ sidecam.thermalState.value === 'nominal' ? 'ОК' : sidecam.thermalState.value }}
           </span>
         </div>
         <!-- Latency -->
-        <div class="text-center p-2 rounded-lg" :class="isDark ? 'bg-white/5' : 'bg-gray-50'">
-          <div class="i-lucide-activity w-4 h-4 mx-auto mb-1" :class="qualityColor" />
-          <span class="text-xs font-mono" :class="qualityColor">
+        <div
+          class="text-center p-2 rounded-lg"
+          :class="isDark ? 'bg-white/5' : 'bg-gray-50'"
+        >
+          <div
+            class="i-lucide-activity w-4 h-4 mx-auto mb-1"
+            :class="qualityColor"
+          />
+          <span
+            class="text-xs font-mono"
+            :class="qualityColor"
+          >
             {{ sidecam.pairingSession.value?.health?.latencyMs ?? '—' }}ms
           </span>
         </div>
       </div>
 
       <!-- Anomaly Alerts -->
-      <div v-if="!sidecam.handsOnDesk.value" class="flex items-center gap-2 p-2 rounded-lg" :class="isDark ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'">
+      <div
+        v-if="!sidecam.handsOnDesk.value"
+        class="flex items-center gap-2 p-2 rounded-lg"
+        :class="isDark ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'"
+      >
         <div class="i-lucide-alert-triangle w-4 h-4 text-red-400" />
         <span class="text-xs text-red-400">Руки не на столе</span>
       </div>
 
-      <div v-if="sidecam.displacementAlert.value" class="flex items-center gap-2 p-2 rounded-lg" :class="isDark ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'">
+      <div
+        v-if="sidecam.displacementAlert.value"
+        class="flex items-center gap-2 p-2 rounded-lg"
+        :class="isDark ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'"
+      >
         <div class="i-lucide-move w-4 h-4 text-red-400" />
         <span class="text-xs text-red-400">Устройство перемещено</span>
       </div>
@@ -330,39 +379,59 @@ onUnmounted(() => {
           class="w-4 h-4"
           :class="alert.severity === 'critical' ? 'i-lucide-alert-octagon text-red-400' : 'i-lucide-alert-triangle text-amber-400'"
         />
-        <span class="text-xs" :class="alert.severity === 'critical' ? 'text-red-400' : 'text-amber-400'">
+        <span
+          class="text-xs"
+          :class="alert.severity === 'critical' ? 'text-red-400' : 'text-amber-400'"
+        >
           {{ alert.message }}
         </span>
       </div>
     </div>
 
     <!-- Disconnected Phase -->
-    <div v-else-if="sidecam.phase.value === 'disconnected'" class="space-y-3">
+    <div
+      v-else-if="sidecam.phase.value === 'disconnected'"
+      class="space-y-3"
+    >
       <div
         class="flex items-center gap-2 p-3 rounded-lg"
         :class="isDark ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'"
       >
         <div class="i-lucide-wifi-off w-5 h-5 text-orange-400" />
         <div>
-          <p class="text-xs font-medium text-orange-400">Связь потеряна</p>
-          <p class="text-[10px] opacity-60">Ожидание восстановления...</p>
+          <p class="text-xs font-medium text-orange-400">
+            Связь потеряна
+          </p>
+          <p class="text-[10px] opacity-60">
+            Ожидание восстановления...
+          </p>
         </div>
       </div>
-      <p v-if="props.policy === 'mandatory'" class="text-[10px] text-red-400 text-center">
+      <p
+        v-if="props.policy === 'mandatory'"
+        class="text-[10px] text-red-400 text-center"
+      >
         Экзамен будет приостановлен до восстановления связи
       </p>
     </div>
 
     <!-- Failed Phase -->
-    <div v-else-if="sidecam.phase.value === 'failed'" class="space-y-3">
+    <div
+      v-else-if="sidecam.phase.value === 'failed'"
+      class="space-y-3"
+    >
       <div
         class="flex items-center gap-2 p-3 rounded-lg"
         :class="isDark ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'"
       >
         <div class="i-lucide-x-circle w-5 h-5 text-red-400" />
         <div>
-          <p class="text-xs font-medium text-red-400">Ошибка сопряжения</p>
-          <p class="text-[10px] opacity-60">{{ sidecam.error.value }}</p>
+          <p class="text-xs font-medium text-red-400">
+            Ошибка сопряжения
+          </p>
+          <p class="text-[10px] opacity-60">
+            {{ sidecam.error.value }}
+          </p>
         </div>
       </div>
       <button

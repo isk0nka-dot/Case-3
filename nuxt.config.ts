@@ -6,6 +6,8 @@ export default defineNuxtConfig({
     '@pinia/nuxt'
   ],
 
+  ssr: false,
+
   devtools: {
     enabled: true
   },
@@ -40,12 +42,6 @@ export default defineNuxtConfig({
     classSuffix: ''
   },
 
-  routeRules: {
-    '/': { ssr: true }
-  },
-
-  ssr: false,
-
   // Runtime configuration for the backend API base URL.
   // Override via environment variable:
   //   NUXT_PUBLIC_API_BASE_URL=https://api.argus.ai
@@ -56,6 +52,10 @@ export default defineNuxtConfig({
       // Backwards-compat: NUXT_PUBLIC_GRPC_URL is read via fallback below.
       apiBaseUrl: 'http://localhost:8080'
     }
+  },
+
+  routeRules: {
+    '/': { ssr: true }
   },
 
   compatibilityDate: '2025-01-15',

@@ -187,8 +187,8 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
 
   async function refreshStats(): Promise<void> {
     try {
-      const [pendingEvents, pendingSnapshots, failedEvents, failedSnapshots, totalSize, oldestAge] =
-        await Promise.all([
+      const [pendingEvents, pendingSnapshots, failedEvents, failedSnapshots, totalSize, oldestAge]
+        = await Promise.all([
           countEventsByStatus('pending'),
           countSnapshotsByStatus('pending'),
           countEventsByStatus('failed'),
@@ -571,7 +571,7 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
   // -------------------------------------------------------------------------
 
   /** Browser storage quota info. */
-  const storageQuota: Ref<{ usage: number; quota: number; percent: number }> = ref({
+  const storageQuota: Ref<{ usage: number, quota: number, percent: number }> = ref({
     usage: 0,
     quota: 0,
     percent: 0
