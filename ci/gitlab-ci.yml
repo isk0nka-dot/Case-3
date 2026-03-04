@@ -84,32 +84,32 @@ sync-infra:
 
       # ── Docker compose files + configs ──
       echo "→ Syncing docker/ (compose, redis, clickhouse configs)..."
-      rsync -avz --exclude='.env' --exclude='keys/' \
+      rsync -avzO --exclude='.env' --exclude='keys/' \
         docker/docker-compose.yaml \
         docker/docker-compose.prod.yml \
         docker/redis.conf \
         ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/docker/
 
       # Sync clickhouse config XMLs
-      rsync -avz \
+      rsync -avzO \
         docker/clickhouse/ \
         ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/docker/clickhouse/
 
       # ── Nginx config ──
       echo "→ Syncing nginx/"
-      rsync -avz \
+      rsync -avzO \
         nginx/ \
         ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/nginx/
 
       # ── Migrations ──
       echo "→ Syncing migrations/"
-      rsync -avz \
+      rsync -avzO \
         migrations/ \
         ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/migrations/
 
       # ── Scripts ──
       echo "→ Syncing scripts/"
-      rsync -avz \
+      rsync -avzO \
         scripts/ \
         ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/scripts/
 
