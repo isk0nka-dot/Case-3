@@ -698,9 +698,9 @@ export async function getOldestPendingAge(): Promise<number> {
 
 /**
  * Safely evict old LOW and NORMAL priority events to free up storage space.
- * CRITICAL and HIGH events (violations, screenshots) are NEVER evicted, 
+ * CRITICAL and HIGH events (violations, screenshots) are NEVER evicted,
  * preserving the legal evidence chain while preventing browser crashes.
- * 
+ *
  * @param count - Maximum number of events to evict
  * @returns Number of events actually evicted
  */
@@ -716,7 +716,7 @@ export async function evictOldEvents(count: number): Promise<number> {
     const lowReq = index.openCursor(IDBKeyRange.only('low'))
 
     // Arrays to collect IDs (since we can't reliably sort by createdAt via cursor easily when indexing by priority)
-    // Actually, we can just delete from the cursor directly, which is close enough to 'oldest first' 
+    // Actually, we can just delete from the cursor directly, which is close enough to 'oldest first'
     // because add() usually appends in insertion order.
 
     lowReq.onsuccess = (event) => {

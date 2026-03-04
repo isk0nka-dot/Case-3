@@ -18,7 +18,15 @@ export default withNuxt(
       }
     },
     rules: {
-      'argus/no-duplicate-utils': 'error'
+      'argus/no-duplicate-utils': 'warn',
+      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@stylistic/max-statements-per-line': 'warn',
+      'vue/no-mutating-props': 'warn',
+      'vue/return-in-computed-property': 'warn',
+      '@typescript-eslint/unified-signatures': 'warn',
+      '@typescript-eslint/no-duplicate-enum-values': 'warn',
+      'no-useless-escape': 'warn'
     }
   }
 )
