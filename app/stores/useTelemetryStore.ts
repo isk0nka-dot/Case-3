@@ -89,127 +89,47 @@ export interface SessionTelemetry {
 }
 
 // ---------------------------------------------------------------------------
-// Internal: Pre-allocated Buffers
-// ---------------------------------------------------------------------------
-
-/** Gaze buffer using Float32Array for memory efficiency. */
-class GazeBuffer {
-  // Each gaze point = 3 floats (x, y, timestamp_offset).
-  // Buffer holds 256 points = 3072 bytes (3KB).
-  private buffer: Float32Array
-  private head = 0
-  private _size = 0
-  readonly capacity: number
-
-  constructor(capacity: number = 256) {
-    this.capacity = capacity
-    this.buffer = new Float32Array(capacity * 3)
-  }
-
-  push(x: number, y: number, timestampOffset: number): void {
-    const idx = this.head * 3
-    this.buffer[idx] = x
-    this.buffer[idx + 1] = y
-    this.buffer[idx + 2] = timestampOffset
-    this.head = (this.head + 1) % this.capacity
-    if (this._size < this.capacity) this._size++
-  }
-
-  get size(): number {
-    return this._size
-  }
-
-  /** Get recent N points as GazePoint array for rendering. */
-  recent(count: number): GazePoint[] {
-    const n = Math.min(count, this._size)
-    const result: GazePoint[] = []
-    for (let i = 0; i < n; i++) {
-      const idx = ((this.head - 1 - i + this.capacity) % this.capacity) * 3
-      result.push({
-        x: this.buffer[idx]!,
-        y: this.buffer[idx + 1]!,
-        timestamp: this.buffer[idx + 2]!
-      })
-    }
-    return result
-  }
-
-  clear(): void {
-    this.buffer.fill(0)
-    this.head = 0
-    this._size = 0
-  }
-}
-
-/** Heatmap accumulator using Uint16Array for count tracking. */
-class HeatmapAccumulator {
-  private readonly gridSize: number
-  private counts: Uint16Array
-
-  constructor(gridSize: number = 10) {
-    this.gridSize = gridSize
-    this.counts = new Uint16Array(gridSize * gridSize)
-  }
-
-  /** Record a gaze point at (x, y) where 0 <= x,y <= 1. */
-  record(x: number, y: number): void {
-    const gx = Math.min(this.gridSize - 1, Math.floor(x * this.gridSize))
-    const gy = Math.min(this.gridSize - 1, Math.floor(y * this.gridSize))
-    this.counts[gy * this.gridSize + gx]!++
-  }
-
-  /** Export as HeatmapCell array for rendering. */
-  toGrid(): HeatmapCell[] {
-    let maxCount = 0
-    for (let i = 0; i < this.counts.length; i++) {
-      if (this.counts[i]! > maxCount) maxCount = this.counts[i]!
-    }
-
-    const cells: HeatmapCell[] = []
-    for (let gy = 0; gy < this.gridSize; gy++) {
-      for (let gx = 0; gx < this.gridSize; gx++) {
-        const count = this.counts[gy * this.gridSize + gx]!
-        cells.push({
-          gridX: gx,
-          gridY: gy,
-          count,
-          intensity: maxCount > 0 ? count / maxCount : 0
-        })
-      }
-    }
-    return cells
-  }
-
-  clear(): void {
-    this.counts.fill(0)
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
 export const useTelemetryStore = defineStore('telemetry', () => {
-  // -------------------------------------------------------------------------
-  // Internal State (non-reactive for performance)
-  // -------------------------------------------------------------------------
-
-  // Per-session buffers: sessionId → { gazeBuffer, heatmap, ... }
-  const gazeBuffers = new Map<string, GazeBuffer>()
-  const heatmapAccumulators = new Map<string, HeatmapAccumulator>()
-  const mousePositions = new Map<string, { x: number, y: number }>()
-  const focusHistories = new Map<string, number[]>()
-  const typingHistories = new Map<string, number[]>()
-  const sampleCounts = new Map<string, { gaze: number, mouse: number, keyboard: number }>()
-
-  // Session start times for timestamp offset calculation.
-  const sessionStartTimes = new Map<string, number>()
-
-  // Update timer.
-  let updateTimer: ReturnType<typeof setInterval> | null = null
 
   // -------------------------------------------------------------------------
-  // Reactive State (updated at 2Hz)
+  // Worker Initialization
+  // -------------------------------------------------------------------------
+
+  let worker: Worker | null = null
+
+  function initWorker() {
+    if (worker) return
+    // Assuming the worker is served correctly by Nuxt/Vite
+    worker = new Worker(new URL('../workers/telemetry.worker.ts', import.meta.url), { type: 'module' })
+
+    worker.onmessage = (e) => {
+      const { type, payload } = e.data
+      if (type === 'SYNC_STATE') {
+        const now = Date.now()
+        const newSessions = new Map<string, SessionTelemetry>()
+
+        // Convert plain object back to Map and freeze states
+        for (const sessionId of Object.keys(payload.sessions)) {
+          const s = payload.sessions[sessionId]
+          newSessions.set(sessionId, Object.freeze({
+            ...s,
+            lastUpdate: now
+          }) as SessionTelemetry)
+        }
+
+        sessions.value = newSessions
+        triggerRef(sessions)
+
+        globalStats.value = payload.globalStats
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Reactive State (updated at 2Hz from Worker)
   // -------------------------------------------------------------------------
 
   /**
@@ -229,109 +149,44 @@ export const useTelemetryStore = defineStore('telemetry', () => {
     totalKeyboardEvents: 0
   })
 
+  // Update timer (asks worker for state).
+  let updateTimer: ReturnType<typeof setInterval> | null = null
+
   // -------------------------------------------------------------------------
   // Session Management
   // -------------------------------------------------------------------------
 
-  /**
-   * Start tracking telemetry for a session.
-   */
   function startSession(sessionId: string): void {
-    if (gazeBuffers.has(sessionId)) return
+    initWorker()
+    if (activeSessionIds.value.includes(sessionId)) return
 
-    gazeBuffers.set(sessionId, new GazeBuffer(256))
-    heatmapAccumulators.set(sessionId, new HeatmapAccumulator(10))
-    mousePositions.set(sessionId, { x: 0.5, y: 0.5 })
-    focusHistories.set(sessionId, [])
-    typingHistories.set(sessionId, [])
-    sampleCounts.set(sessionId, { gaze: 0, mouse: 0, keyboard: 0 })
-    sessionStartTimes.set(sessionId, Date.now())
-
+    worker?.postMessage({ type: 'START_SESSION', payload: { sessionId } })
     activeSessionIds.value = [...activeSessionIds.value, sessionId]
   }
 
-  /**
-   * Stop tracking telemetry for a session.
-   */
   function stopSession(sessionId: string): void {
-    gazeBuffers.get(sessionId)?.clear()
-    gazeBuffers.delete(sessionId)
-    heatmapAccumulators.get(sessionId)?.clear()
-    heatmapAccumulators.delete(sessionId)
-    mousePositions.delete(sessionId)
-    focusHistories.delete(sessionId)
-    typingHistories.delete(sessionId)
-    sampleCounts.delete(sessionId)
-    sessionStartTimes.delete(sessionId)
-
+    worker?.postMessage({ type: 'STOP_SESSION', payload: { sessionId } })
     activeSessionIds.value = activeSessionIds.value.filter(id => id !== sessionId)
   }
 
   // -------------------------------------------------------------------------
-  // Data Ingestion (high-frequency, non-reactive)
+  // Data Ingestion (offloaded to Web Worker via postMessage)
   // -------------------------------------------------------------------------
 
-  /**
-   * Record a gaze data point.
-   * Called at 30Hz from the gaze tracking system.
-   */
   function recordGaze(sessionId: string, x: number, y: number): void {
-    const buffer = gazeBuffers.get(sessionId)
-    if (!buffer) return
-
-    const startTime = sessionStartTimes.get(sessionId) ?? Date.now()
-    buffer.push(x, y, Date.now() - startTime)
-
-    // Update heatmap.
-    heatmapAccumulators.get(sessionId)?.record(x, y)
-
-    // Increment counter.
-    const counts = sampleCounts.get(sessionId)
-    if (counts) counts.gaze++
+    worker?.postMessage({ type: 'RECORD_GAZE', payload: { sessionId, x, y } })
   }
 
-  /**
-   * Record a mouse position.
-   * Called at 60Hz from mousemove events.
-   */
   function recordMouse(sessionId: string, x: number, y: number): void {
-    const pos = mousePositions.get(sessionId)
-    if (pos) {
-      pos.x = x
-      pos.y = y
-    }
-
-    const counts = sampleCounts.get(sessionId)
-    if (counts) counts.mouse++
+    worker?.postMessage({ type: 'RECORD_MOUSE', payload: { sessionId, x, y } })
   }
 
-  /**
-   * Record a keyboard event.
-   * Called on each keystroke (~5Hz average).
-   */
   function recordKeyboard(sessionId: string, wpm: number): void {
-    const history = typingHistories.get(sessionId)
-    if (history) {
-      history.push(wpm)
-      // Keep last 120 data points (2 minutes at 1Hz after aggregation).
-      if (history.length > 120) history.shift()
-    }
-
-    const counts = sampleCounts.get(sessionId)
-    if (counts) counts.keyboard++
+    worker?.postMessage({ type: 'RECORD_KEYBOARD', payload: { sessionId, wpm } })
   }
 
-  /**
-   * Record a focus score update.
-   * Called at ~1Hz from the AI model.
-   */
   function recordFocusScore(sessionId: string, score: number): void {
-    const history = focusHistories.get(sessionId)
-    if (history) {
-      history.push(score)
-      // Keep last 120 data points (2 minutes).
-      if (history.length > 120) history.shift()
-    }
+    worker?.postMessage({ type: 'RECORD_FOCUS', payload: { sessionId, score } })
   }
 
   // -------------------------------------------------------------------------
@@ -362,56 +217,11 @@ export const useTelemetryStore = defineStore('telemetry', () => {
 
   /**
    * Sync non-reactive internal state → reactive Vue state.
-   * This is the only point where Vue reactivity is triggered.
+   * This simply asks the background Worker to construct the state and postMessage it back.
    */
   function syncReactiveState(): void {
-    const now = Date.now()
-    const newSessions = new Map<string, SessionTelemetry>()
-
-    let totalGaze = 0
-    let totalMouse = 0
-    let totalKeyboard = 0
-
-    for (const sessionId of activeSessionIds.value) {
-      const gazeBuffer = gazeBuffers.get(sessionId)
-      const heatmap = heatmapAccumulators.get(sessionId)
-      const mouse = mousePositions.get(sessionId)
-      const focus = focusHistories.get(sessionId)
-      const typing = typingHistories.get(sessionId)
-      const counts = sampleCounts.get(sessionId)
-
-      if (!gazeBuffer || !heatmap || !counts) continue
-
-      totalGaze += counts.gaze
-      totalMouse += counts.mouse
-      totalKeyboard += counts.keyboard
-
-      // Extract recent 2 seconds of gaze trail (60 points at 30Hz).
-      const gazeTrail = gazeBuffer.recent(60)
-
-      newSessions.set(sessionId, Object.freeze({
-        gazeTrail,
-        heatmap: heatmap.toGrid(),
-        currentGaze: gazeTrail[0] ? { x: gazeTrail[0].x, y: gazeTrail[0].y } : null,
-        currentMouse: mouse ? { ...mouse } : null,
-        focusHistory: focus ? [...focus] : [],
-        typingSpeedHistory: typing ? [...typing] : [],
-        lastUpdate: now,
-        totalGazeSamples: counts.gaze,
-        totalMouseSamples: counts.mouse,
-        totalKeyboardEvents: counts.keyboard
-      }) as SessionTelemetry)
-    }
-
-    sessions.value = newSessions
-    triggerRef(sessions)
-
-    globalStats.value = {
-      totalSessions: activeSessionIds.value.length,
-      totalGazeSamples: totalGaze,
-      totalMouseSamples: totalMouse,
-      totalKeyboardEvents: totalKeyboard
-    }
+    if (!worker) return
+    worker.postMessage({ type: 'GET_STATE' })
   }
 
   // -------------------------------------------------------------------------

@@ -692,10 +692,57 @@ export async function getOldestPendingAge(): Promise<number> {
   })
 }
 
-// NOTE: evictToSizeLimit() has been REMOVED (ADR-007: Edge Persistence Policy).
-// Evidence is NEVER evicted — storage pressure triggers HardBlockerModal instead.
-// The browser evidence queue is a legal evidence chain; destroying evidence is
-// prohibited regardless of storage quota pressure.
+// ---------------------------------------------------------------------------
+// Eviction Utility (v3.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Safely evict old LOW and NORMAL priority events to free up storage space.
+ * CRITICAL and HIGH events (violations, screenshots) are NEVER evicted, 
+ * preserving the legal evidence chain while preventing browser crashes.
+ * 
+ * @param count - Maximum number of events to evict
+ * @returns Number of events actually evicted
+ */
+export async function evictOldEvents(count: number): Promise<number> {
+  const db = await openDB()
+  return new Promise<number>((resolve, reject) => {
+    let evicted = 0
+    const tx = db.transaction(STORE_EVENTS, 'readwrite')
+    const store = tx.objectStore(STORE_EVENTS)
+    const index = store.index('priority') // 'low' or 'normal'
+
+    // We evict 'low' priority first.
+    const lowReq = index.openCursor(IDBKeyRange.only('low'))
+
+    // Arrays to collect IDs (since we can't reliably sort by createdAt via cursor easily when indexing by priority)
+    // Actually, we can just delete from the cursor directly, which is close enough to 'oldest first' 
+    // because add() usually appends in insertion order.
+
+    lowReq.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
+      if (cursor && evicted < count) {
+        cursor.delete()
+        evicted++
+        cursor.continue()
+      } else if (evicted < count) {
+        // If we ran out of 'low' events, try 'normal'
+        const normalReq = index.openCursor(IDBKeyRange.only('normal'))
+        normalReq.onsuccess = (e) => {
+          const nCursor = (e.target as IDBRequest<IDBCursorWithValue | null>).result
+          if (nCursor && evicted < count) {
+            nCursor.delete()
+            evicted++
+            nCursor.continue()
+          }
+        }
+      }
+    }
+
+    tx.oncomplete = () => resolve(evicted)
+    tx.onerror = () => reject(tx.error)
+  })
+}
 
 // ---------------------------------------------------------------------------
 // SHA-256 Utility

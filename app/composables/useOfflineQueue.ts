@@ -39,6 +39,7 @@ import {
   updateSnapshotStatus,
   getTotalQueueSize,
   getOldestPendingAge,
+  evictOldEvents,
   sha256,
   hmacSha256,
   type QueuedEvent,
@@ -667,7 +668,31 @@ export function useOfflineQueue(config?: Partial<OfflineQueueConfig>) {
       storageQuota.value = { usage, quota, percent }
 
       if (percent >= QUOTA_CRITICAL_THRESHOLD && !isStorageBlocked.value) {
-        // CRITICAL: Storage nearly full. Hard-block the exam.
+        // STORAGE CRITICAL (80%+): Try to free space before blocking
+        console.warn('[argus:queue] Storage reaching limit, evicting LOW/NORMAL events...')
+
+        // Evict up to 5000 low-priority events
+        const evictedCount = await evictOldEvents(5000)
+
+        if (evictedCount > 0) {
+          console.info('[argus:queue] Evicted', evictedCount, 'events. Rechecking quota...')
+          // Refresh estimate
+          const newEstimate = await navigator.storage.estimate()
+          const newUsage = newEstimate.usage ?? 0
+          const newQuota = newEstimate.quota ?? 0
+          const newPercent = newQuota > 0 ? newUsage / newQuota : 0
+
+          storageQuota.value = { usage: newUsage, quota: newQuota, percent: newPercent }
+
+          // If we successfully dropped below threshold, skip the hard block
+          if (newPercent < QUOTA_CRITICAL_THRESHOLD) {
+            console.info('[argus:queue] Storage recovered organically via eviction.')
+            void refreshStats()
+            return
+          }
+        }
+
+        // If eviction didn't help (e.g. only CRITICAL events left), we MUST hard-block.
         isStorageBlocked.value = true
         stopDrain()
         console.error('[argus:queue] STORAGE CRITICAL — exam hard-blocked', {
