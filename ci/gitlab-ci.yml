@@ -65,6 +65,7 @@ lint:
   stage: verify
   needs: [install]
   script:
+    - npx nuxt prepare
     - npm run lint
   tags:
     - prod
