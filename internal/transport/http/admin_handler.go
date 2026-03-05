@@ -10,19 +10,20 @@
 //   - proctor/viewer: read-only access to their own organization
 //
 // URL structure:
-//   POST   /api/v1/auth/login                     — Authenticate user
-//   GET    /api/v1/auth/me                         — Get current user info
-//   GET    /api/v1/admin/organizations              — List organizations (super_admin only)
-//   POST   /api/v1/admin/organizations              — Create organization (super_admin only)
-//   GET    /api/v1/admin/organizations/:orgId       — Get organization details
-//   PUT    /api/v1/admin/organizations/:orgId       — Update organization
-//   DELETE /api/v1/admin/organizations/:orgId       — Soft-delete organization
-//   GET    /api/v1/admin/organizations/:orgId/users — List users for org
-//   POST   /api/v1/admin/organizations/:orgId/users — Create user
-//   GET    /api/v1/admin/organizations/:orgId/keys  — List API keys
-//   POST   /api/v1/admin/organizations/:orgId/keys  — Create API key
-//   DELETE /api/v1/admin/keys/:keyId                — Revoke API key
-//   GET    /api/v1/admin/stats                      — Cross-org statistics
+//
+//	POST   /api/v1/auth/login                     — Authenticate user
+//	GET    /api/v1/auth/me                         — Get current user info
+//	GET    /api/v1/admin/organizations              — List organizations (super_admin only)
+//	POST   /api/v1/admin/organizations              — Create organization (super_admin only)
+//	GET    /api/v1/admin/organizations/:orgId       — Get organization details
+//	PUT    /api/v1/admin/organizations/:orgId       — Update organization
+//	DELETE /api/v1/admin/organizations/:orgId       — Soft-delete organization
+//	GET    /api/v1/admin/organizations/:orgId/users — List users for org
+//	POST   /api/v1/admin/organizations/:orgId/users — Create user
+//	GET    /api/v1/admin/organizations/:orgId/keys  — List API keys
+//	POST   /api/v1/admin/organizations/:orgId/keys  — Create API key
+//	DELETE /api/v1/admin/keys/:keyId                — Revoke API key
+//	GET    /api/v1/admin/stats                      — Cross-org statistics
 package http
 
 import (
@@ -267,21 +268,21 @@ func (h *AdminHandler) handleCreateOrg(w http.ResponseWriter, r *http.Request) {
 	}
 
 	org := &entity.Organization{
-		OrgID:        req.OrgID,
-		Name:         req.Name,
-		Slug:         req.Slug,
-		OrgType:      orgType,
-		ContactEmail: req.ContactEmail,
-		ContactPhone: req.ContactPhone,
-		City:         req.City,
-		Region:       req.Region,
-		Plan:         entity.Plan(plan),
-		MaxSessions:  req.MaxSessions,
-		MaxEventsRPS: req.MaxEventsRPS,
+		OrgID:         req.OrgID,
+		Name:          req.Name,
+		Slug:          req.Slug,
+		OrgType:       orgType,
+		ContactEmail:  req.ContactEmail,
+		ContactPhone:  req.ContactPhone,
+		City:          req.City,
+		Region:        req.Region,
+		Plan:          entity.Plan(plan),
+		MaxSessions:   req.MaxSessions,
+		MaxEventsRPS:  req.MaxEventsRPS,
 		RetentionDays: 90,
-		IsActive:     true,
-		CreatedBy:    caller.ID,
-		UpdatedBy:    caller.ID,
+		IsActive:      true,
+		CreatedBy:     caller.ID,
+		UpdatedBy:     caller.ID,
 	}
 
 	if req.MaxSessions == 0 {
@@ -392,21 +393,21 @@ func (h *AdminHandler) handleCreateOrgWithAdmin(w http.ResponseWriter, r *http.R
 	}
 
 	org := &entity.Organization{
-		OrgID:        req.OrgID,
-		Name:         req.Name,
-		Slug:         req.Slug,
-		OrgType:      orgType,
-		ContactEmail: req.ContactEmail,
-		ContactPhone: req.ContactPhone,
-		City:         req.City,
-		Region:       req.Region,
-		Plan:         entity.Plan(plan),
-		MaxSessions:  req.MaxSessions,
-		MaxEventsRPS: req.MaxEventsRPS,
+		OrgID:         req.OrgID,
+		Name:          req.Name,
+		Slug:          req.Slug,
+		OrgType:       orgType,
+		ContactEmail:  req.ContactEmail,
+		ContactPhone:  req.ContactPhone,
+		City:          req.City,
+		Region:        req.Region,
+		Plan:          entity.Plan(plan),
+		MaxSessions:   req.MaxSessions,
+		MaxEventsRPS:  req.MaxEventsRPS,
 		RetentionDays: 90,
-		IsActive:     true,
-		CreatedBy:    caller.ID,
-		UpdatedBy:    caller.ID,
+		IsActive:      true,
+		CreatedBy:     caller.ID,
+		UpdatedBy:     caller.ID,
 	}
 	if org.MaxSessions == 0 {
 		org.MaxSessions = 1000
@@ -482,7 +483,7 @@ func (h *AdminHandler) handleCreateOrgWithAdmin(w http.ResponseWriter, r *http.R
 	).Scan(&adminUser.ID, &adminUser.CreatedAt, &adminUser.UpdatedAt)
 	if err != nil {
 		h.logger.Error("TX: create admin user failed", zap.Error(err))
-		h.jsonError(w, "Failed to create admin user (phone may already exist): "+err.Error(), http.StatusConflict)
+		h.jsonError(w, "Не удалось создать администратора (возможно, такой номер телефона уже зарегистрирован)", http.StatusConflict)
 		return
 	}
 
@@ -911,7 +912,7 @@ func (h *AdminHandler) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		// Verify token and get user.
 		user, err := h.verifyToken(r.Context(), token)
 		if err != nil {
-			h.jsonError(w, "Invalid or expired token", http.StatusUnauthorized)
+			h.jsonError(w, "Токен недействителен или устарел", http.StatusUnauthorized)
 			return
 		}
 
@@ -963,14 +964,14 @@ func (h *AdminHandler) generateToken(user *entity.User) (string, error) {
 	// Use the existing auth package for token generation.
 	// For simplicity, we create a base64-encoded JSON payload with HMAC signature.
 	payload := map[string]interface{}{
-		"sub":      user.ID,
-		"phone":    user.Phone,
-		"org_id":   user.OrgID,
-		"role":     string(user.Role),
-		"name":     user.FullName,
-		"iat":      time.Now().Unix(),
-		"exp":      time.Now().Add(24 * time.Hour).Unix(),
-		"iss":      "argus-admin",
+		"sub":    user.ID,
+		"phone":  user.Phone,
+		"org_id": user.OrgID,
+		"role":   string(user.Role),
+		"name":   user.FullName,
+		"iat":    time.Now().Unix(),
+		"exp":    time.Now().Add(24 * time.Hour).Unix(),
+		"iss":    "argus-admin",
 	}
 
 	payloadJSON, err := json.Marshal(payload)

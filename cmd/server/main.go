@@ -1101,7 +1101,13 @@ func run() error {
 		MaxAge:           cfg.CORS.MaxAge,
 		AllowCredentials: cfg.CORS.AllowCredentials,
 	}
-	corsHandler := cors.Middleware(corsConfig)(grpcWebProxy)
+	// ---- Debug Middleware to log all requests ----
+	loggingMux := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger.Info("INCOMING HTTP REQUEST", zap.String("method", r.Method), zap.String("url", r.URL.String()), zap.String("path", r.URL.Path))
+		grpcWebProxy.ServeHTTP(w, r) // Pass the request to the next handler in the chain
+	})
+
+	corsHandler := cors.Middleware(corsConfig)(loggingMux)
 
 	// Security headers middleware — wraps the full handler stack.
 	// TLS is enabled when HTTPS is terminated at this server (not at Nginx).
