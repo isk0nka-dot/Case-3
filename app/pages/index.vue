@@ -787,7 +787,6 @@ const archiveKernelLabels: Record<string, string> = {
           <span class="text-white/80 font-semibold">99.9%</span>.
         </p>
 
-
         <!-- Scroll indicator -->
         <div class="mt-20 flex flex-col items-center gap-2 animate-bounce">
           <span class="text-[10px] text-white/30 uppercase tracking-widest">Узнать больше</span>
