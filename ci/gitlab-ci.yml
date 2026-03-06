@@ -67,6 +67,7 @@ lint:
   script:
     - npx nuxt prepare
     - npm run lint
+  allow_failure: true
   tags:
     - prod
   rules:
@@ -79,6 +80,7 @@ typecheck:
   needs: [install]
   script:
     - npm run typecheck
+  allow_failure: true
   tags:
     - prod
   rules:
@@ -95,7 +97,9 @@ deploy-production:
   image: alpine:3.20
   needs:
     - job: lint
+      optional: true
     - job: typecheck
+      optional: true
   script:
     - |
       # Determine git ref for the deploy

@@ -512,7 +512,7 @@ const studentCount = ref(1000)
 const pricePerStudent = computed(() => {
   if (studentCount.value > 5000) return 1.00
   if (studentCount.value > 2000) return 1.20
-  if (studentCount.value > 500) return 1.80
+  if (studentCount.value > 500) return 0.60
   return 2.50
 })
 
@@ -716,9 +716,6 @@ const archiveKernelLabels: Record<string, string> = {
             </NuxtLink>
           </template>
 
-          <button class="scanner-btn scanner-btn-nav px-5 py-2.5 rounded-lg text-sm font-bold text-white">
-            <span>Записаться на демо</span>
-          </button>
         </div>
       </div>
     </nav>
@@ -790,16 +787,6 @@ const archiveKernelLabels: Record<string, string> = {
           <span class="text-white/80 font-semibold">99.9%</span>.
         </p>
 
-        <!-- CTA Buttons -->
-        <div class="flex items-center justify-center gap-4 mt-12">
-          <button class="scanner-btn scanner-btn-hero px-8 py-4 rounded-xl text-base font-bold text-white">
-            <span>Записаться на демо</span>
-          </button>
-
-          <button class="scanner-btn scanner-btn-ghost px-8 py-4 rounded-xl text-base font-semibold text-white/70 hover:text-white">
-            <span>Как это работает</span>
-          </button>
-        </div>
 
         <!-- Scroll indicator -->
         <div class="mt-20 flex flex-col items-center gap-2 animate-bounce">
@@ -3173,7 +3160,7 @@ const archiveKernelLabels: Record<string, string> = {
                 />
               </div>
               <div class="min-w-0">
-                <span class="text-xs font-semibold text-white/70">{{ row.category }}</span>
+                <span class="text-sm font-semibold text-white/70">{{ row.category }}</span>
                 <span
                   v-if="row.highlight"
                   class="ml-2 text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase"
@@ -3198,7 +3185,7 @@ const archiveKernelLabels: Record<string, string> = {
                     :style="{ color: row.standard.level > 0 ? 'rgba(255,255,255,0.25)' : '#EA4335' }"
                   />
                 </div>
-                <span class="text-[10px] text-white/40 leading-tight">{{ row.standard.label }}</span>
+                <span class="text-sm text-white/40 leading-tight">{{ row.standard.label }}</span>
               </div>
             </div>
 
@@ -3221,7 +3208,7 @@ const archiveKernelLabels: Record<string, string> = {
                     style="color: #34A853;"
                   />
                 </div>
-                <span class="text-[10px] font-medium text-white/70 leading-tight">{{ row.argus.label }}</span>
+                <span class="text-sm font-medium text-white/70 leading-tight">{{ row.argus.label }}</span>
               </div>
             </div>
           </div>
@@ -3546,7 +3533,7 @@ const archiveKernelLabels: Record<string, string> = {
                   class="text-xs font-bold mt-0.5"
                   :style="{ color: studentCount > 500 && studentCount <= 2000 ? 'white' : 'rgba(255,255,255,0.2)' }"
                 >
-                  $1.80
+                  $0.60
                 </p>
               </div>
               <div
@@ -3621,12 +3608,6 @@ const archiveKernelLabels: Record<string, string> = {
               </div>
             </div>
 
-            <!-- CTA -->
-            <div class="text-center">
-              <button class="scanner-btn px-8 py-4 rounded-xl text-sm font-bold text-white">
-                <span>Связаться с отделом продаж</span>
-              </button>
-            </div>
           </div>
 
           <!-- API callout -->
@@ -3694,14 +3675,14 @@ const archiveKernelLabels: Record<string, string> = {
         </p>
 
         <div class="flex items-center justify-center gap-4 mt-12">
-          <button class="scanner-btn scanner-btn-hero px-10 py-5 rounded-xl text-lg font-bold text-white">
-            <span>Начать бесплатный пробный период</span>
-          </button>
+          <a
+            href="https://wa.me/77073057755"
+            target="_blank"
+            class="scanner-btn scanner-btn-hero px-10 py-5 rounded-xl text-lg font-bold text-white inline-flex items-center gap-3"
+          >
+            <span>Связаться с отделом продаж</span>
+          </a>
         </div>
-
-        <p class="text-xs text-white/30 mt-6">
-          14 дней бесплатно · Без привязки карты · Полный доступ
-        </p>
       </div>
     </section>
 
