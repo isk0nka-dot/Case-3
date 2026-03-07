@@ -715,7 +715,6 @@ const archiveKernelLabels: Record<string, string> = {
               <span>Админ панель</span>
             </NuxtLink>
           </template>
-
         </div>
       </div>
     </nav>
@@ -3606,7 +3605,6 @@ const archiveKernelLabels: Record<string, string> = {
                 </ul>
               </div>
             </div>
-
           </div>
 
           <!-- API callout -->
