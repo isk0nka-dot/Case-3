@@ -651,11 +651,11 @@ async function loadTabData(tab: string, orgId: string) {
   try {
     if (tab === 'users') {
       usersLoading.value = true
-      orgUsers.value = await adminAPI.listUsers(orgId)
+      orgUsers.value = (await adminAPI.listUsers(orgId)) ?? []
       usersLoading.value = false
     } else if (tab === 'keys') {
       keysLoading.value = true
-      orgApiKeys.value = await adminAPI.listAPIKeys(orgId)
+      orgApiKeys.value = (await adminAPI.listAPIKeys(orgId)) ?? []
       keysLoading.value = false
     } else if (tab === 'features') {
       loadFeatureToggles()
@@ -694,7 +694,7 @@ async function submitCreateUser() {
     })
     toast.add({ title: 'Пользователь создан', icon: 'i-lucide-check-circle', color: 'success' })
     showCreateUserForm.value = false
-    orgUsers.value = await adminAPI.listUsers(selectedOrg.value.orgId)
+    orgUsers.value = (await adminAPI.listUsers(selectedOrg.value.orgId)) ?? []
   } catch (err: unknown) {
     showErrorToast(err, 'Ошибка создания пользователя')
   } finally {
@@ -726,7 +726,7 @@ async function submitCreateKey() {
     })
     newlyCreatedSecret.value = response.secret
     toast.add({ title: 'API ключ создан', icon: 'i-lucide-check-circle', color: 'success' })
-    orgApiKeys.value = await adminAPI.listAPIKeys(selectedOrg.value.orgId)
+    orgApiKeys.value = (await adminAPI.listAPIKeys(selectedOrg.value.orgId)) ?? []
   } catch (err: unknown) {
     showErrorToast(err, 'Ошибка создания ключа')
   } finally {
@@ -741,7 +741,7 @@ async function revokeKey(keyId: string) {
     await adminAPI.revokeAPIKey(keyId)
     toast.add({ title: 'API ключ отозван', icon: 'i-lucide-check-circle', color: 'warning' })
     if (selectedOrg.value) {
-      orgApiKeys.value = await adminAPI.listAPIKeys(selectedOrg.value.orgId)
+      orgApiKeys.value = (await adminAPI.listAPIKeys(selectedOrg.value.orgId)) ?? []
     }
   } catch (err: unknown) {
     showErrorToast(err, 'Ошибка отзыва ключа')
