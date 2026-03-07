@@ -271,7 +271,7 @@ func (r *Repository) ListOrgs(ctx context.Context, filter port.OrgFilter) ([]*en
 	}
 	defer rows.Close()
 
-	var orgs []*entity.Organization
+	orgs := make([]*entity.Organization, 0)
 	for rows.Next() {
 		org := &entity.Organization{}
 		var plan string
@@ -373,7 +373,7 @@ func (r *Repository) ListUsersByOrg(ctx context.Context, orgID string) ([]*entit
 	}
 	defer rows.Close()
 
-	var users []*entity.User
+	users := make([]*entity.User, 0)
 	for rows.Next() {
 		u := &entity.User{}
 		var role string
@@ -436,7 +436,7 @@ func (r *Repository) ListAllUsers(ctx context.Context, filter port.UserFilter) (
 	}
 	defer rows.Close()
 
-	var users []*entity.User
+	users := make([]*entity.User, 0)
 	for rows.Next() {
 		u := &entity.User{}
 		var role string
@@ -542,7 +542,7 @@ func (r *Repository) ListAPIKeysByOrg(ctx context.Context, orgID string) ([]*ent
 	}
 	defer rows.Close()
 
-	var keys []*entity.APIKey
+	keys := make([]*entity.APIKey, 0)
 	for rows.Next() {
 		k := &entity.APIKey{}
 		var perms string
@@ -574,7 +574,7 @@ func (r *Repository) ListAllAPIKeys(ctx context.Context) ([]*entity.APIKey, erro
 	}
 	defer rows.Close()
 
-	var keys []*entity.APIKey
+	keys := make([]*entity.APIKey, 0)
 	for rows.Next() {
 		k := &entity.APIKey{}
 		var perms string
@@ -809,7 +809,7 @@ func (r *Repository) ListAuditLogs(ctx context.Context, filter AuditFilter) ([]*
 	}
 	defer rows.Close()
 
-	var entries []*entity.AuditEntry
+	entries := make([]*entity.AuditEntry, 0)
 	for rows.Next() {
 		e := &entity.AuditEntry{}
 		var detailsStr string
