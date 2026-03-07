@@ -7,6 +7,7 @@ require (
 	github.com/IBM/sarama v1.43.3
 	github.com/dgraph-io/badger/v4 v4.9.1
 	github.com/docker/docker v27.4.1+incompatible
+	github.com/google/uuid v1.6.0
 	github.com/hibiken/asynq v0.26.0
 	github.com/lib/pq v1.10.9
 	github.com/minio/minio-go/v7 v7.0.98
@@ -48,7 +49,6 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
