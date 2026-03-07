@@ -186,7 +186,9 @@ cd "$COMPOSE_DIR"
 export BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Rebuild only the target service (--no-deps prevents restarting dependencies)
-docker compose up -d --build --no-deps "$SERVICE" 2>&1 | tee -a "$LOG_FILE"
+# --no-cache ensures Docker always builds from fresh source, not stale layer cache
+docker compose build --no-cache "$SERVICE" 2>&1 | tee -a "$LOG_FILE"
+docker compose up -d --no-deps "$SERVICE" 2>&1 | tee -a "$LOG_FILE"
 
 # ── Step 5: Wait for container to become healthy ────────────────────────────
 CONTAINER_NAME="argus-${SERVICE}"
