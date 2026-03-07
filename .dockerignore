@@ -1,0 +1,31 @@
+# =============================================================================
+# argus-frontend — .dockerignore
+# Exclude heavy directories from Docker build context.
+# This ensures layer cache is based on SOURCE files only,
+# and prevents stale node_modules from being copied into the image.
+# =============================================================================
+
+# Dependencies (installed fresh inside container via npm ci)
+node_modules/
+
+# Nuxt generated files (rebuilt inside container via nuxt build)
+.nuxt/
+.output/
+.nitro/
+.cache/
+
+# Dev tools
+.git/
+.gitignore
+*.md
+playwright-report/
+test-results/
+tests/
+
+# CI/CD
+ci/
+
+# Env files (secrets must never enter the image)
+.env
+.env.*
+!.env.example
