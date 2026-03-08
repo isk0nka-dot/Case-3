@@ -13,6 +13,8 @@ dist/
 
 # ── Dependencies ─────────────────────────────────────────────────────────────
 node_modules/
+# Except Nitro server runtime deps (externalized by rollup, required at runtime)
+!.output/server/node_modules/
 
 # ── Environment & Secrets (CRITICAL: never commit) ──────────────────────────
 .env

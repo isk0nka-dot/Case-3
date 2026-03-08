@@ -8,11 +8,11 @@
 # Dependencies (installed fresh inside container via npm ci)
 node_modules/
 
-# Nuxt generated files (rebuilt inside container via nuxt build)
+# Nuxt generated files
 .nuxt/
-.output/
 .nitro/
 .cache/
+# .output/ is intentionally NOT excluded — pre-built and committed to git
 
 # Dev tools
 .git/
