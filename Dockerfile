@@ -1,60 +1,30 @@
 # =============================================================================
-# argus-frontend — Multi-stage Dockerfile
+# argus-frontend — Pre-built Dockerfile
 # =============================================================================
 #
-# Stage 1 (builder): Installs dependencies and produces a static Nuxt build.
-# Stage 2 (runtime): Serves the SPA via a minimal Node.js image.
-#
-# Build args:
-#   NUXT_PUBLIC_API_BASE_URL  Backend API URL baked into the build.
-#                              Can be overridden at runtime via environment.
+# .output/ is pre-built locally and committed to git.
+# This image simply copies the pre-built output — no npm ci / nuxt build needed.
 #
 # Usage:
-#   docker build \
-#     --build-arg NUXT_PUBLIC_API_BASE_URL=https://api.argus.ai \
-#     -t argus/frontend:latest .
-#
-#   docker run -p 3000:3000 \
-#     -e NUXT_PUBLIC_API_BASE_URL=https://api.argus.ai \
-#     argus/frontend:latest
+#   docker build -t argus/frontend:latest .
+#   docker run -p 3000:3000 argus/frontend:latest
 # =============================================================================
 
-# ── Stage 1: Build ────────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
-
-WORKDIR /app
-
-# Build argument — baked into the static output.
-ARG NUXT_PUBLIC_API_BASE_URL=http://localhost:8080
-ENV NUXT_PUBLIC_API_BASE_URL=${NUXT_PUBLIC_API_BASE_URL}
-
-# Install dependencies first (layer cache).
-COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
-
-# Copy application source.
-COPY . .
-
-# Build the Nuxt application.
-RUN npm run build
-
-# ── Stage 2: Runtime ──────────────────────────────────────────────────────────
-FROM node:22-alpine AS runtime
+FROM node:22-alpine
 
 WORKDIR /app
 
 # Create non-root user for security.
 RUN addgroup -S argus && adduser -S argus -G argus
 
-# Copy only the built output from the builder stage.
-COPY --from=builder --chown=argus:argus /app/.output /app/.output
+# Copy pre-built Nuxt output from git (built locally before commit).
+COPY --chown=argus:argus .output /app/.output
 
 USER argus
 
 # Nuxt server listens on port 3000 by default.
 EXPOSE 3000
 
-# Runtime env vars (override NUXT_PUBLIC_API_BASE_URL if needed).
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
