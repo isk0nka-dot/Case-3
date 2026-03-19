@@ -111,6 +111,29 @@ func (h *AppealsHandler) handleSubmitAppeal(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// ── Org isolation: NEVER trust client-supplied org_id ──────────────────
+	// Force org_id to the caller's organization. Super admin may override
+	// via the ?org_id= query parameter for cross-org operations.
+	caller := getUserFromContext(r.Context())
+	if caller == nil {
+		h.appealsJSONError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	orgID := caller.OrgID
+	if orgID == "*" {
+		if override := r.URL.Query().Get("org_id"); override != "" {
+			orgID = override
+		}
+	}
+	if orgID == "*" {
+		h.appealsJSONError(w, "org_id query parameter is required for super_admin", http.StatusBadRequest)
+		return
+	}
+
+	// Override the client-provided value with the verified org_id.
+	req.OrgID = orgID
+
 	id := generateAppealID()
 
 	_, err := h.db.ExecContext(r.Context(), `
@@ -126,8 +149,10 @@ func (h *AppealsHandler) handleSubmitAppeal(w http.ResponseWriter, r *http.Reque
 
 	h.logger.Info("appeal submitted",
 		zap.String("id", id),
+		zap.String("org_id", req.OrgID),
 		zap.String("session_id", req.SessionID),
 		zap.String("student_id", req.StudentID),
+		zap.String("submitted_by", caller.ID),
 	)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -227,6 +252,13 @@ func (h *AppealsHandler) handleGetAppeal(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// ── Org isolation: verify caller has access to this appeal ─────────────
+	caller := getUserFromContext(r.Context())
+	if caller == nil {
+		h.appealsJSONError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var a appealResponse
 	err := h.db.QueryRowContext(r.Context(), `
 		SELECT id, session_id, student_id, org_id, exam_id, reason, status,
@@ -243,6 +275,13 @@ func (h *AppealsHandler) handleGetAppeal(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		h.logger.Error("appeals: failed to get", zap.Error(err))
 		h.appealsJSONError(w, "Failed to get appeal", http.StatusInternalServerError)
+		return
+	}
+
+	// Org access check: non-super-admin can only see their own org's appeals.
+	// Returns 404 (not 403) to prevent appeal ID enumeration across orgs.
+	if caller.OrgID != "*" && a.OrgID != caller.OrgID {
+		h.appealsJSONError(w, "Appeal not found", http.StatusNotFound)
 		return
 	}
 
@@ -287,9 +326,13 @@ func (h *AppealsHandler) handleReviewAppeal(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Get current appeal to validate transition.
+	// ── Org isolation: fetch appeal status AND org_id in a single query ────
+	// Verify the caller's org matches the appeal's org before allowing update.
 	var currentStatus string
-	err := h.db.QueryRowContext(r.Context(), `SELECT status FROM appeals WHERE id = $1`, appealID).Scan(&currentStatus)
+	var appealOrgID string
+	err := h.db.QueryRowContext(r.Context(),
+		`SELECT status, org_id FROM appeals WHERE id = $1`, appealID,
+	).Scan(&currentStatus, &appealOrgID)
 	if err == sql.ErrNoRows {
 		h.appealsJSONError(w, "Appeal not found", http.StatusNotFound)
 		return
@@ -300,6 +343,12 @@ func (h *AppealsHandler) handleReviewAppeal(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Org access check: org_admin can only review appeals within their org.
+	if caller.OrgID != "*" && appealOrgID != caller.OrgID {
+		h.appealsJSONError(w, "Appeal not found", http.StatusNotFound)
+		return
+	}
+
 	// Validate state transition using domain entity.
 	appeal := &entity.Appeal{Status: entity.AppealStatus(currentStatus)}
 	if err := appeal.ValidateTransition(entity.AppealStatus(req.Status)); err != nil {
@@ -307,12 +356,12 @@ func (h *AppealsHandler) handleReviewAppeal(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Update appeal.
+	// Update appeal with org_id in WHERE clause as defense-in-depth.
 	_, err = h.db.ExecContext(r.Context(), `
 		UPDATE appeals SET status = $1, reviewed_by = $2, review_notes = $3,
 		       reviewed_at = NOW(), updated_at = NOW()
-		WHERE id = $4`,
-		req.Status, caller.ID, req.ReviewNotes, appealID,
+		WHERE id = $4 AND org_id = $5`,
+		req.Status, caller.ID, req.ReviewNotes, appealID, appealOrgID,
 	)
 	if err != nil {
 		h.logger.Error("appeals: failed to update", zap.Error(err))
