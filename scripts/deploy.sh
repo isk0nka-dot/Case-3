@@ -254,10 +254,10 @@ if [[ "$healthy" != "true" ]]; then
   # Revert database if we are rolling back the backend
   if [[ "$SERVICE" == "backend" && "$SKIP_MIGRATIONS" != "true" ]]; then
     step "Reverting database migration (1 step down)..."
-    local db_url="postgres://argus:argus_secret_password@157.180.46.33:5432/argus?sslmode=disable"
-    local pg_dir="$MIGRATIONS_DIR/postgres"
-    if [[ -d "$pg_dir" ]]; then
-      docker run --rm --network host -v "$pg_dir:/migrations" migrate/migrate:v4.18.1 -path=/migrations/ -database "$db_url" down 1 >> "$LOG_FILE" 2>&1 || warn "Failed to revert database migration!"
+    rollback_db_url="postgres://argus:argus_secret_password@157.180.46.33:5432/argus?sslmode=disable"
+    rollback_pg_dir="$MIGRATIONS_DIR/postgres"
+    if [[ -d "$rollback_pg_dir" ]]; then
+      docker run --rm --network host -v "$rollback_pg_dir:/migrations" migrate/migrate:v4.18.1 -path=/migrations/ -database "$rollback_db_url" down 1 >> "$LOG_FILE" 2>&1 || warn "Failed to revert database migration!"
     fi
   fi
 

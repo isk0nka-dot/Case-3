@@ -314,7 +314,7 @@ services:
       - ./clickhouse/node-1.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
       - ./clickhouse/macros-1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
       - ../migrations/clickhouse/init.sql:/docker-entrypoint-initdb.d/02_init.sql:ro
-      - ../migrations/clickhouse/004_reliability_hardening.sql:/docker-entrypoint-initdb.d/03_reliability.sql:ro
+      - ../migrations/clickhouse/000004_reliability_hardening.up.sql:/docker-entrypoint-initdb.d/03_reliability.sql:ro
     ulimits:
       nofile:
         soft: 262144
@@ -350,7 +350,7 @@ services:
       - ./clickhouse/node-2.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
       - ./clickhouse/macros-2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
       - ../migrations/clickhouse/init.sql:/docker-entrypoint-initdb.d/02_init.sql:ro
-      - ../migrations/clickhouse/004_reliability_hardening.sql:/docker-entrypoint-initdb.d/03_reliability.sql:ro
+      - ../migrations/clickhouse/000004_reliability_hardening.up.sql:/docker-entrypoint-initdb.d/03_reliability.sql:ro
     ulimits:
       nofile:
         soft: 262144
@@ -386,7 +386,7 @@ services:
       - ./clickhouse/node-3.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
       - ./clickhouse/macros-3.xml:/etc/clickhouse-server/config.d/macros.xml:ro
       - ../migrations/clickhouse/init.sql:/docker-entrypoint-initdb.d/02_init.sql:ro
-      - ../migrations/clickhouse/004_reliability_hardening.sql:/docker-entrypoint-initdb.d/03_reliability.sql:ro
+      - ../migrations/clickhouse/000004_reliability_hardening.up.sql:/docker-entrypoint-initdb.d/03_reliability.sql:ro
     ulimits:
       nofile:
         soft: 262144
