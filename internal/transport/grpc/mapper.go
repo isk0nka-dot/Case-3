@@ -10,6 +10,7 @@ package grpc
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -254,8 +255,8 @@ func marshalOneofPayload(pbEvent *pb.ProctoringEvent) ([]byte, string) {
 	// JSON compliance, consider google.golang.org/protobuf/encoding/protojson.
 	data, err := json.Marshal(payload)
 	if err != nil {
-		// This should never happen with well-formed proto messages.
-		// Return nil rather than propagating errors in a mapper.
+		// Should never happen with well-formed proto messages, but log if it does.
+		slog.Error("mapper: failed to marshal oneof payload", "payload_type", ptype, "error", err)
 		return nil, ""
 	}
 

@@ -36,6 +36,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -327,7 +328,15 @@ func (v *Verifier) initRS256(cfg VerifierConfig) error {
 func (v *Verifier) initHS256(cfg VerifierConfig) error {
 	// Decode base64 key if raw key is not set.
 	if len(cfg.SigningKey) == 0 && cfg.SigningKeyBase64 != "" {
-		cfg.SigningKey = []byte(cfg.SigningKeyBase64)
+		decoded, err := base64.StdEncoding.DecodeString(cfg.SigningKeyBase64)
+		if err != nil {
+			// Fall back to RawStdEncoding (no padding) — accept both variants.
+			decoded, err = base64.RawStdEncoding.DecodeString(cfg.SigningKeyBase64)
+			if err != nil {
+				return fmt.Errorf("auth: failed to decode base64 signing key: %w", err)
+			}
+		}
+		cfg.SigningKey = decoded
 	}
 
 	if len(cfg.SigningKey) == 0 {

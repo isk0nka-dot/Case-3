@@ -87,14 +87,12 @@ test:
     GOFLAGS: "-count=1"
     GOPATH: "${CI_PROJECT_DIR}/.go-cache"
   script:
-    - go test -race -coverprofile=coverage.out ./... || true
+    - go test -race -coverprofile=coverage.out ./...
     - go tool cover -func=coverage.out | tail -1
   coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
   artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
+    paths:
+      - coverage.out
   tags:
     - prod
   rules:

@@ -23,8 +23,10 @@ package evidence
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -108,7 +110,10 @@ func NewChainWriter(chConn driver.Conn, publisher KafkaPublisher, logger *zap.Lo
 func (w *ChainWriter) RecordEvidence(ctx context.Context, fragment *entity.EvidenceFragment) error {
 	uploadedAt := fragment.CreatedAt.UTC().Format(time.RFC3339Nano)
 
-	// ── Step 1: Compute hash chain under mutex ──────────────────────────
+	// ── Step 1: Compute hash chain under mutex and advance state atomically ─
+	// State is advanced BEFORE releasing the mutex to prevent concurrent
+	// goroutines from computing the same seqNum for the same session.
+	// If downstream writes fail, state is rolled back.
 	w.mu.Lock()
 	state, err := w.getOrRecoverChainState(ctx, fragment.SessionID)
 	if err != nil {
@@ -119,6 +124,14 @@ func (w *ChainWriter) RecordEvidence(ctx context.Context, fragment *entity.Evide
 	seqNum := state.sequenceNum + 1
 	prevHash := state.lastHash
 	recordHash := computeRecordHash(seqNum, prevHash, fragment.FragmentID, fragment.SHA256Hash, uploadedAt)
+
+	// Save previous state for rollback on I/O failure.
+	rollbackSeqNum := state.sequenceNum
+	rollbackHash := state.lastHash
+
+	// Advance state under lock — prevents race condition on seqNum assignment.
+	state.sequenceNum = seqNum
+	state.lastHash = recordHash
 	w.mu.Unlock()
 
 	// ── Step 2: Write to Kafka evidence chain topic (source of truth) ───
@@ -148,6 +161,14 @@ func (w *ChainWriter) RecordEvidence(ctx context.Context, fragment *entity.Evide
 	}
 
 	if err := w.publisher.PublishRaw(ctx, KafkaTopic, fragment.SessionID, value); err != nil {
+		// Kafka write failed — roll back the in-memory state so the next
+		// attempt reuses the same seqNum instead of creating a gap.
+		w.mu.Lock()
+		if s, ok := w.chains[fragment.SessionID]; ok && s.sequenceNum == seqNum {
+			s.sequenceNum = rollbackSeqNum
+			s.lastHash = rollbackHash
+		}
+		w.mu.Unlock()
 		return fmt.Errorf("evidence chain: kafka write failed: %w", err)
 	}
 
@@ -220,13 +241,8 @@ func (w *ChainWriter) RecordEvidence(ctx context.Context, fragment *entity.Evide
 		return fmt.Errorf("evidence chain: clickhouse write failed: %w", err)
 	}
 
-	// ── Step 5: Update in-memory chain state (only after successful writes) ─
-	w.mu.Lock()
-	w.chains[fragment.SessionID] = &sessionChainState{
-		sequenceNum: seqNum,
-		lastHash:    recordHash,
-	}
-	w.mu.Unlock()
+	// State was already advanced in Step 1 under mutex.
+	// No further update needed — both Kafka and ClickHouse writes succeeded.
 
 	w.logger.Info("evidence chain recorded",
 		zap.String("fragment_id", fragment.FragmentID),
@@ -301,6 +317,12 @@ func (w *ChainWriter) getOrRecoverChainState(ctx context.Context, sessionID stri
 	)
 
 	if err := row.Scan(&seqNum, &lastHash); err != nil {
+		// Distinguish "no rows" (first fragment) from a real ClickHouse error.
+		// Treating a connection failure as GENESIS would cause duplicate seqNums.
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("evidence chain: clickhouse query failed: %w", err)
+		}
+
 		// No previous records — this is the first fragment for this session.
 		state := &sessionChainState{
 			sequenceNum: 0,

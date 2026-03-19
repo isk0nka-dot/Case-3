@@ -274,12 +274,14 @@ func (s *Store) DrainBatch(limit int) ([]*entity.ProctoringEvent, [][]byte, erro
 			err := item.Value(func(val []byte) error {
 				var event entity.ProctoringEvent
 				if err := json.Unmarshal(val, &event); err != nil {
-					s.logger.Error("dlq: corrupt entry, skipping",
+					// Log with raw bytes for manual recovery — do NOT delete
+					// the entry. It stays in the DLQ and will alert on every
+					// drain cycle until an operator inspects and clears it.
+					s.logger.Error("dlq: corrupt entry, leaving in queue for manual inspection",
 						zap.String("key", string(keyCopy)),
+						zap.ByteString("raw_bytes", val),
 						zap.Error(err),
 					)
-					// Skip corrupt entries — still add key for deletion.
-					keys = append(keys, keyCopy)
 					return nil
 				}
 				events = append(events, &event)
