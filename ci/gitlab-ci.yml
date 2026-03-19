@@ -113,9 +113,14 @@ sync-infra:
         scripts/ \
         ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/scripts/
 
-      # Ensure deploy script is executable
-      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} \
-        "chmod +x ${DEPLOY_PATH}/scripts/*.sh"
+      # Ensure deploy script is executable and fix repo ownership
+      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "
+        chmod +x ${DEPLOY_PATH}/scripts/*.sh
+        # Fix git repo ownership so deploy user can fetch/reset
+        sudo chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${DEPLOY_PATH}/backend/ 2>/dev/null || true
+        sudo chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${DEPLOY_PATH}/frontend/ 2>/dev/null || true
+        sudo chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${DEPLOY_PATH}/logs/ 2>/dev/null || true
+      "
 
       echo "═══════════════════════════════════════════════════════════"
       echo "  ✓ Sync complete"
