@@ -91,6 +91,9 @@ info "Deploy lock acquired"
 REPO_DIR="${DEPLOY_PATH}/${SERVICE}"
 [[ -d "$REPO_DIR/.git" ]] || fail "Not a git repo: $REPO_DIR"
 
+# Mark the repo as safe if owned by a different user (e.g., root-owned repo, deploy user)
+git config --global --add safe.directory "$REPO_DIR" 2>/dev/null || true
+
 cd "$REPO_DIR"
 ROLLBACK_SHA=$(git rev-parse HEAD)
 ROLLBACK_SHORT=$(git rev-parse --short HEAD)
