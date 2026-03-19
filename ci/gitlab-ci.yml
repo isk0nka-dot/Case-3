@@ -105,10 +105,10 @@ deploy-production:
       echo "→ Syncing code to ${BUILD_DIR}..."
       ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p ${BUILD_DIR}"
       rsync -azO --delete \
-        --exclude='.git' \
-        --exclude='node_modules' \
-        --exclude='.npm-cache' \
-        --exclude='.nuxt' \
+        --exclude='/.git' \
+        --exclude='/node_modules' \
+        --exclude='/.npm-cache' \
+        --exclude='/.nuxt' \
         ${CI_PROJECT_DIR}/ \
         ${DEPLOY_USER}@${DEPLOY_HOST}:${BUILD_DIR}/
 
