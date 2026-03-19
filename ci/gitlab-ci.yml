@@ -132,30 +132,33 @@ deploy-production:
     - ssh-keyscan -H ${DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null
   script:
     - |
-      DEPLOY_PATH="/opt/argus"
       SERVICE="backend"
+      BUILD_DIR="/home/${DEPLOY_USER}/builds/${SERVICE}"
 
       echo "═══════════════════════════════════════════════════════════"
       echo "  Deploying backend to ${DEPLOY_HOST}"
       echo "  Commit: ${CI_COMMIT_SHORT_SHA}"
       echo "═══════════════════════════════════════════════════════════"
 
-      # Step 1: Rsync source code to the server
-      echo "→ Syncing code to server..."
+      # Step 1: Rsync to deploy user's home (writable)
+      echo "→ Syncing code to ${BUILD_DIR}..."
+      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p ${BUILD_DIR}"
       rsync -azO --delete \
         --exclude='.git' \
         --exclude='.go-cache' \
         ${CI_PROJECT_DIR}/ \
-        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/${SERVICE}/
+        ${DEPLOY_USER}@${DEPLOY_HOST}:${BUILD_DIR}/
 
-      # Step 2: Rebuild and restart the Docker container
+      # Step 2: Build Docker image from build dir, then restart via compose
       echo "→ Rebuilding Docker container..."
       ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "
-        cd ${DEPLOY_PATH}/docker
-        docker compose build --no-cache ${SERVICE} 2>&1
-        docker compose up -d --no-deps ${SERVICE} 2>&1
+        set -e
+        cd ${BUILD_DIR}
+        docker build --no-cache -t argus/${SERVICE}:latest -f Dockerfile . 2>&1
 
-        # Wait for healthy
+        cd /opt/argus/docker
+        docker compose up -d --no-deps --no-build ${SERVICE} 2>&1
+
         echo '→ Waiting for container to become healthy...'
         for i in \$(seq 1 20); do
           sleep 6
