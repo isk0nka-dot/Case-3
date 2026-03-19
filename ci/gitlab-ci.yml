@@ -26,7 +26,7 @@
 # All secrets live in /opt/argus/docker/.env — never transiting through CI.
 # =============================================================================
 
-image: golang:1.24-alpine
+image: golang:1.24
 
 stages:
   - verify
