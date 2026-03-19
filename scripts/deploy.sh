@@ -164,10 +164,10 @@ run_migrations() {
       local basename=$(basename "$f")
       info "  → $basename"
       if docker exec -i argus-clickhouse-1 clickhouse-client --multiquery < "$f" >> "$LOG_FILE" 2>&1; then
-        ((ch_count++))
+        ch_count=$((ch_count + 1))
       else
         warn "  ⚠ $basename returned non-zero (expected for idempotent re-runs)"
-        ((ch_fail++))
+        ch_fail=$((ch_fail + 1))
       fi
     done
     info "ClickHouse: $ch_count applied, $ch_fail warnings"
