@@ -31,6 +31,21 @@
 #
 # =============================================================================
 
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# PRODUCTION OVERRIDES — MUST be set via environment variables:
+#
+#   EVENT_COLLECTOR_LOG_LEVEL=info          (not "debug")
+#   EVENT_COLLECTOR_CORS_ORIGINS=https://argusai.kz  (not "*")
+#   EVENT_COLLECTOR_JWT_SIGNING_KEY=<secret>          (enables auth)
+#   EVENT_COLLECTOR_PG_PASSWORD=<real password>       (not "argus")
+#   EVENT_COLLECTOR_MINIO_SECRET_KEY=<real secret>    (not placeholder)
+#   EVENT_COLLECTOR_CH_PASSWORD=<real password>        (if set)
+#
+# Running with development defaults in production is a SECURITY RISK.
+# The deploy.sh script validates that required env vars are set before
+# starting the stack.
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 # ---------------------------------------------------------------------------
 # Server
 # ---------------------------------------------------------------------------
