@@ -7,9 +7,7 @@
 .nitro/
 .cache/
 dist/
-# .output/ is intentionally tracked in git.
-# Pre-built locally and committed so Docker copies it directly —
-# no npm ci / nuxt build needed on the server.
+.output/
 
 # ── Dependencies ─────────────────────────────────────────────────────────────
 node_modules/

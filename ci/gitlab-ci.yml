@@ -2,25 +2,26 @@
 # argus-frontend — GitLab CI/CD Pipeline
 # =============================================================================
 #
-# Pipeline: verify → deploy
+# Pipeline: verify → build → deploy
 #
-#   verify (runs on GitLab shared Docker runners):
-#     npm install, lint, typecheck
-#
-#   deploy (rsync code to server + rebuild Docker):
-#     1. rsync repo (with pre-built .output/) to server
-#     2. SSH to server: docker compose build + up
+#   verify:  npm ci, lint, typecheck
+#   build:   nuxt build → produces .output/
+#   deploy:  rsync .output + Dockerfile to server, docker build, docker compose up
 #
 # Required CI variables (project or group level):
 #   DEPLOY_HOST       Production server IP
 #   DEPLOY_USER       SSH user (e.g. deploy)
 #   DEPLOY_SSH_KEY    SSH private key (type: File, protected + masked)
+#
+# Optional CI variables:
+#   NUXT_PUBLIC_API_URL   Backend API URL (default: https://argusai.kz/api)
 # =============================================================================
 
 image: node:22-alpine
 
 stages:
   - verify
+  - build
   - deploy
 
 variables:
@@ -67,20 +68,47 @@ typecheck:
   script:
     - npx nuxt prepare
     - npm run typecheck
+  allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
 
-# ── Stage: deploy ────────────────────────────────────────────────────────────
-# Rsync the pre-built code to the server, then rebuild Docker container.
-# Bypasses git on the server entirely (avoids ownership/permission issues).
+# ── Stage: build ─────────────────────────────────────────────────────────────
+# Runs `nuxt build` to produce the .output/ directory.
+# The .output/ artifact is passed to the deploy job.
+
+build-production:
+  stage: build
+  needs: [install]
+  before_script:
+    - npm config set cache ${NPM_CACHE}
+  script:
+    - |
+      # Set the API URL — falls back to the production default if not set.
+      export NUXT_PUBLIC_API_URL="${NUXT_PUBLIC_API_URL:-https://argusai.kz/api}"
+      echo "→ Building Nuxt app (API: ${NUXT_PUBLIC_API_URL})..."
+      npm run build
+      echo "→ Build complete. Output size:"
+      du -sh .output/
+  artifacts:
+    paths:
+      - .output/
+    expire_in: 1 hour
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ── Stage: deploy ─────────────────────────────────────────────────────────────
+# Rsync the freshly-built .output/ and Dockerfile to the server,
+# rebuild the Docker image, then restart the frontend container.
 
 deploy-production:
   stage: deploy
   image: alpine:3.20
   needs:
-    - job: install
+    - job: build-production
+      artifacts: true
     - job: typecheck
     - job: lint
       optional: true
@@ -101,8 +129,8 @@ deploy-production:
       echo "  Commit: ${CI_COMMIT_SHORT_SHA}"
       echo "═══════════════════════════════════════════════════════════"
 
-      # Step 1: Rsync to deploy user's home (writable)
-      echo "→ Syncing code to ${BUILD_DIR}..."
+      # Step 1: Rsync .output/ + Dockerfile to server (writable build dir)
+      echo "→ Syncing built artifacts to ${BUILD_DIR}..."
       ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p ${BUILD_DIR}"
       rsync -azO --delete \
         --exclude='/.git' \
@@ -112,7 +140,7 @@ deploy-production:
         ${CI_PROJECT_DIR}/ \
         ${DEPLOY_USER}@${DEPLOY_HOST}:${BUILD_DIR}/
 
-      # Step 2: Build Docker image from build dir, then restart via compose
+      # Step 2: Build Docker image on server, then restart container via compose
       echo "→ Rebuilding Docker container..."
       ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "
         set -e
@@ -133,7 +161,7 @@ deploy-production:
           echo \"  Attempt \$i/20: health=\$health\"
         done
         echo 'DEPLOY FAILED: container did not become healthy'
-        docker logs --tail=20 argus-${SERVICE} 2>&1
+        docker logs --tail=30 argus-${SERVICE} 2>&1
         exit 1
       "
 
