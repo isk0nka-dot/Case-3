@@ -110,8 +110,8 @@ security-scan:
     - if: $CI_COMMIT_TAG
 
 # ── Stage: deploy ────────────────────────────────────────────────────────────
-# SSHes into DEPLOY_HOST and runs deploy.sh remotely.
-# This ensures deploys go to the same server as infra sync.
+# Rsync code to server + rebuild Docker container.
+# Bypasses git on the server (avoids ownership/permission issues).
 
 deploy-production:
   stage: deploy
@@ -122,9 +122,9 @@ deploy-production:
     - job: vet
     - job: test
     - job: security-scan
-      optional: true      # security-scan is allow_failure, don't block deploy
+      optional: true
   before_script:
-    - apk add --no-cache openssh-client
+    - apk add --no-cache openssh-client rsync
     - eval $(ssh-agent -s)
     - chmod 600 "${DEPLOY_SSH_KEY}"
     - ssh-add "${DEPLOY_SSH_KEY}"
@@ -132,27 +132,51 @@ deploy-production:
     - ssh-keyscan -H ${DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null
   script:
     - |
-      # Determine git ref for the deploy
-      if [ -n "${CI_COMMIT_TAG}" ]; then
-        DEPLOY_REF="refs/tags/${CI_COMMIT_TAG}"
-        echo "Deploying tag: ${CI_COMMIT_TAG}"
-      else
-        DEPLOY_REF="origin/${CI_COMMIT_BRANCH}"
-        echo "Deploying branch: ${CI_COMMIT_BRANCH} (commit ${CI_COMMIT_SHORT_SHA})"
-      fi
+      DEPLOY_PATH="/opt/argus"
+      SERVICE="backend"
 
       echo "═══════════════════════════════════════════════════════════"
-      echo "  Deploying backend via SSH to ${DEPLOY_HOST}"
-      echo "  Ref: ${DEPLOY_REF}"
+      echo "  Deploying backend to ${DEPLOY_HOST}"
+      echo "  Commit: ${CI_COMMIT_SHORT_SHA}"
       echo "═══════════════════════════════════════════════════════════"
 
-      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} \
-        "CI_JOB_TOKEN=${CI_JOB_TOKEN} /opt/argus/scripts/deploy.sh --service=backend --ref=${DEPLOY_REF}"
+      # Step 1: Rsync source code to the server
+      echo "→ Syncing code to server..."
+      rsync -azO --delete \
+        --exclude='.git' \
+        --exclude='.go-cache' \
+        ${CI_PROJECT_DIR}/ \
+        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/${SERVICE}/
+
+      # Step 2: Rebuild and restart the Docker container
+      echo "→ Rebuilding Docker container..."
+      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "
+        cd ${DEPLOY_PATH}/docker
+        docker compose build --no-cache ${SERVICE} 2>&1
+        docker compose up -d --no-deps ${SERVICE} 2>&1
+
+        # Wait for healthy
+        echo '→ Waiting for container to become healthy...'
+        for i in \$(seq 1 20); do
+          sleep 6
+          health=\$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' argus-${SERVICE} 2>/dev/null)
+          if [ \"\$health\" = 'healthy' ]; then
+            echo \"✓ Container healthy after \$((i * 6))s\"
+            exit 0
+          fi
+          echo \"  Attempt \$i/20: health=\$health\"
+        done
+        echo 'DEPLOY FAILED: container did not become healthy'
+        docker logs --tail=20 argus-${SERVICE} 2>&1
+        exit 1
+      "
+
+      echo "═══════════════════════════════════════════════════════════"
+      echo "  ✓ DEPLOY SUCCESS: backend (${CI_COMMIT_SHORT_SHA})"
+      echo "═══════════════════════════════════════════════════════════"
   environment:
     name: production
     url: https://argusai.kz
   rules:
-    # Auto-deploy on version tags (v1.0.0, v2.1.3, etc.)
     - if: $CI_COMMIT_TAG
-    # Auto deploy on pushes to main
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
