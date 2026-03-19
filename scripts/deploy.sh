@@ -30,8 +30,8 @@ set -euo pipefail
 DEPLOY_PATH="${DEPLOY_PATH:-/opt/argus}"
 COMPOSE_DIR="${DEPLOY_PATH}/docker"
 MIGRATIONS_DIR="${DEPLOY_PATH}/migrations"
-LOCK_FILE="/var/lock/argus-deploy.lock"
-LOG_DIR="/var/log/argus"
+LOCK_FILE="${DEPLOY_PATH}/deploy.lock"
+LOG_DIR="${DEPLOY_PATH}/logs"
 
 SERVICE=""
 GIT_REF="origin/main"
