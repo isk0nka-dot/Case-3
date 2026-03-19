@@ -223,12 +223,22 @@ interface OrgFeatureToggles {
   ai_anti_spoofing: boolean
   ai_voice_detection: boolean
   ai_blink_analysis: boolean
+  ai_dynamic_face_recheck: boolean   // Dynamic Face ID
+  ai_focus_loss_score: boolean        // Скоринг потери фокуса
+  // Video / Camera Rules
+  video_require_side_camera: boolean  // Боковая камера
+  video_room_scan_360: boolean        // Room Scan 360°
+  video_audio_periphery: boolean      // Детекция периф. звуков
+  video_smart_noise_filter: boolean   // Умный шумоподавитель
   // Browser Rules
   browser_fullscreen: boolean
+  browser_fullscreen_exit_detection: boolean // Детекция выхода из fullscreen
+  browser_web_display_monitoring: boolean    // Мониторинг внешних дисплеев
   browser_tab_limit: boolean
   browser_copy_paste_block: boolean
   browser_print_screen_block: boolean
   browser_vm_block: boolean
+  browser_multi_desktop_block: boolean       // Блокировка мульти-десктопа
   browser_context_menu_block: boolean
   browser_remote_access_block: boolean
   // Behavioral Analysis Rules
@@ -251,11 +261,20 @@ const featureToggles = reactive<OrgFeatureToggles>({
   ai_anti_spoofing: true,
   ai_voice_detection: true,
   ai_blink_analysis: true,
+  ai_dynamic_face_recheck: true,
+  ai_focus_loss_score: true,
+  video_require_side_camera: true,
+  video_room_scan_360: true,
+  video_audio_periphery: true,
+  video_smart_noise_filter: true,
   browser_fullscreen: true,
+  browser_fullscreen_exit_detection: true,
+  browser_web_display_monitoring: true,
   browser_tab_limit: true,
   browser_copy_paste_block: true,
   browser_print_screen_block: true,
   browser_vm_block: true,
+  browser_multi_desktop_block: true,
   browser_context_menu_block: true,
   browser_remote_access_block: true,
   behavioral_typing_dynamics: true,
@@ -285,22 +304,36 @@ const featureGroups: FeatureGroup[] = [
     id: 'ai', label: 'AI Правила', icon: 'i-lucide-brain', color: 'var(--argus-accent)',
     features: [
       { key: 'ai_face_verification', label: 'Верификация лица', description: 'ID-фото сопоставление перед экзаменом' },
+      { key: 'ai_dynamic_face_recheck', label: 'Dynamic Face ID', description: 'Периодическая повторная проверка лица во время экзамена' },
       { key: 'ai_gaze_tracking', label: 'Отслеживание взгляда', description: 'AI-анализ направления взгляда' },
       { key: 'ai_object_detection', label: 'Детекция объектов', description: 'Обнаружение телефона, книг, наушников' },
       { key: 'ai_emotion_analysis', label: 'Анализ эмоций', description: 'Стресс и подозрительные эмоции' },
+      { key: 'ai_focus_loss_score', label: 'Скоринг потери фокуса', description: 'Непрерывный AI-скоринг концентрации по мимике и движениям' },
       { key: 'ai_anti_spoofing', label: 'Anti-spoofing', description: 'Защита от подмены лица (фото/видео)' },
       { key: 'ai_voice_detection', label: 'Голосовая детекция', description: 'Обнаружение речи и шёпота' },
       { key: 'ai_blink_analysis', label: 'Анализ моргания', description: 'Паттерны моргания для liveness' }
     ]
   },
   {
+    id: 'video', label: 'Видео / Камера', icon: 'i-lucide-video', color: 'var(--argus-accent)',
+    features: [
+      { key: 'video_require_side_camera', label: 'Боковая камера', description: 'Требовать подключение мобильного как боковой камеры' },
+      { key: 'video_room_scan_360', label: 'Room Scan 360°', description: 'Полный осмотр помещения перед началом экзамена' },
+      { key: 'video_audio_periphery', label: 'Детекция периф. звуков', description: 'AI-анализ шёпота, наушников, второго устройства' },
+      { key: 'video_smart_noise_filter', label: 'Умный шумоподавитель', description: 'AI-классификация источника звука и интеллектуальная фильтрация' }
+    ]
+  },
+  {
     id: 'browser', label: 'Правила браузера', icon: 'i-lucide-globe', color: isDark.value ? '#fbbf24' : '#d97706',
     features: [
-      { key: 'browser_fullscreen', label: 'Полноэкранный режим', description: 'Принудительный fullscreen + детекция выхода' },
+      { key: 'browser_fullscreen', label: 'Полноэкранный режим', description: 'Принудительный fullscreen при старте' },
+      { key: 'browser_fullscreen_exit_detection', label: 'Детекция выхода из fullscreen', description: 'Мгновенная фиксация попытки свернуть браузер' },
+      { key: 'browser_web_display_monitoring', label: 'Мониторинг внешних дисплеев', description: 'Обнаружение второго монитора через Browser API' },
       { key: 'browser_tab_limit', label: 'Лимит вкладок', description: 'Ограничение переключений вкладок' },
       { key: 'browser_copy_paste_block', label: 'Блокировка копирования', description: 'Запрет Ctrl+C / Ctrl+V' },
       { key: 'browser_print_screen_block', label: 'Блокировка скриншотов', description: 'Запрет PrintScreen / снимков экрана' },
       { key: 'browser_vm_block', label: 'Блокировка VM', description: 'Обнаружение виртуальных машин' },
+      { key: 'browser_multi_desktop_block', label: 'Блокировка мульти-десктопа', description: 'Запрет использования нескольких рабочих столов' },
       { key: 'browser_context_menu_block', label: 'Блокировка контекстного меню', description: 'Запрет правого клика' },
       { key: 'browser_remote_access_block', label: 'Блокировка удалённого доступа', description: 'TeamViewer, AnyDesk и др.' }
     ]
