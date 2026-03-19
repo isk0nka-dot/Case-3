@@ -141,14 +141,25 @@ export function useResilience(config: ResilienceConfig) {
 
     // Use the median to reject outliers (e.g., one slow heartbeat)
     const sorted = [...clockOffsetSamples].sort((a, b) => a - b)
-    const medianOffset = sorted[Math.floor(sorted.length / 2)]
+    const medianOffset = sorted[Math.floor(sorted.length / 2)] ?? 0
 
-    clockOffsetMs.value = medianOffset ?? 0
+    // Clamp offset to ±1 hour to prevent runaway offsets (e.g., student clock
+    // set 24h ahead) from breaking JWT expiry checks and session timestamps.
+    const MAX_CLOCK_OFFSET_MS = 3_600_000 // 1 hour
+    const clampedOffset = Math.max(-MAX_CLOCK_OFFSET_MS, Math.min(MAX_CLOCK_OFFSET_MS, medianOffset))
+    if (clampedOffset !== medianOffset) {
+      console.warn('[argus:resilience] Clock offset clamped (extreme skew)', {
+        rawOffsetMs: medianOffset,
+        clampedOffsetMs: clampedOffset
+      })
+    }
+
+    clockOffsetMs.value = clampedOffset
 
     // Log significant skew (>2s) for debugging
-    if (Math.abs(medianOffset ?? 0) > 2000) {
+    if (Math.abs(clampedOffset) > 2000) {
       console.warn('[argus:resilience] Significant clock skew detected', {
-        offsetMs: medianOffset,
+        offsetMs: clampedOffset,
         rttMs: rtt,
         samples: clockOffsetSamples.length
       })

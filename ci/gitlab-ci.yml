@@ -79,8 +79,8 @@ typecheck:
   stage: verify
   needs: [install]
   script:
+    - npx nuxt prepare
     - npm run typecheck
-  allow_failure: true
   tags:
     - prod
   rules:
@@ -96,9 +96,9 @@ deploy-production:
   stage: deploy
   image: alpine:3.20
   needs:
-    - job: lint
-      optional: true
+    - job: install
     - job: typecheck
+    - job: lint
       optional: true
   script:
     - |

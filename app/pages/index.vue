@@ -699,7 +699,10 @@ const archiveKernelLabels: Record<string, string> = {
           <!-- Not logged in: show "Войти" -->
           <template v-if="!authStore.isLoggedIn">
             <button
-              class="px-4 py-2 rounded-lg text-sm font-medium text-white/70 hover:text-white transition-colors cursor-pointer"
+              class="px-5 py-2 rounded-lg text-sm font-semibold text-white/80 hover:text-white transition-all duration-200 cursor-pointer"
+              style="border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.04); backdrop-filter: blur(8px);"
+              @mouseenter="e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.35)'"
+              @mouseleave="e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.18)'"
               @click="showLoginModal = true"
             >
               Войти
@@ -3073,7 +3076,7 @@ const archiveKernelLabels: Record<string, string> = {
     <section
       id="comparison"
       ref="comparisonRef"
-      class="relative py-32 px-6"
+      class="relative py-32 pl-6 pr-6"
     >
       <div class="max-w-6xl mx-auto">
         <div class="text-center mb-16">
@@ -3169,7 +3172,7 @@ const archiveKernelLabels: Record<string, string> = {
 
             <!-- Standard -->
             <div
-              class="col-span-4 px-6 py-4 flex items-center justify-center"
+              class="col-span-4 px-6 py-4 flex items-center justify-start"
               style="background: rgba(255,255,255,0.02);"
             >
               <div class="flex items-center gap-2.5">
@@ -3189,7 +3192,7 @@ const archiveKernelLabels: Record<string, string> = {
 
             <!-- Argus AI -->
             <div
-              class="col-span-4 px-6 py-4 flex items-center justify-center"
+              class="col-span-4 px-6 py-4 flex items-center justify-start"
               :style="{
                 background: row.highlight ? `${row.highlight}06` : 'rgba(66, 133, 244, 0.04)',
                 borderLeft: `2px solid ${row.highlight ? `${row.highlight}30` : 'rgba(66, 133, 244, 0.1)'}`

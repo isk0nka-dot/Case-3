@@ -584,10 +584,7 @@ async function submitCreateOrg() {
       adminPassword: newOrg.adminPassword
     }
 
-    console.log('[Organizations] Creating org+admin with payload (password redacted)')
-
     const result = await adminAPI.createOrgWithAdmin(payload)
-    console.log('[Organizations] Org+admin created successfully:', result.organization.orgId)
 
     // Populate credential popup BEFORE closing create modal.
     createdCredentials.orgName = result.organization.name

@@ -7,6 +7,7 @@
 //
 // =============================================================================
 
+import { type Ref, onMounted, onUnmounted } from 'vue'
 import { useInspectorStore } from '~/stores/useInspectorStore'
 
 export function useKeyboardNav(totalCells: Ref<number>) {
