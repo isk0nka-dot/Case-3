@@ -71,6 +71,7 @@ func (h *AdminHandler) RegisterRoutes(mux *http.ServeMux) {
 
 	// Auth-required endpoints.
 	mux.HandleFunc("GET /api/v1/auth/me", h.requireAuth(h.handleMe))
+	mux.HandleFunc("POST /api/v1/auth/refresh", h.requireAuth(h.handleRefreshToken))
 
 	// Organization management.
 	mux.HandleFunc("GET /api/v1/admin/organizations", h.requireAuth(h.requireRole(entity.RoleSuperAdmin, h.handleListOrgs)))
@@ -83,6 +84,8 @@ func (h *AdminHandler) RegisterRoutes(mux *http.ServeMux) {
 	// User management.
 	mux.HandleFunc("GET /api/v1/admin/organizations/{orgId}/users", h.requireAuth(h.handleListUsers))
 	mux.HandleFunc("POST /api/v1/admin/organizations/{orgId}/users", h.requireAuth(h.requireOrgAdmin(h.handleCreateUser)))
+	mux.HandleFunc("PUT /api/v1/admin/organizations/{orgId}/users/{userId}", h.requireAuth(h.requireOrgAdmin(h.handleUpdateUser)))
+	mux.HandleFunc("DELETE /api/v1/admin/organizations/{orgId}/users/{userId}", h.requireAuth(h.requireOrgAdmin(h.handleDeactivateUser)))
 
 	// API key management.
 	mux.HandleFunc("GET /api/v1/admin/organizations/{orgId}/keys", h.requireAuth(h.handleListAPIKeys))
@@ -193,6 +196,33 @@ func (h *AdminHandler) handleMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.jsonResponse(w, user, http.StatusOK)
+}
+
+// handleRefreshToken issues a fresh JWT for an authenticated user.
+// Called by the frontend before heartbeat when the current token is near expiry.
+// This keeps long-running exam sessions (2-4 hours) alive without forcing re-login.
+func (h *AdminHandler) handleRefreshToken(w http.ResponseWriter, r *http.Request) {
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		h.jsonError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Re-fetch user from DB to ensure they haven't been deactivated since last login
+	fresh, err := h.repo.GetUserByID(r.Context(), user.ID)
+	if err != nil || fresh == nil || !fresh.IsActive {
+		h.jsonError(w, "User is inactive or not found", http.StatusForbidden)
+		return
+	}
+
+	token, err := h.generateToken(fresh)
+	if err != nil {
+		h.logger.Error("Token refresh failed", zap.Error(err), zap.String("user_id", user.ID))
+		h.jsonError(w, "Failed to refresh token", http.StatusInternalServerError)
+		return
+	}
+
+	h.jsonResponse(w, map[string]string{"token": token}, http.StatusOK)
 }
 
 // ==========================================================================
@@ -371,8 +401,8 @@ func (h *AdminHandler) handleCreateOrgWithAdmin(w http.ResponseWriter, r *http.R
 		h.jsonError(w, "Admin full name, phone, and password are required", http.StatusBadRequest)
 		return
 	}
-	if len(req.AdminPassword) < 6 {
-		h.jsonError(w, "Admin password must be at least 6 characters", http.StatusBadRequest)
+	if len(req.AdminPassword) < 10 {
+		h.jsonError(w, "Admin password must be at least 10 characters", http.StatusBadRequest)
 		return
 	}
 
@@ -734,6 +764,150 @@ func (h *AdminHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 	h.jsonResponse(w, user, http.StatusCreated)
 }
 
+// --------------------------------------------------------------------------
+// Update User
+// --------------------------------------------------------------------------
+
+type updateUserRequest struct {
+	FullName string `json:"fullName"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+	IsActive *bool  `json:"isActive"` // pointer so we can distinguish "not provided" from "false"
+}
+
+func (h *AdminHandler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("orgId")
+	userID := r.PathValue("userId")
+	caller := getUserFromContext(r.Context())
+
+	if caller == nil {
+		h.jsonError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Fetch target user.
+	target, err := h.repo.GetUserByID(r.Context(), userID)
+	if err != nil || target == nil {
+		h.jsonError(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Org isolation: non-super_admin can only manage users within their own org.
+	if !caller.IsSuperAdmin() && target.OrgID != orgID {
+		h.jsonError(w, "User not found", http.StatusNotFound) // anti-enumeration: 404 not 403
+		return
+	}
+
+	var req updateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Only super_admin can promote to super_admin.
+	if req.Role != "" {
+		newRole := entity.Role(req.Role)
+		if newRole == entity.RoleSuperAdmin && !caller.IsSuperAdmin() {
+			h.jsonError(w, "Only Super Admin can assign super_admin role", http.StatusForbidden)
+			return
+		}
+		target.Role = newRole
+	}
+
+	// Apply optional updates.
+	if req.FullName != "" {
+		target.FullName = req.FullName
+	}
+	if req.Email != "" {
+		target.Email = req.Email
+	}
+	if req.IsActive != nil {
+		target.IsActive = *req.IsActive
+	}
+	target.UpdatedBy = caller.ID
+
+	if err := h.repo.UpdateUser(r.Context(), target); err != nil {
+		h.logger.Error("Update user failed", zap.Error(err), zap.String("user_id", userID))
+		h.jsonError(w, "Failed to update user", http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info("User updated",
+		zap.String("user_id", userID),
+		zap.String("updated_by", caller.ID),
+		zap.String("org_id", orgID),
+	)
+
+	h.audit(r, "update_user", "user", userID, map[string]interface{}{
+		"fullName": target.FullName, "email": target.Email,
+		"role": string(target.Role), "isActive": target.IsActive,
+		"orgId": orgID,
+	})
+
+	h.jsonResponse(w, target, http.StatusOK)
+}
+
+// --------------------------------------------------------------------------
+// Deactivate (Soft-Delete) User
+// --------------------------------------------------------------------------
+
+func (h *AdminHandler) handleDeactivateUser(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("orgId")
+	userID := r.PathValue("userId")
+	caller := getUserFromContext(r.Context())
+
+	if caller == nil {
+		h.jsonError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Self-deactivation guard.
+	if caller.ID == userID {
+		h.jsonError(w, "Cannot deactivate your own account", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch target user.
+	target, err := h.repo.GetUserByID(r.Context(), userID)
+	if err != nil || target == nil {
+		h.jsonError(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Org isolation.
+	if !caller.IsSuperAdmin() && target.OrgID != orgID {
+		h.jsonError(w, "User not found", http.StatusNotFound) // anti-enumeration
+		return
+	}
+
+	// Non-super_admin cannot deactivate super_admin.
+	if target.IsSuperAdmin() && !caller.IsSuperAdmin() {
+		h.jsonError(w, "Insufficient permissions", http.StatusForbidden)
+		return
+	}
+
+	// Soft delete — sets deleted_at, user no longer appears in queries.
+	if err := h.repo.SoftDeleteUser(r.Context(), userID); err != nil {
+		h.logger.Error("Deactivate user failed", zap.Error(err), zap.String("user_id", userID))
+		h.jsonError(w, "Failed to deactivate user", http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info("User deactivated",
+		zap.String("user_id", userID),
+		zap.String("deactivated_by", caller.ID),
+		zap.String("org_id", orgID),
+	)
+
+	h.audit(r, "deactivate_user", "user", userID, map[string]interface{}{
+		"phone": target.Phone, "fullName": target.FullName,
+		"role": string(target.Role), "orgId": orgID,
+		"deactivatedBy": caller.ID,
+	})
+
+	h.jsonResponse(w, map[string]string{"status": "deactivated", "userId": userID}, http.StatusOK)
+}
+
 // ==========================================================================
 // API Key Endpoints
 // ==========================================================================
@@ -845,13 +1019,35 @@ func (h *AdminHandler) handleCreateAPIKey(w http.ResponseWriter, r *http.Request
 func (h *AdminHandler) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 	keyID := r.PathValue("keyId")
 
+	caller := getUserFromContext(r.Context())
+	if caller == nil {
+		h.jsonError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// ── Org isolation: verify the API key belongs to the caller's org ──────
+	// Fetch the key first to check org ownership before revoking.
+	apiKey, err := h.repo.GetAPIKeyByKeyID(r.Context(), keyID)
+	if err != nil || apiKey == nil {
+		h.jsonError(w, "API key not found", http.StatusNotFound)
+		return
+	}
+
+	if !caller.IsSuperAdmin() && caller.OrgID != apiKey.OrgID {
+		h.jsonError(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
 	if err := h.repo.RevokeAPIKey(r.Context(), keyID); err != nil {
 		h.logger.Error("Revoke API key failed", zap.Error(err))
 		h.jsonError(w, "Failed to revoke API key", http.StatusInternalServerError)
 		return
 	}
 
-	h.audit(r, "revoke_api_key", "api_key", keyID, map[string]string{"keyId": keyID})
+	h.audit(r, "revoke_api_key", "api_key", keyID, map[string]string{
+		"keyId": keyID,
+		"orgId": apiKey.OrgID,
+	})
 
 	h.jsonResponse(w, map[string]string{"status": "revoked"}, http.StatusOK)
 }
