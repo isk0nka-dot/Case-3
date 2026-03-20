@@ -199,28 +199,46 @@ export function useBrowserIntegrity() {
   // -------------------------------------------------------------------------
 
   function checkDevTools() {
-    // Method 1: Debugger timing (most reliable)
-    const start = performance.now()
-    // Using a regex with toString that triggers debugger check
-    const threshold = 100 // ms — debugger pauses cause large deltas
-    const elapsed = performance.now() - start
+    let devToolsDetected = false
 
-    if (elapsed > threshold) {
-      state.value.devToolsOpen = true
-      return
-    }
-
-    // Method 2: Window size heuristic
-    // DevTools docked to side/bottom reduces inner dimensions
+    // Signal 1: Window size heuristic (most reliable cross-browser)
+    // DevTools docked to side/bottom reduces inner dimensions significantly
     const widthDiff = window.outerWidth - window.innerWidth
     const heightDiff = window.outerHeight - window.innerHeight
-    const suspiciousResize = widthDiff > 200 || heightDiff > 200
-
-    if (suspiciousResize && !state.value.isFullscreen) {
-      state.value.devToolsOpen = true
-    } else {
-      state.value.devToolsOpen = false
+    if ((widthDiff > 200 || heightDiff > 200) && !state.value.isFullscreen) {
+      devToolsDetected = true
     }
+
+    // Signal 2: Image getter detection — when DevTools Console is open,
+    // accessing object properties triggers getters (used by console.log)
+    try {
+      const element = new Image()
+      Object.defineProperty(element, 'id', {
+        get: function () {
+          devToolsDetected = true
+          return ''
+        }
+      })
+      // eslint-disable-next-line no-console
+      console.debug('%c', element as unknown as string)
+    } catch {
+      // Property definition may fail in strict environments — non-fatal
+    }
+
+    // Signal 3: Regex toString override — triggers when console formats objects
+    try {
+      const devtools = /./
+      devtools.toString = function () {
+        devToolsDetected = true
+        return ''
+      }
+      // eslint-disable-next-line no-console
+      console.debug('%c', devtools as unknown as string)
+    } catch {
+      // toString override may fail — non-fatal
+    }
+
+    state.value.devToolsOpen = devToolsDetected
   }
 
   // -------------------------------------------------------------------------
@@ -398,7 +416,7 @@ export function useBrowserIntegrity() {
   // Lifecycle
   // -------------------------------------------------------------------------
 
-  function start() {
+  function start(options?: { forceFullscreen?: boolean }) {
     window.addEventListener('blur', handleBlur)
     window.addEventListener('focus', handleFocus)
     document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -417,6 +435,32 @@ export function useBrowserIntegrity() {
 
     // Initial fullscreen state
     state.value.isFullscreen = !!document.fullscreenElement
+
+    // Request fullscreen if exam settings require it and we're not already in fullscreen
+    if (options?.forceFullscreen && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        state.value.isFullscreen = true
+      }).catch(() => {
+        // Browser denied the fullscreen request (requires user gesture)
+        sendEventFn?.(
+          EventType.FULLSCREEN_EXIT,
+          Severity.WARNING,
+          {
+            type: 'browser',
+            data: {
+              tabSwitchCount: state.value.tabSwitchCount,
+              targetInfo: 'fullscreen_denied',
+              fullscreenExited: true,
+              displayCount: state.value.externalDisplays + 1,
+              action: 'fullscreen_request_denied'
+            }
+          },
+          'Запрос полноэкранного режима отклонён браузером',
+          0.5,
+          EventSource.BROWSER
+        )
+      })
+    }
   }
 
   function stop() {

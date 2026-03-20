@@ -7,6 +7,19 @@ const authStore = useAuthStore()
 const { isDark, accentBg, errorBg, successBg, warningBg, purpleBg } = useColors()
 const { formatDate, formatDateTime } = useFormatters()
 
+// ---------------------------------------------------------------------------
+// Constants — extracted from magic numbers throughout the file
+// ---------------------------------------------------------------------------
+const EXAM_DEFAULTS = {
+  CLEAN_THRESHOLD: 80,
+  WARNING_THRESHOLD: 50,
+  AUTO_TERMINATE_AT: 30,
+  TOAST_DURATION_MS: 3000,
+  EXCEPTION_TOAST_MS: 2000,
+  DROPDOWN_BLUR_DELAY_MS: 200,
+  ERROR_AUTO_DISMISS_MS: 8000,
+} as const
+
 // --- Search ---
 const searchQuery = ref('')
 const searchFocused = ref(false)
@@ -50,6 +63,12 @@ const settingsDirty = ref(false)
 // Snapshot of server-persisted settings for dirty tracking
 let serverSettingsSnapshot: string | null = null
 
+// Verdict thresholds — configurable per-exam (used by saveSettings payload)
+const cleanThreshold = ref(EXAM_DEFAULTS.CLEAN_THRESHOLD)
+const warningThreshold = ref(EXAM_DEFAULTS.WARNING_THRESHOLD)
+const autoTerminate = ref(false)
+const autoTerminateAt = ref(EXAM_DEFAULTS.AUTO_TERMINATE_AT)
+
 async function openSettings(exam: ExamProctoringConfig) {
   selectedExam.value = exam
   activeTab.value = 'settings'
@@ -65,9 +84,20 @@ async function openSettings(exam: ExamProctoringConfig) {
       // Merge backend settings into local settings (excluding metadata fields)
       const { orgId: _o, examId: _e, updatedAt: _u, updatedBy: _b, cleanThreshold: _ct, warningThreshold: _wt, autoTerminate: _at, autoTerminateAt: _ata, forceLowSpecMode: _f, ...toggles } = remote as any
       Object.assign(exam.settings, toggles)
+      // Hydrate verdict thresholds from server
+      cleanThreshold.value = _ct ?? EXAM_DEFAULTS.CLEAN_THRESHOLD
+      warningThreshold.value = _wt ?? EXAM_DEFAULTS.WARNING_THRESHOLD
+      autoTerminate.value = _at ?? false
+      autoTerminateAt.value = _ata ?? EXAM_DEFAULTS.AUTO_TERMINATE_AT
       serverSettingsSnapshot = JSON.stringify(exam.settings)
-    } catch {
-      // No server settings — use local defaults (first time)
+    } catch (err: any) {
+      // Server unavailable or first-time — use local defaults but show error if not a 404
+      const msg = err?.message || err?.statusText || 'Ошибка сети'
+      const is404 = err?.status === 404 || msg.includes('404') || msg.includes('not found')
+      if (!is404) {
+        settingsError.value = `Не удалось загрузить настройки: ${msg}`
+        setTimeout(() => { settingsError.value = '' }, EXAM_DEFAULTS.ERROR_AUTO_DISMISS_MS)
+      }
       serverSettingsSnapshot = JSON.stringify(exam.settings)
     } finally {
       settingsHydrating.value = false
@@ -75,8 +105,45 @@ async function openSettings(exam: ExamProctoringConfig) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Validation — ensures all numeric settings are within their allowed ranges
+// ---------------------------------------------------------------------------
+interface ValidationRule {
+  field: keyof ExamProctoringSettings
+  label: string
+  min: number
+  max: number
+}
+
+const VALIDATION_RULES: ValidationRule[] = [
+  { field: 'voiceDetectionThreshold', label: 'Порог голоса', min: 0, max: 100 },
+  { field: 'gazeSensitivity', label: 'Чувствительность взгляда', min: 10, max: 95 },
+  { field: 'gazeDeviationLimitSec', label: 'Лимит отклонения взгляда', min: 3, max: 30 },
+  { field: 'tabSwitchingLimit', label: 'Лимит переключений вкладок', min: 0, max: 10 },
+]
+
+function validateSettings(settings: ExamProctoringSettings): string | null {
+  for (const rule of VALIDATION_RULES) {
+    const val = settings[rule.field]
+    if (typeof val === 'number') {
+      if (val < rule.min || val > rule.max) {
+        return `${rule.label}: значение ${val} вне допустимого диапазона (${rule.min}–${rule.max})`
+      }
+    }
+  }
+  return null
+}
+
 async function saveSettings() {
   if (!selectedExam.value) return
+
+  // Pre-save validation
+  const validationError = validateSettings(selectedExam.value.settings)
+  if (validationError) {
+    settingsError.value = validationError
+    setTimeout(() => { settingsError.value = '' }, EXAM_DEFAULTS.ERROR_AUTO_DISMISS_MS)
+    return
+  }
 
   settingsSaving.value = true
   settingsError.value = ''
@@ -88,19 +155,20 @@ async function saveSettings() {
       orgId: exam.orgId,
       examId: exam.id,
       ...exam.settings,
-      // Add verdict thresholds with defaults
-      cleanThreshold: 80,
-      warningThreshold: 50,
-      autoTerminate: false,
-      autoTerminateAt: 30
+      cleanThreshold: cleanThreshold.value,
+      warningThreshold: warningThreshold.value,
+      autoTerminate: autoTerminate.value,
+      autoTerminateAt: autoTerminateAt.value
     } as any)
 
     settingsSaved.value = true
     settingsDirty.value = false
     serverSettingsSnapshot = JSON.stringify(exam.settings)
-    setTimeout(() => { settingsSaved.value = false }, 3000)
+    setTimeout(() => { settingsSaved.value = false }, EXAM_DEFAULTS.TOAST_DURATION_MS)
   } catch (err: any) {
     settingsError.value = err.message || 'Ошибка сохранения настроек'
+    // Auto-dismiss error after a reasonable display period
+    setTimeout(() => { settingsError.value = '' }, EXAM_DEFAULTS.ERROR_AUTO_DISMISS_MS)
   } finally {
     settingsSaving.value = false
   }
@@ -203,7 +271,27 @@ const activePresetId = computed<string | null>(() => {
   return null
 })
 
+// Confirmation dialog state
+const confirmAction = ref<{ message: string, onConfirm: () => void } | null>(null)
+
 function applyPreset(preset: PresetProfile) {
+  if (!selectedExam.value) return
+
+  // If settings are dirty (modified from server state), confirm before overwriting
+  if (settingsDirty.value) {
+    confirmAction.value = {
+      message: `Применить профиль «${preset.label}»? Все несохранённые изменения будут потеряны.`,
+      onConfirm: () => {
+        doApplyPreset(preset)
+        confirmAction.value = null
+      }
+    }
+    return
+  }
+  doApplyPreset(preset)
+}
+
+function doApplyPreset(preset: PresetProfile) {
   if (!selectedExam.value) return
   Object.assign(selectedExam.value.settings, preset.settings)
   if (preset.id === 'light') {
@@ -335,6 +423,23 @@ const excHasExistingException = computed(() => {
 function saveException() {
   if (!selectedExam.value || !excSelectedStudent.value) return
 
+  // If overwriting an existing exception, confirm first
+  if (excHasExistingException.value && !excSaved.value) {
+    confirmAction.value = {
+      message: `Перезаписать исключение для «${excSelectedStudent.value.name}»?`,
+      onConfirm: () => {
+        doSaveException()
+        confirmAction.value = null
+      }
+    }
+    return
+  }
+  doSaveException()
+}
+
+function doSaveException() {
+  if (!selectedExam.value || !excSelectedStudent.value) return
+
   // Build overrides — only include settings that differ from global
   const g = selectedExam.value.settings
   const overrides: Partial<ExamProctoringSettings> = {}
@@ -367,7 +472,7 @@ function saveException() {
   }
 
   excSaved.value = true
-  setTimeout(() => { excSaved.value = false }, 2000)
+  setTimeout(() => { excSaved.value = false }, EXAM_DEFAULTS.EXCEPTION_TOAST_MS)
 }
 
 function removeException(exceptionId: string) {
@@ -504,7 +609,7 @@ function exceptionProfileIcon(_profile: string): string {
 }
 
 function blurExcDropdown() {
-  window.setTimeout(() => { excDropdownOpen.value = false }, 200)
+  window.setTimeout(() => { excDropdownOpen.value = false }, EXAM_DEFAULTS.DROPDOWN_BLUR_DELAY_MS)
 }
 </script>
 
@@ -4291,17 +4396,29 @@ function blurExcDropdown() {
                     style="color: var(--argus-text-dimmed);"
                   >Загрузка с сервера...</span>
                 </template>
-                <!-- Error -->
+                <!-- Error — prominent banner with dismiss -->
                 <template v-else-if="settingsError">
-                  <UIcon
-                    name="i-lucide-alert-circle"
-                    class="size-3.5"
-                    style="color: var(--argus-error);"
-                  />
-                  <span
-                    class="text-[10px]"
-                    style="color: var(--argus-error);"
-                  >{{ settingsError }}</span>
+                  <div
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                    style="background: color-mix(in srgb, var(--argus-error) 12%, transparent); border: 1px solid color-mix(in srgb, var(--argus-error) 25%, transparent);"
+                  >
+                    <UIcon
+                      name="i-lucide-alert-circle"
+                      class="size-3.5 shrink-0"
+                      style="color: var(--argus-error);"
+                    />
+                    <span
+                      class="text-[11px] font-medium"
+                      style="color: var(--argus-error);"
+                    >{{ settingsError }}</span>
+                    <button
+                      class="ml-1 size-4 flex items-center justify-center rounded hover:opacity-70 cursor-pointer"
+                      style="color: var(--argus-error);"
+                      @click="settingsError = ''"
+                    >
+                      <UIcon name="i-lucide-x" class="size-3" />
+                    </button>
+                  </div>
                 </template>
                 <!-- Saved confirmation -->
                 <template v-else-if="settingsSaved">
@@ -4368,6 +4485,51 @@ function blurExcDropdown() {
                   {{ settingsDirty ? 'Закрыть' : 'Готово' }}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Confirmation Dialog — reusable for preset/exception confirmations -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="confirmAction"
+          class="fixed inset-0 z-[200] flex items-center justify-center"
+          style="background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px);"
+          @click.self="confirmAction = null"
+        >
+          <div
+            class="max-w-sm w-full mx-4 rounded-2xl p-6 shadow-xl"
+            style="background: var(--argus-bg-card); border: 1px solid var(--argus-border);"
+          >
+            <div class="flex items-start gap-3 mb-5">
+              <div
+                class="size-9 flex items-center justify-center rounded-full shrink-0"
+                style="background: color-mix(in srgb, var(--argus-warning) 15%, transparent);"
+              >
+                <UIcon name="i-lucide-alert-triangle" class="size-5" style="color: var(--argus-warning);" />
+              </div>
+              <p class="text-sm leading-relaxed pt-1.5" style="color: var(--argus-text);">
+                {{ confirmAction.message }}
+              </p>
+            </div>
+            <div class="flex items-center justify-end gap-2">
+              <button
+                class="px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                style="background: var(--argus-bg-hover); color: var(--argus-text);"
+                @click="confirmAction = null"
+              >
+                Отмена
+              </button>
+              <button
+                class="px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                style="background: var(--argus-accent); color: #fff;"
+                @click="confirmAction?.onConfirm()"
+              >
+                Подтвердить
+              </button>
             </div>
           </div>
         </div>

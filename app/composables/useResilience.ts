@@ -92,6 +92,12 @@ export function useResilience(config: ResilienceConfig) {
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
   const heartbeatIntervalMs = 15_000 // Send heartbeat every 15s
 
+  // Server-side health score bias (B-9: isolation from raw health measurement).
+  // Instead of directly mutating healthGovernor.healthScore, we store the
+  // server-directed bias separately and apply it only in tier selection.
+  // This prevents server directives from corrupting the actual device health reading.
+  const serverScoreBias: Ref<number> = ref(0)
+
   // -------------------------------------------------------------------------
   // Clock Synchronization (NTP-style offset estimation)
   // -------------------------------------------------------------------------
@@ -143,9 +149,11 @@ export function useResilience(config: ResilienceConfig) {
     const sorted = [...clockOffsetSamples].sort((a, b) => a - b)
     const medianOffset = sorted[Math.floor(sorted.length / 2)] ?? 0
 
-    // Clamp offset to ±1 hour to prevent runaway offsets (e.g., student clock
-    // set 24h ahead) from breaking JWT expiry checks and session timestamps.
-    const MAX_CLOCK_OFFSET_MS = 3_600_000 // 1 hour
+    // Clamp offset to ±5 minutes to prevent runaway offsets (e.g., student clock
+    // set hours ahead) from breaking JWT expiry checks and session timestamps.
+    // Tighter than 1hr clamp — if clock skew exceeds 5 minutes, the exam system
+    // cannot reliably verify timestamps and JWT windows.
+    const MAX_CLOCK_OFFSET_MS = 300_000 // 5 minutes
     const clampedOffset = Math.max(-MAX_CLOCK_OFFSET_MS, Math.min(MAX_CLOCK_OFFSET_MS, medianOffset))
     if (clampedOffset !== medianOffset) {
       console.warn('[argus:resilience] Clock offset clamped (extreme skew)', {
@@ -178,16 +186,23 @@ export function useResilience(config: ResilienceConfig) {
         // Inject the offline queue writer into the gRPC client
         $grpc.client.setOfflineQueue(offlineQueue.writer)
 
-        // Set up the event drain uploader
+        // Set up the event drain uploader with 10s timeout.
+        // Without a timeout, the drain hangs indefinitely on slow/dead connections,
+        // preventing new events from being queued.
         offlineQueue.setEventUploader(async (events: ProctoringEvent[]) => {
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 10_000)
           try {
             const batchId = `drain-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
             await $grpc.client.ingestBatch({
               events,
-              batchId
+              batchId,
+              signal: controller.signal
             })
+            clearTimeout(timeout)
             return true
           } catch {
+            clearTimeout(timeout)
             return false
           }
         })
@@ -298,6 +313,55 @@ export function useResilience(config: ResilienceConfig) {
   }
 
   /**
+   * Proactively refresh the JWT token before it expires.
+   * Called before each heartbeat to prevent mid-exam token expiry for
+   * long-running sessions (2-4 hour exams).
+   */
+  async function maybeRefreshToken(): Promise<void> {
+    try {
+      const authStore = useNuxtApp().$pinia?.state?.value?.auth
+      if (!authStore?.jwtToken) return
+
+      // Decode JWT payload to check expiry (standard base64url-encoded middle segment)
+      const parts = authStore.jwtToken.split('.')
+      if (parts.length !== 3) return
+
+      const payload = JSON.parse(atob(parts[1]!.replace(/-/g, '+').replace(/_/g, '/')))
+      const expiresAtMs = (payload.exp ?? 0) * 1000
+      const now = Date.now()
+      const REFRESH_BUFFER_MS = 5 * 60 * 1000 // Refresh 5 minutes before expiry
+
+      if (now < expiresAtMs - REFRESH_BUFFER_MS) return // Token is still fresh
+
+      // Token is about to expire — attempt refresh
+      const response = await fetch('/api/v1/auth/refresh', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authStore.jwtToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.token) {
+          // Update token in auth store
+          authStore.jwtToken = data.token
+          // Persist to localStorage
+          if (typeof localStorage !== 'undefined') {
+            try { localStorage.setItem('argus_jwt', data.token) } catch { /* ignore */ }
+          }
+          console.info('[argus:resilience] JWT token refreshed successfully')
+        }
+      } else {
+        console.warn('[argus:resilience] JWT refresh failed', { status: response.status })
+      }
+    } catch {
+      console.warn('[argus:resilience] JWT refresh error (will retry on next heartbeat)')
+    }
+  }
+
+  /**
    * Send a single heartbeat with clock offset measurement.
    * Extracted from the interval loop so it can be called immediately on reconnect.
    */
@@ -305,6 +369,9 @@ export function useResilience(config: ResilienceConfig) {
     try {
       const { $grpc } = useNuxtApp()
       if (!$grpc?.client) return
+
+      // Proactively refresh JWT before it expires (B-7: long exam support)
+      await maybeRefreshToken()
 
       // Capture send time for clock offset calculation
       const sendTimeMs = Date.now()
@@ -374,31 +441,27 @@ export function useResilience(config: ResilienceConfig) {
     const TelemetryMode_HIGH_FREQ = 1
     const TelemetryMode_LOW_FREQ = 2
 
-    let scoreBias = 0
     if (mode === TelemetryMode_HIGH_FREQ) {
-      scoreBias = 30 // Bias toward Tier A
+      serverScoreBias.value = 30 // Bias toward Tier A
       connectionMessage.value = 'Сервер запрашивает увеличенную телеметрию'
     } else if (mode === TelemetryMode_LOW_FREQ) {
-      scoreBias = -30 // Bias toward Tier C
+      serverScoreBias.value = -30 // Bias toward Tier C
       connectionMessage.value = 'Сервер снижает частоту телеметрии (backpressure)'
     } else if (mode === TelemetryMode_NORMAL) {
-      scoreBias = 0
+      serverScoreBias.value = 0
       if (connectionMessage.value.includes('телеметрию') || connectionMessage.value.includes('backpressure')) {
         connectionMessage.value = ''
       }
     }
 
-    // Apply bias to the current health score to influence tier selection.
-    // The Health Governor's next sample will incorporate this bias.
-    const currentScore = healthGovernor.healthScore.value
-    const biasedScore = Math.max(0, Math.min(100, currentScore + scoreBias))
-    healthGovernor.healthScore.value = biasedScore
-
+    // B-9: We store the bias separately instead of mutating healthScore.
+    // The effective score (healthScore + serverScoreBias) is used for tier
+    // selection but does NOT corrupt the actual device health measurement.
     console.info('[argus:resilience] Server directive applied', {
       telemetryMode: mode,
-      scoreBias,
-      originalScore: currentScore,
-      biasedScore,
+      serverBias: serverScoreBias.value,
+      healthScore: healthGovernor.healthScore.value,
+      effectiveScore: Math.max(0, Math.min(100, healthGovernor.healthScore.value + serverScoreBias.value)),
       currentTier: healthGovernor.currentTier.value
     })
 
@@ -626,6 +689,7 @@ export function useResilience(config: ResilienceConfig) {
     serverDirective,
     serverTerminated,
     serverTerminateReason,
+    serverScoreBias: computed(() => serverScoreBias.value),
 
     // Clock synchronization
     clockOffsetMs: computed(() => clockOffsetMs.value),

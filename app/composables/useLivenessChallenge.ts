@@ -108,7 +108,12 @@ export function useLivenessChallenge(config: ChallengeConfig = {}) {
   // Internals
   let scheduleTimer: ReturnType<typeof setTimeout> | null = null
   let deadlineTimer: ReturnType<typeof setTimeout> | null = null
-  let blinkBaselineCount = 0
+  // Blink baseline: -1 means "not yet captured for this challenge".
+  // Will be set to frame.blink.blinkCount on the FIRST verifyFrame() call
+  // after a blink_twice challenge is issued. This ensures we measure only
+  // blinks that occur DURING the challenge, not global accumulated count.
+  let blinkBaselineCount = -1
+  let consecutivePasses = 0
 
   // Callback for sending events
   let sendEventFn: ((
@@ -154,8 +159,8 @@ export function useLivenessChallenge(config: ChallengeConfig = {}) {
       attempts: 0
     }
 
-    // Record blink baseline for blink challenges
-    blinkBaselineCount = 0
+    // Reset blink baseline — will be captured on first verifyFrame() call
+    blinkBaselineCount = -1
 
     currentChallenge.value = challenge
 
@@ -211,11 +216,15 @@ export function useLivenessChallenge(config: ChallengeConfig = {}) {
         passed = frame.headPose.pitch < -headPoseThreshold
         break
       case 'blink_twice': {
-        // Track blinks since challenge was issued
-        if (blinkBaselineCount === 0 && frame.blink.blinkCount > 0) {
+        // Capture baseline on FIRST verifyFrame() call for this challenge.
+        // This ensures we count only blinks that happen AFTER the challenge
+        // is issued, not the global accumulated count from session start.
+        if (blinkBaselineCount < 0) {
           blinkBaselineCount = frame.blink.blinkCount
         }
-        const blinksSinceChallenge = frame.blink.blinkCount - blinkBaselineCount
+        let blinksSinceChallenge = frame.blink.blinkCount - blinkBaselineCount
+        // Handle counter wrap-around (e.g., 8-bit counter rolling over)
+        if (blinksSinceChallenge < 0) blinksSinceChallenge += 256
         passed = blinksSinceChallenge >= blinkCountRequired
         break
       }
@@ -240,7 +249,15 @@ export function useLivenessChallenge(config: ChallengeConfig = {}) {
     challenge.status = 'passed'
     challenge.completedAt = Date.now()
     challengeHistory.value.push({ ...challenge })
-    consecutiveFailures.value = 0
+
+    // Track consecutive passes to recover from failure escalation.
+    // After 2 consecutive passes, reset the failure counter so that
+    // severity doesn't stay stuck at CRITICAL forever.
+    consecutivePasses++
+    if (consecutivePasses >= 2) {
+      consecutiveFailures.value = 0
+      consecutivePasses = 0
+    }
 
     if (deadlineTimer) {
       clearTimeout(deadlineTimer)
@@ -258,6 +275,7 @@ export function useLivenessChallenge(config: ChallengeConfig = {}) {
     challenge.completedAt = Date.now()
     challengeHistory.value.push({ ...challenge })
     consecutiveFailures.value++
+    consecutivePasses = 0 // Reset pass streak on failure
 
     if (deadlineTimer) {
       clearTimeout(deadlineTimer)
