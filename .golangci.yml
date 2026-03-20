@@ -1,5 +1,5 @@
 # .golangci.yml — Argus Backend linter configuration.
-# Used by CI: golangci-lint run ./...
+# Compatible with golangci-lint v1.50+. CI pins to v1.64.8.
 
 run:
   timeout: 5m
@@ -11,10 +11,10 @@ linters:
     - staticcheck
     - unused
     - ineffassign
-    - typecheck
     - gosimple
 
 issues:
+  exit-code: 1
   exclude-rules:
     # HTTP response writing — if the client disconnected, there is nothing
     # actionable. Our critical handlers (admin_handler, external_handler)
