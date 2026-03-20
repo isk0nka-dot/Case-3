@@ -63,13 +63,14 @@ export enum EventType {
   SECOND_SPEAKER_DETECTED = 25,
   AUDIO_PLAYBACK_DETECTED = 26,
 
-  // Browser events (30-35)
+  // Browser events (30-36)
   TAB_SWITCH = 30,
   COPY_PASTE_ATTEMPT = 31,
   PRINT_SCREEN_ATTEMPT = 32,
   CONTEXT_MENU_ATTEMPT = 33,
   FULLSCREEN_EXIT = 34,
   EXTERNAL_DISPLAY_DETECTED = 35,
+  CAMERA_BLOCKED = 36,
 
   // Network events (40-41)
   VPN_PROXY_DETECTED = 40,
@@ -181,6 +182,7 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   [EventType.CONTEXT_MENU_ATTEMPT]: 'Контекстное меню',
   [EventType.FULLSCREEN_EXIT]: 'Выход из полного экрана',
   [EventType.EXTERNAL_DISPLAY_DETECTED]: 'Внешний монитор',
+  [EventType.CAMERA_BLOCKED]: 'Камера/микрофон заблокированы',
   [EventType.VPN_PROXY_DETECTED]: 'VPN/Прокси обнаружен',
   [EventType.SUSPICIOUS_NETWORK_DEVICE]: 'Пассивный сетевой анализ',
   [EventType.EMOTION_STRESS_SPIKE]: 'Повышенный риск вовлечённости (не диагностический)',
@@ -297,10 +299,11 @@ export interface BrowserPayload {
 }
 
 export interface SystemPayload {
-  processName: string
-  processId: number
-  terminated: boolean
-  category: string
+  processName?: string
+  processId?: number
+  terminated?: boolean
+  category?: string
+  message?: string
 }
 
 export interface PsychometryPayload {
@@ -459,6 +462,7 @@ export interface IngestEventResponse {
 export interface IngestBatchRequest {
   events: ProctoringEvent[]
   batchId: string
+  signal?: AbortSignal
 }
 
 export interface IngestBatchResponse {
