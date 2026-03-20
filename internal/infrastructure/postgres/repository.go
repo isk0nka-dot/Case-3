@@ -199,7 +199,10 @@ func (r *Repository) GetOrgByOrgID(ctx context.Context, orgID string) (*entity.O
 	}
 	org.Plan = entity.Plan(plan)
 	if len(featuresJSON) > 0 {
-		_ = json.Unmarshal(featuresJSON, &org.AllowedFeatures)
+		if err := json.Unmarshal(featuresJSON, &org.AllowedFeatures); err != nil {
+			r.logger.Warn("Failed to unmarshal allowed_features",
+				zap.Error(err), zap.String("org_id", orgID))
+		}
 	}
 	return org, nil
 }
@@ -234,7 +237,10 @@ func (r *Repository) GetOrgBySlug(ctx context.Context, slug string) (*entity.Org
 	}
 	org.Plan = entity.Plan(plan)
 	if len(featuresJSON) > 0 {
-		_ = json.Unmarshal(featuresJSON, &org.AllowedFeatures)
+		if err := json.Unmarshal(featuresJSON, &org.AllowedFeatures); err != nil {
+			r.logger.Warn("Failed to unmarshal allowed_features",
+				zap.Error(err), zap.String("slug", slug))
+		}
 	}
 	return org, nil
 }
@@ -314,7 +320,10 @@ func (r *Repository) ListOrgs(ctx context.Context, filter port.OrgFilter) ([]*en
 		}
 		org.Plan = entity.Plan(plan)
 		if len(featuresJSON) > 0 {
-			_ = json.Unmarshal(featuresJSON, &org.AllowedFeatures)
+			if err := json.Unmarshal(featuresJSON, &org.AllowedFeatures); err != nil {
+				r.logger.Warn("Failed to unmarshal allowed_features",
+					zap.Error(err), zap.String("org_id", org.OrgID))
+			}
 		}
 		orgs = append(orgs, org)
 	}
@@ -1290,7 +1299,11 @@ func (r *Repository) PurgeOrgData(ctx context.Context, orgID string) error {
 	if err != nil {
 		return fmt.Errorf("postgres: purge org data: begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if rbErr := tx.Rollback(); rbErr != nil && rbErr != sql.ErrTxDone {
+			r.logger.Error("Failed to rollback transaction", zap.Error(rbErr))
+		}
+	}()
 
 	// Delete from all org-scoped tables.
 	tables := []struct {
@@ -1453,7 +1466,7 @@ func (r *Repository) GetWebhookEndpointsByOrg(ctx context.Context, orgID string)
 		ep.Events = parsePgArray(events)
 		endpoints = append(endpoints, ep)
 	}
-	return endpoints, nil
+	return endpoints, rows.Err()
 }
 
 func (r *Repository) GetWebhookEndpointsByOrgAndEvent(ctx context.Context, orgID, eventType string) ([]*entity.WebhookEndpoint, error) {
@@ -1486,7 +1499,7 @@ func (r *Repository) GetWebhookEndpointsByOrgAndEvent(ctx context.Context, orgID
 		ep.Events = parsePgArray(events)
 		endpoints = append(endpoints, ep)
 	}
-	return endpoints, nil
+	return endpoints, rows.Err()
 }
 
 func (r *Repository) DeleteWebhookEndpoint(ctx context.Context, endpointID string) error {
@@ -1544,7 +1557,7 @@ func (r *Repository) GetPendingWebhookDeliveries(ctx context.Context, limit int)
 		d.ErrorMessage = endpointSecret
 		deliveries = append(deliveries, d)
 	}
-	return deliveries, nil
+	return deliveries, rows.Err()
 }
 
 func (r *Repository) MarkWebhookDelivered(ctx context.Context, deliveryID int64, httpStatus int, responseBody string) error {

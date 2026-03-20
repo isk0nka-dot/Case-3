@@ -138,7 +138,12 @@ func (h *ExternalHandler) requireAPIKey(requiredPerm string, next http.HandlerFu
 
 		// Update last_used_at asynchronously (fire-and-forget).
 		go func() {
-			_ = h.repo.UpdateAPIKeyLastUsed(context.Background(), apiKey.KeyID)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := h.repo.UpdateAPIKeyLastUsed(ctx, apiKey.KeyID); err != nil {
+				h.logger.Warn("Failed to update API key last_used_at",
+					zap.Error(err), zap.String("key_id", apiKey.KeyID))
+			}
 		}()
 
 		// Inject API key context for downstream handlers.
@@ -548,7 +553,12 @@ func (h *ExternalHandler) handleDeleteWebhook(w http.ResponseWriter, r *http.Req
 // for the given event type. Delivery is handled by the background dispatcher.
 func (h *ExternalHandler) enqueueWebhook(ctx context.Context, orgID, eventType string, payload interface{}) {
 	endpoints, err := h.repo.GetWebhookEndpointsByOrgAndEvent(ctx, orgID, eventType)
-	if err != nil || len(endpoints) == 0 {
+	if err != nil {
+		h.logger.Error("Failed to get webhook endpoints",
+			zap.Error(err), zap.String("org_id", orgID), zap.String("event_type", eventType))
+		return
+	}
+	if len(endpoints) == 0 {
 		return
 	}
 
@@ -593,7 +603,9 @@ func (h *ExternalHandler) jsonResponse(w http.ResponseWriter, data interface{}, 
 func (h *ExternalHandler) jsonError(w http.ResponseWriter, message string, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": message}); err != nil {
+		h.logger.Error("Failed to encode JSON error response", zap.Error(err))
+	}
 }
 
 // generateSessionID creates a unique session identifier with argus_ prefix.

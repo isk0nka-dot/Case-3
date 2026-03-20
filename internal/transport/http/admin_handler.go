@@ -1006,7 +1006,7 @@ func (h *AdminHandler) handleCreateAPIKey(w http.ResponseWriter, r *http.Request
 	}
 
 	// Hash the secret.
-	secretHash, err := bcrypt.GenerateFromPassword([]byte(rawSecret), 10)
+	secretHash, err := bcrypt.GenerateFromPassword([]byte(rawSecret), 12)
 	if err != nil {
 		h.jsonError(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -1247,10 +1247,26 @@ type adminStats struct {
 }
 
 func (h *AdminHandler) handleStats(w http.ResponseWriter, r *http.Request) {
-	orgCount, _ := h.repo.CountOrgs(r.Context())
+	orgCount, err := h.repo.CountOrgs(r.Context())
+	if err != nil {
+		h.logger.Error("Failed to count organizations", zap.Error(err))
+		h.jsonError(w, "Failed to load statistics", http.StatusInternalServerError)
+		return
+	}
 
-	allUsers, _ := h.repo.ListAllUsers(r.Context(), port.UserFilter{})
-	allKeys, _ := h.repo.ListAllAPIKeys(r.Context())
+	allUsers, err := h.repo.ListAllUsers(r.Context(), port.UserFilter{})
+	if err != nil {
+		h.logger.Error("Failed to list users", zap.Error(err))
+		h.jsonError(w, "Failed to load statistics", http.StatusInternalServerError)
+		return
+	}
+
+	allKeys, err := h.repo.ListAllAPIKeys(r.Context())
+	if err != nil {
+		h.logger.Error("Failed to list API keys", zap.Error(err))
+		h.jsonError(w, "Failed to load statistics", http.StatusInternalServerError)
+		return
+	}
 
 	stats := adminStats{
 		TotalOrganizations: orgCount,
@@ -1458,7 +1474,9 @@ func (h *AdminHandler) jsonResponse(w http.ResponseWriter, data interface{}, sta
 func (h *AdminHandler) jsonError(w http.ResponseWriter, message string, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": message}); err != nil {
+		h.logger.Error("Failed to encode JSON error response", zap.Error(err))
+	}
 }
 
 // ==========================================================================

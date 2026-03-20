@@ -215,7 +215,12 @@ func (d *Dispatcher) deliver(ctx context.Context, delivery *entity.WebhookDelive
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096)) // Read up to 4KB of response.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4096)) // Read up to 4KB of response.
+	if err != nil {
+		d.logger.Warn("Failed to read webhook response body",
+			zap.Error(err), zap.Int64("delivery_id", delivery.ID))
+		body = []byte{}
+	}
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		// Success.
