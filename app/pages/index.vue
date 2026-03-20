@@ -666,32 +666,32 @@ const archiveKernelLabels: Record<string, string> = {
         <div class="hidden md:flex items-center gap-8">
           <a
             href="#features"
-            class="text-sm text-white/50 hover:text-white transition-colors"
+            class="text-base text-white/50 hover:text-white transition-colors"
           >Возможности</a>
           <a
             href="#settings-demo"
-            class="text-sm text-white/50 hover:text-white transition-colors"
+            class="text-base text-white/50 hover:text-white transition-colors"
           >Настройки</a>
           <a
             href="#archive-demo"
-            class="text-sm text-white/50 hover:text-white transition-colors"
+            class="text-base text-white/50 hover:text-white transition-colors"
           >Архив</a>
           <a
             href="#stats"
-            class="text-sm text-white/50 hover:text-white transition-colors"
+            class="text-base text-white/50 hover:text-white transition-colors"
           >Результаты</a>
           <a
             href="#comparison"
-            class="text-sm text-white/50 hover:text-white transition-colors"
+            class="text-base text-white/50 hover:text-white transition-colors"
           >Сравнение</a>
           <a
             href="#pricing"
-            class="text-sm text-white/50 hover:text-white transition-colors"
+            class="text-base text-white/50 hover:text-white transition-colors"
           >Стоимость</a>
           <NuxtLink
             v-if="authStore.isLoggedIn"
             to="/"
-            class="text-sm text-white/50 hover:text-white transition-colors"
+            class="text-base text-white/50 hover:text-white transition-colors"
           >Дашборд</NuxtLink>
         </div>
 
@@ -699,7 +699,7 @@ const archiveKernelLabels: Record<string, string> = {
           <!-- Not logged in: show "Войти" -->
           <template v-if="!authStore.isLoggedIn">
             <button
-              class="px-5 py-2 rounded-lg text-sm font-semibold text-white/80 hover:text-white transition-all duration-200 cursor-pointer"
+              class="px-5 py-2 rounded-lg text-base font-semibold text-white/80 hover:text-white transition-all duration-200 cursor-pointer"
               style="border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.04); backdrop-filter: blur(8px);"
               @mouseenter="e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.35)'"
               @mouseleave="e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.18)'"
@@ -713,7 +713,7 @@ const archiveKernelLabels: Record<string, string> = {
           <template v-else>
             <NuxtLink
               to="/"
-              class="scanner-btn scanner-btn-nav px-5 py-2.5 rounded-lg text-sm font-bold text-white inline-flex items-center"
+              class="scanner-btn scanner-btn-nav px-5 py-2.5 rounded-lg text-base font-bold text-white inline-flex items-center"
             >
               <span>Админ панель</span>
             </NuxtLink>
