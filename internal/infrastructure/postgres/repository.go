@@ -1274,3 +1274,262 @@ func (r *Repository) PurgeOrgData(ctx context.Context, orgID string) error {
 
 	return nil
 }
+
+// ==========================================================================
+// External Session CRUD
+// ==========================================================================
+
+func (r *Repository) CreateExternalSession(ctx context.Context, s *entity.ExternalSession) error {
+	query := `
+		INSERT INTO external_sessions (
+			session_id, org_id, exam_id, student_id,
+			student_name, exam_name, callback_url, metadata,
+			session_token, token_expires_at, status
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		RETURNING id, created_at, updated_at`
+
+	return r.db.QueryRowContext(ctx, query,
+		s.SessionID, s.OrgID, s.ExamID, s.StudentID,
+		s.StudentName, s.ExamName, s.CallbackURL, s.Metadata,
+		s.SessionToken, s.TokenExpiresAt, s.Status,
+	).Scan(&s.ID, &s.CreatedAt, &s.UpdatedAt)
+}
+
+func (r *Repository) GetExternalSessionByID(ctx context.Context, sessionID string) (*entity.ExternalSession, error) {
+	query := `
+		SELECT id, session_id, org_id, exam_id, student_id,
+			student_name, exam_name, callback_url, metadata,
+			token_expires_at, status,
+			verdict, verdict_details, integrity_score, violation_count,
+			started_at, completed_at, created_at, updated_at
+		FROM external_sessions
+		WHERE session_id = $1`
+
+	s := &entity.ExternalSession{}
+	err := r.db.QueryRowContext(ctx, query, sessionID).Scan(
+		&s.ID, &s.SessionID, &s.OrgID, &s.ExamID, &s.StudentID,
+		&s.StudentName, &s.ExamName, &s.CallbackURL, &s.Metadata,
+		&s.TokenExpiresAt, &s.Status,
+		&s.Verdict, &s.VerdictDetails, &s.IntegrityScore, &s.ViolationCount,
+		&s.StartedAt, &s.CompletedAt, &s.CreatedAt, &s.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("postgres: get external session: %w", err)
+	}
+	return s, nil
+}
+
+func (r *Repository) UpdateExternalSessionStatus(ctx context.Context, sessionID, status string) error {
+	query := `UPDATE external_sessions SET status = $2, updated_at = NOW() WHERE session_id = $1`
+	if status == "active" {
+		query = `UPDATE external_sessions SET status = $2, started_at = NOW(), updated_at = NOW() WHERE session_id = $1`
+	}
+	_, err := r.db.ExecContext(ctx, query, sessionID, status)
+	return err
+}
+
+func (r *Repository) CompleteExternalSession(ctx context.Context, sessionID, verdict string, details []byte, score float64, violations int) error {
+	query := `
+		UPDATE external_sessions
+		SET status = 'completed', verdict = $2, verdict_details = $3,
+			integrity_score = $4, violation_count = $5,
+			completed_at = NOW(), updated_at = NOW()
+		WHERE session_id = $1`
+	_, err := r.db.ExecContext(ctx, query, sessionID, verdict, details, score, violations)
+	return err
+}
+
+// ==========================================================================
+// Webhook Endpoint CRUD
+// ==========================================================================
+
+func (r *Repository) CreateWebhookEndpoint(ctx context.Context, ep *entity.WebhookEndpoint) error {
+	query := `
+		INSERT INTO webhook_endpoints (org_id, name, url, secret, events, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, created_at, updated_at`
+	return r.db.QueryRowContext(ctx, query,
+		ep.OrgID, ep.Name, ep.URL, ep.Secret, pqStringArray(ep.Events), ep.IsActive,
+	).Scan(&ep.ID, &ep.CreatedAt, &ep.UpdatedAt)
+}
+
+func (r *Repository) GetWebhookEndpointByID(ctx context.Context, endpointID string) (*entity.WebhookEndpoint, error) {
+	query := `
+		SELECT id, org_id, name, url, events, is_active,
+			last_delivery_at, last_failure_at, consecutive_failures,
+			created_at, updated_at
+		FROM webhook_endpoints
+		WHERE id = $1 AND deleted_at IS NULL`
+
+	ep := &entity.WebhookEndpoint{}
+	var events string
+	err := r.db.QueryRowContext(ctx, query, endpointID).Scan(
+		&ep.ID, &ep.OrgID, &ep.Name, &ep.URL, &events, &ep.IsActive,
+		&ep.LastDeliveryAt, &ep.LastFailureAt, &ep.ConsecutiveFailures,
+		&ep.CreatedAt, &ep.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("postgres: get webhook endpoint: %w", err)
+	}
+	ep.Events = parsePgArray(events)
+	return ep, nil
+}
+
+func (r *Repository) GetWebhookEndpointsByOrg(ctx context.Context, orgID string) ([]*entity.WebhookEndpoint, error) {
+	query := `
+		SELECT id, org_id, name, url, events, is_active,
+			last_delivery_at, last_failure_at, consecutive_failures,
+			created_at, updated_at
+		FROM webhook_endpoints
+		WHERE org_id = $1 AND deleted_at IS NULL AND is_active = true
+		ORDER BY created_at DESC`
+
+	rows, err := r.db.QueryContext(ctx, query, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list webhook endpoints: %w", err)
+	}
+	defer rows.Close()
+
+	var endpoints []*entity.WebhookEndpoint
+	for rows.Next() {
+		ep := &entity.WebhookEndpoint{}
+		var events string
+		if err := rows.Scan(
+			&ep.ID, &ep.OrgID, &ep.Name, &ep.URL, &events, &ep.IsActive,
+			&ep.LastDeliveryAt, &ep.LastFailureAt, &ep.ConsecutiveFailures,
+			&ep.CreatedAt, &ep.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("postgres: scan webhook endpoint: %w", err)
+		}
+		ep.Events = parsePgArray(events)
+		endpoints = append(endpoints, ep)
+	}
+	return endpoints, nil
+}
+
+func (r *Repository) GetWebhookEndpointsByOrgAndEvent(ctx context.Context, orgID, eventType string) ([]*entity.WebhookEndpoint, error) {
+	query := `
+		SELECT id, org_id, name, url, secret, events, is_active,
+			last_delivery_at, last_failure_at, consecutive_failures,
+			created_at, updated_at
+		FROM webhook_endpoints
+		WHERE org_id = $1 AND deleted_at IS NULL AND is_active = true
+			AND $2 = ANY(events)
+		ORDER BY created_at DESC`
+
+	rows, err := r.db.QueryContext(ctx, query, orgID, eventType)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list webhook endpoints by event: %w", err)
+	}
+	defer rows.Close()
+
+	var endpoints []*entity.WebhookEndpoint
+	for rows.Next() {
+		ep := &entity.WebhookEndpoint{}
+		var events string
+		if err := rows.Scan(
+			&ep.ID, &ep.OrgID, &ep.Name, &ep.URL, &ep.Secret, &events, &ep.IsActive,
+			&ep.LastDeliveryAt, &ep.LastFailureAt, &ep.ConsecutiveFailures,
+			&ep.CreatedAt, &ep.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("postgres: scan webhook endpoint: %w", err)
+		}
+		ep.Events = parsePgArray(events)
+		endpoints = append(endpoints, ep)
+	}
+	return endpoints, nil
+}
+
+func (r *Repository) DeleteWebhookEndpoint(ctx context.Context, endpointID string) error {
+	query := `UPDATE webhook_endpoints SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
+	_, err := r.db.ExecContext(ctx, query, endpointID)
+	return err
+}
+
+// ==========================================================================
+// Webhook Delivery CRUD
+// ==========================================================================
+
+func (r *Repository) CreateWebhookDelivery(ctx context.Context, d *entity.WebhookDelivery) error {
+	query := `
+		INSERT INTO webhook_deliveries (endpoint_id, org_id, event_type, payload, status, max_attempts, next_retry_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, created_at`
+	return r.db.QueryRowContext(ctx, query,
+		d.EndpointID, d.OrgID, d.EventType, d.Payload, d.Status, d.MaxAttempts, d.NextRetryAt,
+	).Scan(&d.ID, &d.CreatedAt)
+}
+
+func (r *Repository) GetPendingWebhookDeliveries(ctx context.Context, limit int) ([]*entity.WebhookDelivery, error) {
+	query := `
+		SELECT d.id, d.endpoint_id, d.org_id, d.event_type, d.payload,
+			d.status, d.attempt, d.max_attempts, d.next_retry_at, d.created_at,
+			e.url, e.secret
+		FROM webhook_deliveries d
+		JOIN webhook_endpoints e ON e.id = d.endpoint_id
+		WHERE d.status = 'pending' AND d.next_retry_at <= NOW()
+		ORDER BY d.next_retry_at ASC
+		LIMIT $1
+		FOR UPDATE OF d SKIP LOCKED`
+
+	rows, err := r.db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: get pending deliveries: %w", err)
+	}
+	defer rows.Close()
+
+	var deliveries []*entity.WebhookDelivery
+	for rows.Next() {
+		d := &entity.WebhookDelivery{}
+		var endpointURL, endpointSecret string
+		if err := rows.Scan(
+			&d.ID, &d.EndpointID, &d.OrgID, &d.EventType, &d.Payload,
+			&d.Status, &d.Attempt, &d.MaxAttempts, &d.NextRetryAt, &d.CreatedAt,
+			&endpointURL, &endpointSecret,
+		); err != nil {
+			return nil, fmt.Errorf("postgres: scan delivery: %w", err)
+		}
+		// Store URL and secret in ResponseBody and ErrorMessage temporarily
+		// (these fields are unused for pending deliveries).
+		d.ResponseBody = endpointURL
+		d.ErrorMessage = endpointSecret
+		deliveries = append(deliveries, d)
+	}
+	return deliveries, nil
+}
+
+func (r *Repository) MarkWebhookDelivered(ctx context.Context, deliveryID int64, httpStatus int, responseBody string) error {
+	query := `
+		UPDATE webhook_deliveries
+		SET status = 'delivered', http_status = $2, response_body = $3,
+			attempt = attempt + 1, delivered_at = NOW()
+		WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, deliveryID, httpStatus, responseBody)
+	return err
+}
+
+func (r *Repository) MarkWebhookFailed(ctx context.Context, deliveryID int64, httpStatus int, errorMsg string, nextRetryAt *time.Time) error {
+	if nextRetryAt != nil {
+		query := `
+			UPDATE webhook_deliveries
+			SET http_status = $2, error_message = $3,
+				attempt = attempt + 1, next_retry_at = $4
+			WHERE id = $1`
+		_, err := r.db.ExecContext(ctx, query, deliveryID, httpStatus, errorMsg, *nextRetryAt)
+		return err
+	}
+	// Final failure — no more retries.
+	query := `
+		UPDATE webhook_deliveries
+		SET status = 'failed', http_status = $2, error_message = $3,
+			attempt = attempt + 1
+		WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, deliveryID, httpStatus, errorMsg)
+	return err
+}

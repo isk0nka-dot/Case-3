@@ -48,6 +48,7 @@ type Config struct {
 	CryptoErase CryptoEraseConfig `yaml:"crypto_erasure"`
 	Backfiller  BackfillerConfig  `yaml:"backfiller"`
 	Cleanup     CleanupConfig     `yaml:"cleanup"`
+	Webhook     WebhookConfig     `yaml:"webhook"`
 }
 
 // CleanupConfig holds org lifecycle cleanup settings.
@@ -99,6 +100,29 @@ type CryptoEraseConfig struct {
 	// CRITICAL: Must be loaded from a secrets manager in production.
 	// Set via ARGUS_CRYPTO_KEK environment variable.
 	KEKHex string `yaml:"kek_hex"`
+}
+
+// WebhookConfig holds configuration for the SaaS webhook delivery system.
+// When enabled, a background dispatcher polls the webhook_deliveries table
+// and delivers payloads to partner endpoints with HMAC-SHA256 signatures.
+type WebhookConfig struct {
+	// Enabled controls whether the webhook dispatcher runs. Default: true.
+	Enabled bool `yaml:"enabled"`
+
+	// PollInterval is how often the dispatcher checks for pending deliveries. Default: 1s.
+	PollInterval time.Duration `yaml:"poll_interval"`
+
+	// BatchSize is the maximum number of deliveries to process per poll. Default: 50.
+	BatchSize int `yaml:"batch_size"`
+
+	// MaxRetries is the maximum delivery attempts before marking as failed. Default: 5.
+	MaxRetries int `yaml:"max_retries"`
+
+	// TimeoutSec is the HTTP request timeout for each delivery attempt. Default: 30.
+	TimeoutSec int `yaml:"timeout_sec"`
+
+	// MaxConcurrent limits parallel delivery goroutines. Default: 10.
+	MaxConcurrent int `yaml:"max_concurrent"`
 }
 
 // TelegramConfig holds Telegram Bot API alerting credentials.
@@ -950,6 +974,23 @@ func applyDefaults(cfg *Config) {
 	if cfg.Inference.Concurrency == 0 {
 		cfg.Inference.Concurrency = 4
 	}
+
+	// --- Webhook dispatcher ---
+	if cfg.Webhook.PollInterval == 0 {
+		cfg.Webhook.PollInterval = 1 * time.Second
+	}
+	if cfg.Webhook.BatchSize == 0 {
+		cfg.Webhook.BatchSize = 50
+	}
+	if cfg.Webhook.MaxRetries == 0 {
+		cfg.Webhook.MaxRetries = 5
+	}
+	if cfg.Webhook.TimeoutSec == 0 {
+		cfg.Webhook.TimeoutSec = 30
+	}
+	if cfg.Webhook.MaxConcurrent == 0 {
+		cfg.Webhook.MaxConcurrent = 10
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1178,6 +1219,26 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("ARGUS_CRYPTO_KEK"); v != "" {
 		cfg.CryptoErase.KEKHex = v
+	}
+
+	// Webhook dispatcher.
+	if v := os.Getenv("EVENT_COLLECTOR_WEBHOOK_ENABLED"); v != "" {
+		cfg.Webhook.Enabled = v == "true" || v == "1"
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_WEBHOOK_MAX_RETRIES"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Webhook.MaxRetries = n
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_WEBHOOK_TIMEOUT_SEC"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Webhook.TimeoutSec = n
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_WEBHOOK_MAX_CONCURRENT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Webhook.MaxConcurrent = n
+		}
 	}
 }
 
