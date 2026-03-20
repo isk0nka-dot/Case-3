@@ -28,7 +28,7 @@
 //
 // =============================================================================
 
-import { computed, type ComputedRef } from 'vue'
+import { ref, computed, type ComputedRef } from 'vue'
 import type { VisionFrame } from './useVisionEngine'
 import { EventType, Severity, EventSource } from '~/lib/proto/types'
 import type { EventPayload } from '~/lib/proto/types'
@@ -116,14 +116,52 @@ export function useSecurityShield(config: SecurityShieldConfig) {
   let started = false
   let periodicVerifyTimer: ReturnType<typeof setInterval> | null = null
 
+  // Permission-blocked state: exam cannot proceed without camera/mic
+  const permissionBlocked = ref(false)
+
   /**
    * Start all shield subsystems.
+   *
+   * If no MediaStream is provided, attempts to acquire camera/mic permissions.
+   * If permissions are denied, the shield enters BLOCKED state — the exam
+   * page should show a HardBlockerModal and prevent the student from proceeding.
    *
    * @param stream - MediaStream from getUserMedia for virtual camera analysis
    */
   async function start(stream?: MediaStream): Promise<void> {
     if (started) return
     started = true
+
+    // ── Camera/mic permission enforcement ─────────────────────────────────
+    // If no stream was provided, attempt to acquire permissions.
+    // Camera is REQUIRED for proctoring — exam cannot proceed without it.
+    if (!stream) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480, facingMode: 'user' },
+          audio: true
+        })
+      } catch {
+        // Camera/mic denied or unavailable — hard block the exam
+        permissionBlocked.value = true
+        sendEvent(
+          EventType.CAMERA_BLOCKED,
+          Severity.CRITICAL,
+          {
+            type: 'system',
+            data: {
+              message: 'Camera/microphone permission denied — exam cannot proceed'
+            }
+          },
+          'Камера/микрофон отклонены — экзамен невозможен',
+          1.0,
+          EventSource.BROWSER
+        )
+        // Do NOT start any subsystems — the exam is blocked
+        started = false
+        return
+      }
+    }
 
     // 1. Browser integrity — immediate
     browser.start()
@@ -310,6 +348,9 @@ export function useSecurityShield(config: SecurityShieldConfig) {
 
     // Composite status
     status,
+
+    // Permission state (for HardBlockerModal)
+    permissionBlocked,
 
     // Subsystem access (for SecurityShield.vue props)
     browserState: browser.state,

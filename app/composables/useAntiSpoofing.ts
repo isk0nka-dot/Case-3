@@ -113,6 +113,20 @@ export function useAntiSpoofing() {
 
   /** Run the composite anti-spoofing analysis. */
   function analyze(): SpoofAnalysis {
+    // Minimum data guard: need at least 5 frames before any analysis
+    // to avoid false positives during session startup.
+    if (headPoseHistory.length < 5) {
+      const noData: SpoofAnalysis = {
+        isSpoof: false,
+        confidence: 0,
+        spoofType: 'none',
+        signals: [],
+        timestamp: Date.now()
+      }
+      currentAnalysis.value = noData
+      return noData
+    }
+
     const signals: SpoofSignal[] = []
 
     // Signal 1: Head pose micro-movement variance
@@ -217,9 +231,13 @@ export function useAntiSpoofing() {
     // Real faces: yaw std > 0.3°, pitch std > 0.2° (involuntary sway)
     // Photos/screens: std ≈ 0 (perfectly static)
     const combinedStd = (yawStd + pitchStd) / 2
-    const isStatic = combinedStd < 0.15 // Less than 0.15° average movement = suspicious
 
-    const score = isStatic ? Math.min(1, 1 - combinedStd / 0.3) : 0
+    // Sigmoid curve: smooth transition instead of binary cliff at 0.15°.
+    // At combinedStd=0 → score≈1.0 (certain spoof)
+    // At combinedStd=0.15 → score≈0.5 (uncertain)
+    // At combinedStd=0.30 → score≈0.05 (likely real)
+    // The factor 20 controls steepness; center point is 0.15°.
+    const score = 1 / (1 + Math.exp(20 * (combinedStd - 0.15)))
 
     return {
       name: 'head_pose_variance',
@@ -236,7 +254,9 @@ export function useAntiSpoofing() {
     // Calculate blinks in the window
     const firstBlink = blinkHistory[0]!.count
     const lastBlink = blinkHistory[blinkHistory.length - 1]!.count
-    const blinksInWindow = lastBlink - firstBlink
+    let blinksInWindow = lastBlink - firstBlink
+    // Handle counter wrap-around (e.g., 8-bit counter rolling 255 → 0)
+    if (blinksInWindow < 0) blinksInWindow += 256
 
     const windowDurationSec = (blinkHistory[blinkHistory.length - 1]!.ts - blinkHistory[0]!.ts) / 1000
     const blinksPerMinute = windowDurationSec > 0 ? (blinksInWindow / windowDurationSec) * 60 : 0

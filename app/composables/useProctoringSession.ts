@@ -170,6 +170,14 @@ export function useProctoringSession(config: SessionConfig) {
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
   let eventCounter = 0
 
+  // Session recovery key for browser crash / tab close protection
+  const SESSION_RECOVERY_KEY = `argus:session:${sessionId}`
+  // Max age for recoverable sessions (3 hours)
+  const SESSION_MAX_AGE_MS = 3 * 3600 * 1000
+
+  // beforeunload handler ref for cleanup
+  let beforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | null = null
+
   // -------------------------------------------------------------------------
   // Client Metadata — cached at session start
   // -------------------------------------------------------------------------
@@ -243,6 +251,44 @@ export function useProctoringSession(config: SessionConfig) {
       startedAt.value = Date.now()
       status.value = 'active'
 
+      // ── Session recovery: persist metadata to sessionStorage ──────────
+      // If the browser crashes or the tab is closed, this allows the exam
+      // page to detect an interrupted session and offer resumption.
+      if (typeof sessionStorage !== 'undefined') {
+        try {
+          sessionStorage.setItem(SESSION_RECOVERY_KEY, JSON.stringify({
+            sessionId, studentId, orgId, examId,
+            startedAt: startedAt.value
+          }))
+        } catch {
+          // sessionStorage may be full or unavailable — non-fatal
+        }
+      }
+
+      // ── beforeunload: warn student and send beacon on unexpected exit ─
+      beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+        if (status.value === 'active') {
+          // Send a final event via navigator.sendBeacon (synchronous, survives page unload)
+          try {
+            const beaconPayload = JSON.stringify({
+              sessionId,
+              studentId,
+              orgId,
+              examId,
+              event: 'SESSION_INTERRUPTED',
+              timestamp: new Date().toISOString()
+            })
+            navigator.sendBeacon('/api/v1/session/beacon', beaconPayload)
+          } catch {
+            // sendBeacon may fail in some contexts — best-effort
+          }
+          e.preventDefault()
+          // Chrome requires returnValue to be set for the dialog to show
+          e.returnValue = 'Экзамен в процессе. Вы уверены, что хотите покинуть страницу?'
+        }
+      }
+      window.addEventListener('beforeunload', beforeUnloadHandler)
+
       // Register with debug bridge for PerformanceDebugger overlay (Ctrl+Shift+D)
       // This is a no-op in production — the debugger panel is hidden by default.
       // We register here (instead of at construction) so the debugger only shows
@@ -279,6 +325,17 @@ export function useProctoringSession(config: SessionConfig) {
       if (heartbeatTimer) {
         clearInterval(heartbeatTimer)
         heartbeatTimer = null
+      }
+
+      // Remove beforeunload handler (graceful exit, not a crash)
+      if (beforeUnloadHandler) {
+        window.removeEventListener('beforeunload', beforeUnloadHandler)
+        beforeUnloadHandler = null
+      }
+
+      // Clear session recovery data (clean stop = no recovery needed)
+      if (typeof sessionStorage !== 'undefined') {
+        try { sessionStorage.removeItem(SESSION_RECOVERY_KEY) } catch { /* ignore */ }
       }
 
       // Flush remaining events.
@@ -569,10 +626,47 @@ export function useProctoringSession(config: SessionConfig) {
   // -------------------------------------------------------------------------
 
   onUnmounted(() => {
+    // Clean up beforeunload handler to prevent memory leaks
+    if (beforeUnloadHandler) {
+      window.removeEventListener('beforeunload', beforeUnloadHandler)
+      beforeUnloadHandler = null
+    }
     if (status.value === 'active') {
       void stop()
     }
   })
+
+  // -------------------------------------------------------------------------
+  // Session Recovery (static utility)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Check if there is a pending (interrupted) proctoring session in sessionStorage.
+   * Call this on page mount to detect browser crashes and offer session resumption.
+   *
+   * @returns Session metadata if a recoverable session exists, null otherwise
+   */
+  function checkPendingSession(): { sessionId: string, studentId: string, orgId: string, examId: string, startedAt: number } | null {
+    if (typeof sessionStorage === 'undefined') return null
+    try {
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i)
+        if (key?.startsWith('argus:session:')) {
+          const raw = sessionStorage.getItem(key)
+          if (!raw) continue
+          const data = JSON.parse(raw)
+          if (Date.now() - data.startedAt < SESSION_MAX_AGE_MS) {
+            return data
+          }
+          // Expired — clean up
+          sessionStorage.removeItem(key)
+        }
+      }
+    } catch {
+      // Corrupted data — ignore
+    }
+    return null
+  }
 
   // -------------------------------------------------------------------------
   // Public API
@@ -592,6 +686,9 @@ export function useProctoringSession(config: SessionConfig) {
     // Lifecycle
     start,
     stop,
+
+    // Session recovery
+    checkPendingSession,
 
     // Generic event sender
     sendEvent,
