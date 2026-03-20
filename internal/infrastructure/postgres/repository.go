@@ -142,17 +142,30 @@ func (r *Repository) Ping(ctx context.Context) error {
 // ==========================================================================
 
 func (r *Repository) CreateOrg(ctx context.Context, org *entity.Organization) error {
+	featuresJSON, err := json.Marshal(org.AllowedFeatures)
+	if err != nil {
+		return fmt.Errorf("postgres: marshal allowed_features: %w", err)
+	}
+	if org.AllowedFeatures == nil {
+		featuresJSON = []byte("{}")
+	}
+
 	query := `
 		INSERT INTO organizations (org_id, name, slug, org_type, contact_email, contact_phone,
-			city, region, plan, max_sessions, max_events_rps, retention_days, is_active, created_by, updated_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+			city, region, plan, max_sessions, max_events_rps, retention_days, is_active,
+			allowed_features, session_limit, sessions_used, trial_ends_at,
+			created_by, updated_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+			$14, $15, $16, $17, $18, $18)
 		RETURNING id, created_at, updated_at`
 
 	return r.db.QueryRowContext(ctx, query,
 		org.OrgID, org.Name, org.Slug, org.OrgType,
 		org.ContactEmail, org.ContactPhone, org.City, org.Region,
 		string(org.Plan), org.MaxSessions, org.MaxEventsRPS, org.RetentionDays,
-		org.IsActive, org.CreatedBy,
+		org.IsActive,
+		featuresJSON, org.SessionLimit, org.SessionsUsed, org.TrialEndsAt,
+		org.CreatedBy,
 	).Scan(&org.ID, &org.CreatedAt, &org.UpdatedAt)
 }
 
@@ -162,18 +175,21 @@ func (r *Repository) GetOrgByOrgID(ctx context.Context, orgID string) (*entity.O
 			COALESCE(contact_email, ''), COALESCE(contact_phone, ''),
 			COALESCE(city, ''), COALESCE(region, ''),
 			plan, max_sessions, max_events_rps, retention_days,
-			is_active, created_at, updated_at, deleted_at, created_by, updated_by
+			is_active, created_at, updated_at, deleted_at, created_by, updated_by,
+			COALESCE(allowed_features, '{}'::jsonb), session_limit, sessions_used, trial_ends_at
 		FROM organizations
 		WHERE org_id = $1 AND deleted_at IS NULL`
 
 	org := &entity.Organization{}
 	var plan string
+	var featuresJSON []byte
 	err := r.db.QueryRowContext(ctx, query, orgID).Scan(
 		&org.ID, &org.OrgID, &org.Name, &org.Slug, &org.OrgType,
 		&org.ContactEmail, &org.ContactPhone, &org.City, &org.Region,
 		&plan, &org.MaxSessions, &org.MaxEventsRPS, &org.RetentionDays,
 		&org.IsActive, &org.CreatedAt, &org.UpdatedAt, &org.DeletedAt,
 		&org.CreatedBy, &org.UpdatedBy,
+		&featuresJSON, &org.SessionLimit, &org.SessionsUsed, &org.TrialEndsAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -182,6 +198,9 @@ func (r *Repository) GetOrgByOrgID(ctx context.Context, orgID string) (*entity.O
 		return nil, fmt.Errorf("postgres: get org: %w", err)
 	}
 	org.Plan = entity.Plan(plan)
+	if len(featuresJSON) > 0 {
+		_ = json.Unmarshal(featuresJSON, &org.AllowedFeatures)
+	}
 	return org, nil
 }
 
@@ -191,18 +210,21 @@ func (r *Repository) GetOrgBySlug(ctx context.Context, slug string) (*entity.Org
 			COALESCE(contact_email, ''), COALESCE(contact_phone, ''),
 			COALESCE(city, ''), COALESCE(region, ''),
 			plan, max_sessions, max_events_rps, retention_days,
-			is_active, created_at, updated_at, deleted_at, created_by, updated_by
+			is_active, created_at, updated_at, deleted_at, created_by, updated_by,
+			COALESCE(allowed_features, '{}'::jsonb), session_limit, sessions_used, trial_ends_at
 		FROM organizations
 		WHERE slug = $1 AND deleted_at IS NULL`
 
 	org := &entity.Organization{}
 	var plan string
+	var featuresJSON []byte
 	err := r.db.QueryRowContext(ctx, query, slug).Scan(
 		&org.ID, &org.OrgID, &org.Name, &org.Slug, &org.OrgType,
 		&org.ContactEmail, &org.ContactPhone, &org.City, &org.Region,
 		&plan, &org.MaxSessions, &org.MaxEventsRPS, &org.RetentionDays,
 		&org.IsActive, &org.CreatedAt, &org.UpdatedAt, &org.DeletedAt,
 		&org.CreatedBy, &org.UpdatedBy,
+		&featuresJSON, &org.SessionLimit, &org.SessionsUsed, &org.TrialEndsAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -211,6 +233,9 @@ func (r *Repository) GetOrgBySlug(ctx context.Context, slug string) (*entity.Org
 		return nil, fmt.Errorf("postgres: get org by slug: %w", err)
 	}
 	org.Plan = entity.Plan(plan)
+	if len(featuresJSON) > 0 {
+		_ = json.Unmarshal(featuresJSON, &org.AllowedFeatures)
+	}
 	return org, nil
 }
 
@@ -253,7 +278,8 @@ func (r *Repository) ListOrgs(ctx context.Context, filter port.OrgFilter) ([]*en
 			COALESCE(contact_email, ''), COALESCE(contact_phone, ''),
 			COALESCE(city, ''), COALESCE(region, ''),
 			plan, max_sessions, max_events_rps, retention_days,
-			is_active, created_at, updated_at, created_by, updated_by
+			is_active, created_at, updated_at, created_by, updated_by,
+			COALESCE(allowed_features, '{}'::jsonb), session_limit, sessions_used, trial_ends_at
 		FROM organizations
 		WHERE %s
 		ORDER BY name ASC`, strings.Join(conditions, " AND "))
@@ -275,16 +301,21 @@ func (r *Repository) ListOrgs(ctx context.Context, filter port.OrgFilter) ([]*en
 	for rows.Next() {
 		org := &entity.Organization{}
 		var plan string
+		var featuresJSON []byte
 		if err := rows.Scan(
 			&org.ID, &org.OrgID, &org.Name, &org.Slug, &org.OrgType,
 			&org.ContactEmail, &org.ContactPhone, &org.City, &org.Region,
 			&plan, &org.MaxSessions, &org.MaxEventsRPS, &org.RetentionDays,
 			&org.IsActive, &org.CreatedAt, &org.UpdatedAt,
 			&org.CreatedBy, &org.UpdatedBy,
+			&featuresJSON, &org.SessionLimit, &org.SessionsUsed, &org.TrialEndsAt,
 		); err != nil {
 			return nil, fmt.Errorf("postgres: scan org: %w", err)
 		}
 		org.Plan = entity.Plan(plan)
+		if len(featuresJSON) > 0 {
+			_ = json.Unmarshal(featuresJSON, &org.AllowedFeatures)
+		}
 		orgs = append(orgs, org)
 	}
 
@@ -292,18 +323,30 @@ func (r *Repository) ListOrgs(ctx context.Context, filter port.OrgFilter) ([]*en
 }
 
 func (r *Repository) UpdateOrg(ctx context.Context, org *entity.Organization) error {
+	featuresJSON, err := json.Marshal(org.AllowedFeatures)
+	if err != nil {
+		return fmt.Errorf("postgres: marshal allowed_features: %w", err)
+	}
+	if org.AllowedFeatures == nil {
+		featuresJSON = []byte("{}")
+	}
+
 	query := `
 		UPDATE organizations
 		SET name = $2, slug = $3, org_type = $4, contact_email = $5, contact_phone = $6,
 			city = $7, region = $8, plan = $9, max_sessions = $10, max_events_rps = $11,
-			retention_days = $12, is_active = $13, updated_at = NOW(), updated_by = $14
+			retention_days = $12, is_active = $13,
+			allowed_features = $14, session_limit = $15, sessions_used = $16, trial_ends_at = $17,
+			updated_at = NOW(), updated_by = $18
 		WHERE org_id = $1 AND deleted_at IS NULL`
 
-	_, err := r.db.ExecContext(ctx, query,
+	_, err = r.db.ExecContext(ctx, query,
 		org.OrgID, org.Name, org.Slug, org.OrgType,
 		org.ContactEmail, org.ContactPhone, org.City, org.Region,
 		string(org.Plan), org.MaxSessions, org.MaxEventsRPS, org.RetentionDays,
-		org.IsActive, org.UpdatedBy,
+		org.IsActive,
+		featuresJSON, org.SessionLimit, org.SessionsUsed, org.TrialEndsAt,
+		org.UpdatedBy,
 	)
 	return err
 }

@@ -20,10 +20,13 @@
 //	DELETE /api/v1/admin/organizations/:orgId       — Soft-delete organization
 //	GET    /api/v1/admin/organizations/:orgId/users — List users for org
 //	POST   /api/v1/admin/organizations/:orgId/users — Create user
-//	GET    /api/v1/admin/organizations/:orgId/keys  — List API keys
-//	POST   /api/v1/admin/organizations/:orgId/keys  — Create API key
-//	DELETE /api/v1/admin/keys/:keyId                — Revoke API key
-//	GET    /api/v1/admin/stats                      — Cross-org statistics
+//	GET    /api/v1/admin/organizations/:orgId/keys     — List API keys
+//	POST   /api/v1/admin/organizations/:orgId/keys     — Create API key
+//	DELETE /api/v1/admin/keys/:keyId                   — Revoke API key
+//	GET    /api/v1/admin/organizations/:orgId/webhooks — List webhook endpoints
+//	POST   /api/v1/admin/organizations/:orgId/webhooks — Create webhook endpoint
+//	DELETE /api/v1/admin/webhooks/:webhookId           — Delete webhook endpoint
+//	GET    /api/v1/admin/stats                         — Cross-org statistics
 package http
 
 import (
@@ -91,6 +94,11 @@ func (h *AdminHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/organizations/{orgId}/keys", h.requireAuth(h.handleListAPIKeys))
 	mux.HandleFunc("POST /api/v1/admin/organizations/{orgId}/keys", h.requireAuth(h.requireOrgAdmin(h.handleCreateAPIKey)))
 	mux.HandleFunc("DELETE /api/v1/admin/keys/{keyId}", h.requireAuth(h.requireOrgAdmin(h.handleRevokeAPIKey)))
+
+	// Webhook endpoint management.
+	mux.HandleFunc("GET /api/v1/admin/organizations/{orgId}/webhooks", h.requireAuth(h.handleListWebhooks))
+	mux.HandleFunc("POST /api/v1/admin/organizations/{orgId}/webhooks", h.requireAuth(h.requireOrgAdmin(h.handleCreateWebhook)))
+	mux.HandleFunc("DELETE /api/v1/admin/webhooks/{webhookId}", h.requireAuth(h.requireOrgAdmin(h.handleDeleteWebhook)))
 
 	// Cross-org statistics (super_admin only).
 	mux.HandleFunc("GET /api/v1/admin/stats", h.requireAuth(h.requireRole(entity.RoleSuperAdmin, h.handleStats)))
@@ -257,6 +265,11 @@ type createOrgRequest struct {
 	Plan         string `json:"plan"`
 	MaxSessions  int    `json:"maxSessions"`
 	MaxEventsRPS int    `json:"maxEventsRps"`
+
+	// Feature Toggles & Quotas.
+	AllowedFeatures map[string]bool `json:"allowedFeatures,omitempty"`
+	SessionLimit    int             `json:"sessionLimit"`
+	TrialEndsAt     *time.Time      `json:"trialEndsAt,omitempty"`
 }
 
 func (h *AdminHandler) handleCreateOrg(w http.ResponseWriter, r *http.Request) {
@@ -298,21 +311,24 @@ func (h *AdminHandler) handleCreateOrg(w http.ResponseWriter, r *http.Request) {
 	}
 
 	org := &entity.Organization{
-		OrgID:         req.OrgID,
-		Name:          req.Name,
-		Slug:          req.Slug,
-		OrgType:       orgType,
-		ContactEmail:  req.ContactEmail,
-		ContactPhone:  req.ContactPhone,
-		City:          req.City,
-		Region:        req.Region,
-		Plan:          entity.Plan(plan),
-		MaxSessions:   req.MaxSessions,
-		MaxEventsRPS:  req.MaxEventsRPS,
-		RetentionDays: 90,
-		IsActive:      true,
-		CreatedBy:     caller.ID,
-		UpdatedBy:     caller.ID,
+		OrgID:           req.OrgID,
+		Name:            req.Name,
+		Slug:            req.Slug,
+		OrgType:         orgType,
+		ContactEmail:    req.ContactEmail,
+		ContactPhone:    req.ContactPhone,
+		City:            req.City,
+		Region:          req.Region,
+		Plan:            entity.Plan(plan),
+		MaxSessions:     req.MaxSessions,
+		MaxEventsRPS:    req.MaxEventsRPS,
+		RetentionDays:   90,
+		AllowedFeatures: req.AllowedFeatures,
+		SessionLimit:    req.SessionLimit,
+		TrialEndsAt:     req.TrialEndsAt,
+		IsActive:        true,
+		CreatedBy:       caller.ID,
+		UpdatedBy:       caller.ID,
 	}
 
 	if req.MaxSessions == 0 {
@@ -372,6 +388,10 @@ type createOrgWithAdminRequest struct {
 	Plan         string `json:"plan"`
 	MaxSessions  int    `json:"maxSessions"`
 	MaxEventsRPS int    `json:"maxEventsRps"`
+	// Feature Toggles & Quotas.
+	AllowedFeatures map[string]bool `json:"allowedFeatures,omitempty"`
+	SessionLimit    int             `json:"sessionLimit"`
+	TrialEndsAt     *time.Time      `json:"trialEndsAt,omitempty"`
 	// Primary admin fields.
 	AdminFullName string `json:"adminFullName"`
 	AdminPhone    string `json:"adminPhone"`
@@ -423,21 +443,24 @@ func (h *AdminHandler) handleCreateOrgWithAdmin(w http.ResponseWriter, r *http.R
 	}
 
 	org := &entity.Organization{
-		OrgID:         req.OrgID,
-		Name:          req.Name,
-		Slug:          req.Slug,
-		OrgType:       orgType,
-		ContactEmail:  req.ContactEmail,
-		ContactPhone:  req.ContactPhone,
-		City:          req.City,
-		Region:        req.Region,
-		Plan:          entity.Plan(plan),
-		MaxSessions:   req.MaxSessions,
-		MaxEventsRPS:  req.MaxEventsRPS,
-		RetentionDays: 90,
-		IsActive:      true,
-		CreatedBy:     caller.ID,
-		UpdatedBy:     caller.ID,
+		OrgID:           req.OrgID,
+		Name:            req.Name,
+		Slug:            req.Slug,
+		OrgType:         orgType,
+		ContactEmail:    req.ContactEmail,
+		ContactPhone:    req.ContactPhone,
+		City:            req.City,
+		Region:          req.Region,
+		Plan:            entity.Plan(plan),
+		MaxSessions:     req.MaxSessions,
+		MaxEventsRPS:    req.MaxEventsRPS,
+		RetentionDays:   90,
+		AllowedFeatures: req.AllowedFeatures,
+		SessionLimit:    req.SessionLimit,
+		TrialEndsAt:     req.TrialEndsAt,
+		IsActive:        true,
+		CreatedBy:       caller.ID,
+		UpdatedBy:       caller.ID,
 	}
 	if org.MaxSessions == 0 {
 		org.MaxSessions = 1000
@@ -595,6 +618,7 @@ func (h *AdminHandler) handleUpdateOrg(w http.ResponseWriter, r *http.Request) {
 	beforeState := map[string]interface{}{
 		"name": org.Name, "plan": string(org.Plan),
 		"maxSessions": org.MaxSessions, "maxEventsRps": org.MaxEventsRPS,
+		"allowedFeatures": org.AllowedFeatures, "sessionLimit": org.SessionLimit,
 	}
 
 	// Apply updates.
@@ -622,6 +646,18 @@ func (h *AdminHandler) handleUpdateOrg(w http.ResponseWriter, r *http.Request) {
 	if req.MaxEventsRPS > 0 {
 		org.MaxEventsRPS = req.MaxEventsRPS
 	}
+
+	// Apply feature toggles & quotas.
+	// When AllowedFeatures is non-nil, the features tab is being saved —
+	// apply features + sessionLimit atomically (solves zero-value ambiguity).
+	if req.AllowedFeatures != nil {
+		org.AllowedFeatures = req.AllowedFeatures
+		org.SessionLimit = req.SessionLimit
+	}
+	if req.TrialEndsAt != nil {
+		org.TrialEndsAt = req.TrialEndsAt
+	}
+
 	org.UpdatedBy = caller.ID
 
 	if err := h.repo.UpdateOrg(r.Context(), org); err != nil {
@@ -633,6 +669,7 @@ func (h *AdminHandler) handleUpdateOrg(w http.ResponseWriter, r *http.Request) {
 	afterState := map[string]interface{}{
 		"name": org.Name, "plan": string(org.Plan),
 		"maxSessions": org.MaxSessions, "maxEventsRps": org.MaxEventsRPS,
+		"allowedFeatures": org.AllowedFeatures, "sessionLimit": org.SessionLimit,
 	}
 	h.audit(r, "update_org", "organization", orgID, map[string]interface{}{
 		"before": beforeState, "after": afterState,
@@ -1050,6 +1087,153 @@ func (h *AdminHandler) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request
 	})
 
 	h.jsonResponse(w, map[string]string{"status": "revoked"}, http.StatusOK)
+}
+
+// ==========================================================================
+// Webhook Endpoints (Admin — JWT-authenticated)
+// ==========================================================================
+
+func (h *AdminHandler) handleListWebhooks(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("orgId")
+	caller := getUserFromContext(r.Context())
+
+	// Org isolation: non-super-admins can only see their own org.
+	if !caller.IsSuperAdmin() && caller.OrgID != orgID {
+		h.jsonError(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	endpoints, err := h.repo.GetWebhookEndpointsByOrg(r.Context(), orgID)
+	if err != nil {
+		h.logger.Error("List webhooks failed", zap.Error(err), zap.String("org_id", orgID))
+		h.jsonError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	h.jsonResponse(w, endpoints, http.StatusOK)
+}
+
+type createAdminWebhookRequest struct {
+	Name   string   `json:"name"`
+	URL    string   `json:"url"`
+	Events []string `json:"events,omitempty"` // Default: all events.
+}
+
+type createAdminWebhookResponse struct {
+	Endpoint *entity.WebhookEndpoint `json:"endpoint"`
+	Secret   string                  `json:"secret"` // Shown ONCE, never stored.
+}
+
+func (h *AdminHandler) handleCreateWebhook(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("orgId")
+	caller := getUserFromContext(r.Context())
+
+	var req createAdminWebhookRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if strings.TrimSpace(req.URL) == "" {
+		h.jsonError(w, "URL is required", http.StatusBadRequest)
+		return
+	}
+	if !strings.HasPrefix(req.URL, "https://") {
+		h.jsonError(w, "Webhook URL must use HTTPS", http.StatusBadRequest)
+		return
+	}
+
+	name := req.Name
+	if name == "" {
+		name = "Default Webhook"
+	}
+
+	// Default to all events if not specified.
+	events := req.Events
+	if len(events) == 0 {
+		events = []string{"session.started", "session.completed", "violation.detected", "verdict.ready"}
+	}
+	// Validate event types.
+	for _, e := range events {
+		if !entity.ValidWebhookEvents[e] {
+			h.jsonError(w, "Invalid event type: "+e, http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Generate HMAC signing secret (reuse function from external_handler.go).
+	secret, err := generateWebhookSecret()
+	if err != nil {
+		h.logger.Error("Failed to generate webhook secret", zap.Error(err))
+		h.jsonError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	endpoint := &entity.WebhookEndpoint{
+		OrgID:    orgID,
+		Name:     name,
+		URL:      req.URL,
+		Secret:   secret,
+		Events:   events,
+		IsActive: true,
+	}
+
+	if err := h.repo.CreateWebhookEndpoint(r.Context(), endpoint); err != nil {
+		h.logger.Error("Create webhook failed", zap.Error(err), zap.String("org_id", orgID))
+		h.jsonError(w, "Failed to create webhook", http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info("Webhook endpoint created via admin API",
+		zap.String("org_id", orgID),
+		zap.String("endpoint_id", endpoint.ID),
+		zap.String("url", req.URL),
+		zap.String("created_by", caller.ID),
+	)
+
+	h.audit(r, "create_webhook", "webhook_endpoint", endpoint.ID, map[string]interface{}{
+		"orgId": orgID, "url": req.URL, "name": name, "events": events,
+	})
+
+	// Return the secret — this is the ONLY time it's available.
+	h.jsonResponse(w, createAdminWebhookResponse{
+		Endpoint: endpoint,
+		Secret:   secret,
+	}, http.StatusCreated)
+}
+
+func (h *AdminHandler) handleDeleteWebhook(w http.ResponseWriter, r *http.Request) {
+	webhookID := r.PathValue("webhookId")
+	caller := getUserFromContext(r.Context())
+	if caller == nil {
+		h.jsonError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Fetch the endpoint to verify org ownership (anti-enumeration: 404 not 403).
+	endpoint, err := h.repo.GetWebhookEndpointByID(r.Context(), webhookID)
+	if err != nil || endpoint == nil {
+		h.jsonError(w, "Webhook not found", http.StatusNotFound)
+		return
+	}
+
+	if !caller.IsSuperAdmin() && caller.OrgID != endpoint.OrgID {
+		// Anti-enumeration: don't reveal that the webhook exists for another org.
+		h.jsonError(w, "Webhook not found", http.StatusNotFound)
+		return
+	}
+
+	if err := h.repo.DeleteWebhookEndpoint(r.Context(), webhookID); err != nil {
+		h.logger.Error("Delete webhook failed", zap.Error(err), zap.String("webhook_id", webhookID))
+		h.jsonError(w, "Failed to delete webhook", http.StatusInternalServerError)
+		return
+	}
+
+	h.audit(r, "delete_webhook", "webhook_endpoint", webhookID, map[string]string{
+		"webhookId": webhookID,
+		"orgId":     endpoint.OrgID,
+	})
+
+	h.jsonResponse(w, map[string]string{"status": "deleted"}, http.StatusOK)
 }
 
 // ==========================================================================
