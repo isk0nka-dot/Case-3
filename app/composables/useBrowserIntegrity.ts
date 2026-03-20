@@ -219,7 +219,7 @@ export function useBrowserIntegrity() {
           return ''
         }
       })
-      // eslint-disable-next-line no-console
+
       console.debug('%c', element as unknown as string)
     } catch {
       // Property definition may fail in strict environments — non-fatal
@@ -232,7 +232,7 @@ export function useBrowserIntegrity() {
         devToolsDetected = true
         return ''
       }
-      // eslint-disable-next-line no-console
+
       console.debug('%c', devtools as unknown as string)
     } catch {
       // toString override may fail — non-fatal

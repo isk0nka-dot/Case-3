@@ -223,22 +223,22 @@ interface OrgFeatureToggles {
   ai_anti_spoofing: boolean
   ai_voice_detection: boolean
   ai_blink_analysis: boolean
-  ai_dynamic_face_recheck: boolean   // Dynamic Face ID
-  ai_focus_loss_score: boolean        // Скоринг потери фокуса
+  ai_dynamic_face_recheck: boolean // Dynamic Face ID
+  ai_focus_loss_score: boolean // Скоринг потери фокуса
   // Video / Camera Rules
-  video_require_side_camera: boolean  // Боковая камера
-  video_room_scan_360: boolean        // Room Scan 360°
-  video_audio_periphery: boolean      // Детекция периф. звуков
-  video_smart_noise_filter: boolean   // Умный шумоподавитель
+  video_require_side_camera: boolean // Боковая камера
+  video_room_scan_360: boolean // Room Scan 360°
+  video_audio_periphery: boolean // Детекция периф. звуков
+  video_smart_noise_filter: boolean // Умный шумоподавитель
   // Browser Rules
   browser_fullscreen: boolean
   browser_fullscreen_exit_detection: boolean // Детекция выхода из fullscreen
-  browser_web_display_monitoring: boolean    // Мониторинг внешних дисплеев
+  browser_web_display_monitoring: boolean // Мониторинг внешних дисплеев
   browser_tab_limit: boolean
   browser_copy_paste_block: boolean
   browser_print_screen_block: boolean
   browser_vm_block: boolean
-  browser_multi_desktop_block: boolean       // Блокировка мульти-десктопа
+  browser_multi_desktop_block: boolean // Блокировка мульти-десктопа
   browser_context_menu_block: boolean
   browser_remote_access_block: boolean
   // Behavioral Analysis Rules

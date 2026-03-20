@@ -17,7 +17,7 @@ const EXAM_DEFAULTS = {
   TOAST_DURATION_MS: 3000,
   EXCEPTION_TOAST_MS: 2000,
   DROPDOWN_BLUR_DELAY_MS: 200,
-  ERROR_AUTO_DISMISS_MS: 8000,
+  ERROR_AUTO_DISMISS_MS: 8000
 } as const
 
 // --- Search ---
@@ -119,7 +119,7 @@ const VALIDATION_RULES: ValidationRule[] = [
   { field: 'voiceDetectionThreshold', label: 'Порог голоса', min: 0, max: 100 },
   { field: 'gazeSensitivity', label: 'Чувствительность взгляда', min: 10, max: 95 },
   { field: 'gazeDeviationLimitSec', label: 'Лимит отклонения взгляда', min: 3, max: 30 },
-  { field: 'tabSwitchingLimit', label: 'Лимит переключений вкладок', min: 0, max: 10 },
+  { field: 'tabSwitchingLimit', label: 'Лимит переключений вкладок', min: 0, max: 10 }
 ]
 
 function validateSettings(settings: ExamProctoringSettings): string | null {
@@ -4416,7 +4416,10 @@ function blurExcDropdown() {
                       style="color: var(--argus-error);"
                       @click="settingsError = ''"
                     >
-                      <UIcon name="i-lucide-x" class="size-3" />
+                      <UIcon
+                        name="i-lucide-x"
+                        class="size-3"
+                      />
                     </button>
                   </div>
                 </template>
@@ -4509,9 +4512,16 @@ function blurExcDropdown() {
                 class="size-9 flex items-center justify-center rounded-full shrink-0"
                 style="background: color-mix(in srgb, var(--argus-warning) 15%, transparent);"
               >
-                <UIcon name="i-lucide-alert-triangle" class="size-5" style="color: var(--argus-warning);" />
+                <UIcon
+                  name="i-lucide-alert-triangle"
+                  class="size-5"
+                  style="color: var(--argus-warning);"
+                />
               </div>
-              <p class="text-sm leading-relaxed pt-1.5" style="color: var(--argus-text);">
+              <p
+                class="text-sm leading-relaxed pt-1.5"
+                style="color: var(--argus-text);"
+              >
                 {{ confirmAction.message }}
               </p>
             </div>
