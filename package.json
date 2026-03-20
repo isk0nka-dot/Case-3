@@ -1,0 +1,44 @@
+{
+  "name": "@argus-ai/sdk",
+  "version": "0.1.0",
+  "description": "Argus AI Proctoring SDK — plug-and-play exam proctoring for any web application",
+  "main": "dist/argus-sdk.umd.js",
+  "module": "dist/argus-sdk.esm.js",
+  "types": "dist/argus-sdk.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "rollup -c rollup.config.mjs",
+    "dev": "rollup -c rollup.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "proctoring",
+    "exam",
+    "webcam",
+    "face-detection",
+    "mediapipe",
+    "sdk"
+  ],
+  "author": "Argus AI <dev@argusai.kz>",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@mediapipe/tasks-vision": "^0.10.33",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-terser": "^0.4.0",
+    "@rollup/plugin-typescript": "^12.1.0",
+    "rollup": "^4.28.0",
+    "tslib": "^2.8.0",
+    "typescript": "^5.7.0"
+  },
+  "peerDependencies": {
+    "@mediapipe/tasks-vision": ">=0.10.0"
+  },
+  "peerDependenciesMeta": {
+    "@mediapipe/tasks-vision": {
+      "optional": true
+    }
+  }
+}
