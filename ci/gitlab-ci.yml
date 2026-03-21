@@ -98,7 +98,7 @@ security-scan:
   stage: verify
   image: securego/gosec:latest
   script:
-    - gosec -fmt sarif -out gosec.sarif ./... || true
+    - cd ${CI_PROJECT_DIR} && gosec -fmt sarif -out gosec.sarif ./... || true
   artifacts:
     reports:
       sast: gosec.sarif

@@ -288,7 +288,7 @@ func (h *ExternalHandler) handleCreateSession(w http.ResponseWriter, r *http.Req
 	h.jsonResponse(w, createSessionResponse{
 		SessionID:         sessionID,
 		ArgusSessionToken: sessionToken,
-		SDKUrl:            fmt.Sprintf("https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js"),
+		SDKUrl:            "https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js",
 		ExpiresAt:         tokenExpiry.UTC().Format(time.RFC3339),
 	}, http.StatusCreated)
 }
