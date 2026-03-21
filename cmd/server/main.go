@@ -80,6 +80,7 @@ import (
 	"github.com/argus-ai/event-collector/internal/infrastructure/recorder"
 	"github.com/argus-ai/event-collector/internal/infrastructure/session"
 	"github.com/argus-ai/event-collector/internal/infrastructure/sidecam"
+	webhookInfra "github.com/argus-ai/event-collector/internal/infrastructure/webhook"
 	"github.com/argus-ai/event-collector/internal/infrastructure/postgres"
 	"github.com/argus-ai/event-collector/internal/domain/entity"
 	"github.com/argus-ai/event-collector/internal/domain/valueobject"
@@ -653,6 +654,7 @@ func run() error {
 
 	// Admin API endpoints (REST) — only if PostgreSQL is available.
 	var sidecamOrchestrator *sidecam.Orchestrator
+	var webhookDispatcher *webhookInfra.Dispatcher
 	if pgRepo != nil {
 		// JWT signing key for admin tokens — reuse the auth signing key,
 		// or use a separate key if auth is disabled.
@@ -684,6 +686,40 @@ func run() error {
 
 		adminHandler := adminHTTP.NewAdminHandler(pgRepo, logger, adminJWTKey)
 		adminHandler.RegisterRoutes(httpMux)
+
+		// =============================================================
+		// External API endpoints (REST) — API key auth for SaaS partners.
+		// Powers the plug-and-play SDK: session creation, webhooks.
+		// =============================================================
+		externalHandler := adminHTTP.NewExternalHandler(pgRepo, logger, adminJWTKey)
+		externalHandler.RegisterRoutes(httpMux)
+
+		logger.Info("external api registered",
+			zap.String("base_path", "/api/v1/external"),
+		)
+
+		// =============================================================
+		// Webhook dispatcher — delivers events to partner endpoints.
+		// Background polling loop with HMAC-SHA256 signing and retries.
+		// =============================================================
+		if cfg.Webhook.Enabled {
+			webhookDispatcher = webhookInfra.NewDispatcher(pgRepo, webhookInfra.Config{
+				Enabled:       cfg.Webhook.Enabled,
+				PollInterval:  cfg.Webhook.PollInterval,
+				BatchSize:     cfg.Webhook.BatchSize,
+				MaxRetries:    cfg.Webhook.MaxRetries,
+				TimeoutSec:    cfg.Webhook.TimeoutSec,
+				MaxConcurrent: cfg.Webhook.MaxConcurrent,
+			}, logger)
+			webhookDispatcher.Start()
+
+			logger.Info("webhook dispatcher started",
+				zap.Duration("poll_interval", cfg.Webhook.PollInterval),
+				zap.Int("max_concurrent", cfg.Webhook.MaxConcurrent),
+			)
+		} else {
+			logger.Info("webhook dispatcher disabled")
+		}
 
 		// Analytics API endpoints (REST) — queries ClickHouse materialized views.
 		// Powers the Executive Dashboard: Risk Distribution, System Health, etc.
@@ -1089,6 +1125,8 @@ func run() error {
 			"Grpc-Timeout",
 			"X-Argus-Session-Id",
 			"X-Idempotency-Key",
+			"X-API-KEY",
+			"X-CLIENT-ID",
 		},
 		ExposedHeaders: []string{
 			"Grpc-Status",
@@ -1309,7 +1347,14 @@ func run() error {
 	sessionValidator.Close()
 	logger.Info("session validator stopped")
 
-	// Phase 3b: Close PostgreSQL connection pool.
+	// Phase 3b: Stop webhook dispatcher (must stop before PostgreSQL closes).
+	if webhookDispatcher != nil {
+		logger.Info("phase 3b: stopping webhook dispatcher...")
+		webhookDispatcher.Stop()
+		logger.Info("webhook dispatcher stopped")
+	}
+
+	// Phase 3c: Close PostgreSQL connection pool.
 	if pgRepo != nil {
 		logger.Info("phase 3b: closing postgresql...")
 		if err := pgRepo.Close(); err != nil {

@@ -224,32 +224,53 @@ func (h *ExportHandler) handleGetExport(w http.ResponseWriter, r *http.Request) 
 
 	var resp exportResponse
 
-	err := h.db.QueryRowContext(r.Context(), `
-		SELECT id, org_id, requested_by, session_ids, status, archive_uri,
-		       sha256_archive, download_url, error_message, total_size_bytes,
-		       fragment_count, expires_at, created_at, completed_at
-		FROM export_jobs
-		WHERE id = $1`, exportID,
-	).Scan(
-		&resp.ID, &resp.OrgID, &resp.RequestedBy, pq.Array(&resp.SessionIDs), &resp.Status,
-		&resp.ArchiveURI, &resp.SHA256Archive, &resp.DownloadURL, &resp.ErrorMessage,
-		&resp.TotalSizeBytes, &resp.FragmentCount, &resp.ExpiresAt,
-		&resp.CreatedAt, &resp.CompletedAt,
-	)
-	if err == sql.ErrNoRows {
-		h.exportJSONError(w, "Export job not found", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		h.logger.Error("export: failed to query job", zap.Error(err))
-		h.exportJSONError(w, "Failed to query export job", http.StatusInternalServerError)
-		return
-	}
-
-	// Org access check.
-	if caller.OrgID != "*" && resp.OrgID != caller.OrgID {
-		h.exportJSONError(w, "Forbidden", http.StatusForbidden)
-		return
+	// ── Org isolation: include org_id in WHERE clause to prevent ID enumeration.
+	// Non-super-admin users get a unified 404 for both "not found" and "forbidden",
+	// so attackers cannot distinguish between non-existent and cross-org exports.
+	if caller.OrgID == "*" {
+		err := h.db.QueryRowContext(r.Context(), `
+			SELECT id, org_id, requested_by, session_ids, status, archive_uri,
+			       sha256_archive, download_url, error_message, total_size_bytes,
+			       fragment_count, expires_at, created_at, completed_at
+			FROM export_jobs
+			WHERE id = $1`, exportID,
+		).Scan(
+			&resp.ID, &resp.OrgID, &resp.RequestedBy, pq.Array(&resp.SessionIDs), &resp.Status,
+			&resp.ArchiveURI, &resp.SHA256Archive, &resp.DownloadURL, &resp.ErrorMessage,
+			&resp.TotalSizeBytes, &resp.FragmentCount, &resp.ExpiresAt,
+			&resp.CreatedAt, &resp.CompletedAt,
+		)
+		if err == sql.ErrNoRows {
+			h.exportJSONError(w, "Export job not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			h.logger.Error("export: failed to query job", zap.Error(err))
+			h.exportJSONError(w, "Failed to query export job", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		err := h.db.QueryRowContext(r.Context(), `
+			SELECT id, org_id, requested_by, session_ids, status, archive_uri,
+			       sha256_archive, download_url, error_message, total_size_bytes,
+			       fragment_count, expires_at, created_at, completed_at
+			FROM export_jobs
+			WHERE id = $1 AND org_id = $2`, exportID, caller.OrgID,
+		).Scan(
+			&resp.ID, &resp.OrgID, &resp.RequestedBy, pq.Array(&resp.SessionIDs), &resp.Status,
+			&resp.ArchiveURI, &resp.SHA256Archive, &resp.DownloadURL, &resp.ErrorMessage,
+			&resp.TotalSizeBytes, &resp.FragmentCount, &resp.ExpiresAt,
+			&resp.CreatedAt, &resp.CompletedAt,
+		)
+		if err == sql.ErrNoRows {
+			h.exportJSONError(w, "Export job not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			h.logger.Error("export: failed to query job", zap.Error(err))
+			h.exportJSONError(w, "Failed to query export job", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

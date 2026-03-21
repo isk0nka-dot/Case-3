@@ -128,7 +128,7 @@ func (w *Worker) claimPendingJob(ctx context.Context) (*entity.ExportJob, error)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var job entity.ExportJob
 	var sessionIDsStr string

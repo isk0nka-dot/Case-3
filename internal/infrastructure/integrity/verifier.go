@@ -121,7 +121,7 @@ func (v *Verifier) VerifySession(ctx context.Context, sessionID string) (*port.I
 		// Check previous_hash linkage.
 		if row.PreviousHash != "" && row.PreviousHash != expectedPrevHash {
 			result.ChainValid = false
-			result.ErrorMessage += fmt.Sprintf("; previous_hash mismatch")
+			result.ErrorMessage += "; previous_hash mismatch"
 		}
 
 		// Recompute record_hash and compare.
@@ -198,7 +198,7 @@ func (v *Verifier) VerifyFragment(ctx context.Context, fragmentID string) (*port
 		computed := computeRecordHash(row.SequenceNum, row.PreviousHash, row.FragmentID, row.SHA256Hash, uploadedAtStr)
 		result.ChainValid = (computed == row.RecordHash)
 		if !result.ChainValid {
-			result.ErrorMessage += fmt.Sprintf("; record_hash mismatch")
+			result.ErrorMessage += "; record_hash mismatch"
 		}
 	} else {
 		// Legacy record without chain — mark as valid (no chain to verify).

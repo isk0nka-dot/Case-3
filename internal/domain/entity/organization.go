@@ -120,6 +120,12 @@ type Organization struct {
 	MaxEventsRPS int    `json:"maxEventsRps"`
 	RetentionDays int   `json:"retentionDays"`
 
+	// Feature Toggles & Quotas.
+	AllowedFeatures map[string]bool `json:"allowedFeatures,omitempty"` // nil/empty = all enabled.
+	SessionLimit    int             `json:"sessionLimit"`              // 0 = unlimited.
+	SessionsUsed    int             `json:"sessionsUsed"`
+	TrialEndsAt     *time.Time      `json:"trialEndsAt,omitempty"`
+
 	// Status.
 	IsActive bool `json:"isActive"`
 

@@ -188,7 +188,9 @@ func (h *ForensicHandler) handlePDF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
 	w.Header().Set("X-Report-Hash", pdfHash)
-	w.Write(pdfBytes)
+	if _, err := w.Write(pdfBytes); err != nil {
+		h.logger.Error("Failed to write PDF response", zap.Error(err))
+	}
 }
 
 // handleAsyncPDF enqueues a forensic PDF generation job via asynq and returns
@@ -281,7 +283,9 @@ func (h *ForensicHandler) handleHeatmap(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
-	w.Write([]byte(svg))
+	if _, err := w.Write([]byte(svg)); err != nil {
+		h.logger.Error("Failed to write SVG response", zap.Error(err))
+	}
 }
 
 // handleVoice returns voice biometric analysis for a session.

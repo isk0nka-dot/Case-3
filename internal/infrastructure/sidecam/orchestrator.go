@@ -512,7 +512,7 @@ func (o *Orchestrator) ProcessDeviceTelemetry(sessionID string, device *MobileDe
 		})
 		// Fix 6: Emit thermal throttle event
 		o.emitEvent(ps, "SIDECAM_THERMAL_THROTTLE", "warning",
-			fmt.Sprintf("Thermal state critical, FPS throttled to 5"))
+			"Thermal state critical, FPS throttled to 5")
 	case "serious":
 		directive.TargetFPS = 10
 		directive.Alerts = append(directive.Alerts, DeviceAlert{
@@ -522,7 +522,7 @@ func (o *Orchestrator) ProcessDeviceTelemetry(sessionID string, device *MobileDe
 		})
 		// Fix 6: Emit thermal throttle event
 		o.emitEvent(ps, "SIDECAM_THERMAL_THROTTLE", "warning",
-			fmt.Sprintf("Thermal state serious, FPS throttled to 10"))
+			"Thermal state serious, FPS throttled to 10")
 	case "fair":
 		directive.TargetFPS = 15
 	default:

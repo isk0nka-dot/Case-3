@@ -48,10 +48,9 @@ lint:
   stage: verify
   before_script:
     - export PATH=$PATH:$(go env GOPATH)/bin
-    - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin latest
+    - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
   script:
     - golangci-lint run ./...
-  allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -99,7 +98,7 @@ security-scan:
   stage: verify
   image: securego/gosec:latest
   script:
-    - gosec -fmt sarif -out gosec.sarif ./... || true
+    - cd ${CI_PROJECT_DIR} && gosec -fmt sarif -out gosec.sarif ./... || true
   artifacts:
     reports:
       sast: gosec.sarif
