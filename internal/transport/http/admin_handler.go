@@ -503,7 +503,7 @@ func (h *AdminHandler) handleCreateOrgWithAdmin(w http.ResponseWriter, r *http.R
 		h.jsonError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback() // No-op if already committed.
+	defer func() { _ = tx.Rollback() }()
 
 	// Insert organization inside the transaction.
 	orgQuery := `

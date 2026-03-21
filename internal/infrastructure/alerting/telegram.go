@@ -279,13 +279,6 @@ func htmlEscape(s string) string {
 	return s
 }
 
-func coalesce(s, fallback string) string {
-	if s == "" {
-		return fallback
-	}
-	return s
-}
-
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s

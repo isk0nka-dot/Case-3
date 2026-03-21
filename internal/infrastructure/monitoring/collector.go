@@ -92,10 +92,7 @@ type Collector struct {
 	prevCPU        map[string]prevCPUStats
 }
 
-type prevCPUStats struct {
-	cpuUsage    uint64
-	systemUsage uint64
-}
+type prevCPUStats struct{}
 
 // containerNameMap maps Docker container names to human-readable names.
 var containerNameMap = map[string]string{

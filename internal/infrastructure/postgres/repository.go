@@ -273,7 +273,6 @@ func (r *Repository) ListOrgs(ctx context.Context, filter port.OrgFilter) ([]*en
 			argIndex, argIndex, argIndex,
 		))
 		args = append(args, "%"+filter.Search+"%")
-		argIndex++
 	}
 
 	// Exclude the internal Super Admin organization from listings.
@@ -465,7 +464,6 @@ func (r *Repository) ListAllUsers(ctx context.Context, filter port.UserFilter) (
 			argIndex, argIndex, argIndex,
 		))
 		args = append(args, "%"+filter.Search+"%")
-		argIndex++
 	}
 
 	query := fmt.Sprintf(`
@@ -827,7 +825,6 @@ func (r *Repository) ListAuditLogs(ctx context.Context, filter AuditFilter) ([]*
 	if filter.ResourceType != "" {
 		conditions = append(conditions, fmt.Sprintf("resource_type = $%d", argIndex))
 		args = append(args, filter.ResourceType)
-		argIndex++
 	}
 
 	whereClause := ""

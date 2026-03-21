@@ -27,8 +27,6 @@ import (
 // PDFGenerator produces forensic report PDFs.
 type PDFGenerator struct {
 	buf     bytes.Buffer
-	objects []string
-	pages   []int // object IDs of page objects
 	xref    []int // byte offsets
 	nextObj int
 	yPos    float64
@@ -36,7 +34,6 @@ type PDFGenerator struct {
 	pageW   float64
 	margin  float64
 	fontSz  float64
-	curPage int
 }
 
 // GenerateForensicPDF creates a forensic report PDF from the given report data.
