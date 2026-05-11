@@ -186,7 +186,15 @@ async function generateNewKey() {
     ? (newKeyOrgId.value || selectedOrgFilter.value)
     : authStore.user?.orgId
 
-  if (!targetOrgId) return
+  if (!targetOrgId) {
+    useToast().add({
+      title: 'Выберите организацию',
+      description: 'Укажите организацию в поле "Организация" перед созданием ключа',
+      color: 'error',
+      duration: 4000
+    })
+    return
+  }
 
   createKeyLoading.value = true
   createdSecretKey.value = null
@@ -285,6 +293,19 @@ const lmsIntegrations = [
   { id: 'lms-classroom', name: 'Google Classroom', icon: 'i-lucide-book-open', description: 'OAuth2 интеграция с Google', status: 'available' },
   { id: 'lms-eduser', name: 'Eduser', icon: 'i-lucide-shield-check', description: 'Нативная интеграция с Eduser ҰБТ', status: 'connected' }
 ]
+
+function handleLMSClick(lms: typeof lmsIntegrations[0]) {
+  if (lms.status === 'connected') {
+    navigateTo('/integrations')
+  } else {
+    useToast().add({
+      title: `Интеграция ${lms.name}`,
+      description: 'Скоро доступно. Обратитесь к документации для ручной настройки.',
+      color: 'info',
+      duration: 4000
+    })
+  }
+}
 
 // --- Stats ---
 const deliverySuccessRate = computed(() => {
@@ -1743,6 +1764,7 @@ function copyToClipboard(text: string) {
             }"
             @mouseenter="($event.currentTarget as HTMLElement).style.background = lms.status === 'connected' ? successBg(0.1) : 'var(--argus-bg-hover)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background = lms.status === 'connected' ? successBg(0.05) : 'transparent'"
+            @click="handleLMSClick(lms)"
           >
             <UIcon
               :name="lms.status === 'connected' ? 'i-lucide-settings' : 'i-lucide-plug'"
@@ -1762,6 +1784,7 @@ function copyToClipboard(text: string) {
         class="glass-card rounded-xl p-5 cursor-pointer video-card-hover"
         @mouseenter="($event.currentTarget as HTMLElement).style.borderColor = 'var(--argus-accent)'"
         @mouseleave="($event.currentTarget as HTMLElement).style.borderColor = 'var(--argus-border)'"
+        @click="navigateTo('/integrations')"
       >
         <div class="flex items-center gap-3">
           <div
@@ -1795,6 +1818,7 @@ function copyToClipboard(text: string) {
         class="glass-card rounded-xl p-5 cursor-pointer video-card-hover"
         @mouseenter="($event.currentTarget as HTMLElement).style.borderColor = 'var(--argus-accent)'"
         @mouseleave="($event.currentTarget as HTMLElement).style.borderColor = 'var(--argus-border)'"
+        @click="navigateTo('/integrations')"
       >
         <div class="flex items-center gap-3">
           <div
@@ -1828,6 +1852,7 @@ function copyToClipboard(text: string) {
         class="glass-card rounded-xl p-5 cursor-pointer video-card-hover"
         @mouseenter="($event.currentTarget as HTMLElement).style.borderColor = 'var(--argus-accent)'"
         @mouseleave="($event.currentTarget as HTMLElement).style.borderColor = 'var(--argus-border)'"
+        @click="useToast().add({ title: 'Поддержка', description: 'Обратитесь по email: support@argus.ai', color: 'info', duration: 4000 })"
       >
         <div class="flex items-center gap-3">
           <div

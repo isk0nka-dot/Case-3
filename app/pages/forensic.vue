@@ -47,7 +47,15 @@ const verifyError = ref('')
 
 async function generateReport() {
   const sid = sessionIdInput.value.trim()
-  if (!sid) return
+  if (!sid) {
+    useToast().add({
+      title: 'Введите Session ID',
+      description: 'Укажите идентификатор сессии для генерации форензик-отчёта',
+      color: 'warning',
+      duration: 3000
+    })
+    return
+  }
 
   loading.value = true
   error.value = ''
@@ -57,7 +65,13 @@ async function generateReport() {
     report.value = await api.getForensicReport(sid)
     activeTab.value = 'overview'
   } catch (e: any) {
-    error.value = e?.message || 'Failed to generate report'
+    error.value = e?.message || 'Не удалось сгенерировать отчёт. Проверьте Session ID.'
+    useToast().add({
+      title: 'Ошибка генерации',
+      description: error.value,
+      color: 'error',
+      duration: 5000
+    })
   } finally {
     loading.value = false
   }

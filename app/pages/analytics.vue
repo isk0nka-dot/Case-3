@@ -63,6 +63,61 @@ const maxMonthlySessions = computed(() =>
 
 // --- Export ---
 const showExportMenu = ref(false)
+const exportLoading = ref<string | null>(null)
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+function exportCSV(filename: string, headers: string[], rows: (string | number)[][]) {
+  const lines = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))]
+  downloadBlob(new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' }), filename)
+}
+
+async function exportPDF() {
+  exportLoading.value = 'pdf'
+  showExportMenu.value = false
+  await nextTick()
+  window.print()
+  exportLoading.value = null
+}
+
+function exportExcel() {
+  exportLoading.value = 'excel'
+  showExportMenu.value = false
+  const rows = store.weeklyTrends.map((w, i) => {
+    const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+    return [days[i] ?? i, w.phone, w.gaze, w.voice, w.tabs, w.persons]
+  })
+  exportCSV(
+    `argus-analytics-${new Date().toISOString().split('T')[0]}.csv`,
+    ['День', 'Телефон', 'Взгляд', 'Голос', 'Вкладки', 'Люди'],
+    rows
+  )
+  exportLoading.value = null
+}
+
+function exportYearlyReport() {
+  exportLoading.value = 'yearly'
+  showExportMenu.value = false
+  const rows = store.monthlyTrends.map(m => [
+    m.month, m.totalSessions, m.totalViolations,
+    m.avgIntegrity.toFixed(2)
+  ])
+  exportCSV(
+    `argus-yearly-report-2026.csv`,
+    ['Месяц', 'Сессий', 'Нарушений', 'Средний индекс'],
+    rows
+  )
+  exportLoading.value = null
+}
 
 // --- Detection accuracy average ---
 const avgAccuracy = computed(() => {
@@ -215,13 +270,15 @@ function trendColor(trend: string, invert = false): string {
               <button
                 class="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-medium transition-all text-left"
                 style="color: var(--argus-text);"
+                :disabled="exportLoading === 'pdf'"
                 @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--argus-bg-hover)'"
                 @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
-                @click="showExportMenu = false"
+                @click="exportPDF"
               >
                 <UIcon
-                  name="i-lucide-file-text"
+                  :name="exportLoading === 'pdf' ? 'i-lucide-loader-2' : 'i-lucide-file-text'"
                   class="size-4"
+                  :class="exportLoading === 'pdf' ? 'animate-spin' : ''"
                   style="color: var(--argus-error);"
                 />
                 Скачать PDF отчёт
@@ -229,13 +286,15 @@ function trendColor(trend: string, invert = false): string {
               <button
                 class="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-medium transition-all text-left"
                 style="color: var(--argus-text);"
+                :disabled="exportLoading === 'excel'"
                 @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--argus-bg-hover)'"
                 @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
-                @click="showExportMenu = false"
+                @click="exportExcel"
               >
                 <UIcon
-                  name="i-lucide-table"
+                  :name="exportLoading === 'excel' ? 'i-lucide-loader-2' : 'i-lucide-table'"
                   class="size-4"
+                  :class="exportLoading === 'excel' ? 'animate-spin' : ''"
                   style="color: var(--argus-success);"
                 />
                 Экспорт в Excel
@@ -247,13 +306,15 @@ function trendColor(trend: string, invert = false): string {
               <button
                 class="flex items-center gap-2 w-full px-4 py-2.5 text-xs font-medium transition-all text-left"
                 style="color: var(--argus-text);"
+                :disabled="exportLoading === 'yearly'"
                 @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--argus-bg-hover)'"
                 @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
-                @click="showExportMenu = false"
+                @click="exportYearlyReport"
               >
                 <UIcon
-                  name="i-lucide-calendar"
+                  :name="exportLoading === 'yearly' ? 'i-lucide-loader-2' : 'i-lucide-calendar'"
                   class="size-4"
+                  :class="exportLoading === 'yearly' ? 'animate-spin' : ''"
                   style="color: var(--argus-accent);"
                 />
                 Годовой отчёт 2026
