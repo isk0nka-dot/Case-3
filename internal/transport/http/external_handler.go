@@ -27,9 +27,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/argus-ai/event-collector/internal/application/usecase"
 	"github.com/argus-ai/event-collector/internal/domain/entity"
+	"github.com/argus-ai/event-collector/internal/domain/valueobject"
 	"github.com/argus-ai/event-collector/internal/infrastructure/postgres"
 	"github.com/argus-ai/event-collector/pkg/auth"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -63,14 +66,16 @@ type ExternalHandler struct {
 	repo          *postgres.Repository
 	logger        *zap.Logger
 	jwtSigningKey []byte
+	ingest        *usecase.IngestUseCase
 }
 
 // NewExternalHandler creates a new external API handler.
-func NewExternalHandler(repo *postgres.Repository, logger *zap.Logger, jwtSigningKey []byte) *ExternalHandler {
+func NewExternalHandler(repo *postgres.Repository, logger *zap.Logger, jwtSigningKey []byte, ingest *usecase.IngestUseCase) *ExternalHandler {
 	return &ExternalHandler{
 		repo:          repo,
 		logger:        logger.Named("external_api"),
 		jwtSigningKey: jwtSigningKey,
+		ingest:        ingest,
 	}
 }
 
@@ -86,6 +91,9 @@ func (h *ExternalHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/external/webhooks", h.requireAPIKey("webhooks:read", h.handleListWebhooks))
 	mux.HandleFunc("POST /api/v1/external/webhooks", h.requireAPIKey("webhooks:write", h.handleCreateWebhook))
 	mux.HandleFunc("DELETE /api/v1/external/webhooks/{webhookId}", h.requireAPIKey("webhooks:write", h.handleDeleteWebhook))
+
+	// Event ingestion (proctoring session JWT auth) — for SDK / test clients.
+	mux.HandleFunc("POST /api/v1/external/events", h.requireSessionToken(h.handleIngestEvents))
 }
 
 // ==========================================================================
@@ -637,4 +645,111 @@ func SignWebhookPayload(secret string, timestamp int64, payload []byte) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(message))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// ==========================================================================
+// Session Token Auth Middleware
+// ==========================================================================
+
+// requireSessionToken validates the Authorization: Bearer <argusSessionToken>
+// header and injects the proctoring claims into the request context.
+func (h *ExternalHandler) requireSessionToken(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			h.jsonError(w, "missing or invalid Authorization header", http.StatusUnauthorized)
+			return
+		}
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+		verifier, err := auth.NewVerifier(auth.VerifierConfig{
+			Algorithm:  "HS256",
+			SigningKey:  h.jwtSigningKey,
+			Issuer:     "argus-external-api",
+			Audience:   "argus-event-collector",
+			ClockSkew:  30 * time.Second,
+		})
+		if err != nil {
+			h.jsonError(w, "internal auth configuration error", http.StatusInternalServerError)
+			return
+		}
+
+		claims, err := verifier.VerifyToken(tokenStr)
+		if err != nil {
+			h.jsonError(w, "invalid or expired session token", http.StatusUnauthorized)
+			return
+		}
+
+		ctx := auth.ContextWithClaims(r.Context(), claims)
+		next(w, r.WithContext(ctx))
+	}
+}
+
+// ==========================================================================
+// Event Ingestion Handler
+// ==========================================================================
+
+// ingestEventRequest is the JSON body for a single event.
+type ingestEventRequest struct {
+	EventType  int32   `json:"event_type"`
+	Severity   int32   `json:"severity"`
+	Source     int32   `json:"source"`
+	Confidence float32 `json:"confidence"`
+	Label      string  `json:"label"`
+}
+
+// handleIngestEvents accepts a JSON batch of proctoring events authenticated
+// with the argusSessionToken returned by createSession.
+func (h *ExternalHandler) handleIngestEvents(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		h.jsonError(w, "missing session claims", http.StatusUnauthorized)
+		return
+	}
+
+	var body struct {
+		Events  []ingestEventRequest `json:"events"`
+		BatchID string               `json:"batch_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		h.jsonError(w, "invalid JSON body", http.StatusBadRequest)
+		return
+	}
+	if len(body.Events) == 0 {
+		h.jsonError(w, "at least one event is required", http.StatusBadRequest)
+		return
+	}
+
+	now := time.Now().UTC()
+	domainEvents := make([]*entity.ProctoringEvent, 0, len(body.Events))
+	for _, ev := range body.Events {
+		domainEvents = append(domainEvents, &entity.ProctoringEvent{
+			EventID:         uuid.New().String(),
+			SessionID:       claims.SessionID,
+			StudentID:       claims.StudentID,
+			ExamID:          claims.ExamID,
+			OrgID:           claims.OrgID,
+			EventType:       valueobject.EventType(ev.EventType),
+			Severity:        valueobject.Severity(ev.Severity),
+			Source:          valueobject.EventSource(ev.Source),
+			ClientTimestamp: now,
+			Confidence:      ev.Confidence,
+			Label:           ev.Label,
+		})
+	}
+
+	result, err := h.ingest.IngestBatch(r.Context(), domainEvents)
+	if err != nil {
+		h.logger.Error("rest event ingestion failed", zap.Error(err))
+		h.jsonError(w, "event ingestion failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"accepted_count": result.AcceptedCount,
+		"rejected_count": result.RejectedCount,
+		"batch_id":       body.BatchID,
+	})
 }

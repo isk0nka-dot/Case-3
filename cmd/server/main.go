@@ -704,7 +704,7 @@ func run() error {
 		// External API endpoints (REST) — API key auth for SaaS partners.
 		// Powers the plug-and-play SDK: session creation, webhooks.
 		// =============================================================
-		externalHandler := adminHTTP.NewExternalHandler(pgRepo, logger, adminJWTKey)
+		externalHandler := adminHTTP.NewExternalHandler(pgRepo, logger, adminJWTKey, ingestUC)
 		externalHandler.RegisterRoutes(httpMux)
 
 		logger.Info("external api registered",
@@ -1075,27 +1075,6 @@ func run() error {
 				zap.String("endpoint", "/debug/pprof/"),
 			)
 		}
-
-		// =============================================================
-		// Temporary diagnostic: test-alert endpoint
-		// =============================================================
-		httpMux.HandleFunc("POST /api/v1/internal/test-alert", func(w http.ResponseWriter, r *http.Request) {
-			if telegramAlerter == nil {
-				http.Error(w, `{"error":"telegram alerter not configured"}`, http.StatusServiceUnavailable)
-				return
-			}
-			msg := alerting.MsgDiagnosticTest(time.Now().Format("2006-01-02 15:04:05 MST"))
-			if err := telegramAlerter.SendDirect(msg); err != nil {
-				logger.Error("test-alert: send failed", zap.Error(err))
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusBadGateway)
-				fmt.Fprintf(w, `{"error":"%s"}`, err.Error())
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, `{"status":"sent","message":"Test alert fired to Telegram"}`)
-		})
 
 		// =============================================================
 		// System Health & Panic Button (Gap 5 — Indestructible)

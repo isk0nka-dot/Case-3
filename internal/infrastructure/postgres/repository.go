@@ -1439,9 +1439,13 @@ func (r *Repository) CreateExternalSession(ctx context.Context, s *entity.Extern
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at, updated_at`
 
+	var metadata interface{}
+	if len(s.Metadata) > 0 {
+		metadata = s.Metadata
+	}
 	return r.db.QueryRowContext(ctx, query,
 		s.SessionID, s.OrgID, s.ExamID, s.StudentID,
-		s.StudentName, s.ExamName, s.CallbackURL, s.Metadata,
+		s.StudentName, s.ExamName, s.CallbackURL, metadata,
 		s.SessionToken, s.TokenExpiresAt, s.Status,
 	).Scan(&s.ID, &s.CreatedAt, &s.UpdatedAt)
 }

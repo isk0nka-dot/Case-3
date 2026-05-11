@@ -87,43 +87,7 @@ func MsgCircuitBreakerOpen(component, cause, recovery, timestamp string) string 
 }
 
 // ---------------------------------------------------------------------------
-// 3. Diagnostic Test Alert
-// ---------------------------------------------------------------------------
-
-func MsgDiagnosticTest(timestamp string) string {
-	kz := fmt.Sprintf(
-		"<b>🇰🇿 🧪 ДИАГНОСТИКА — ARGUS AI</b>\n"+
-			"%s\n"+
-			"<b>Компонент:</b>   <code>database-monitor</code>\n"+
-			"<b>Маңыздылық:</b>  <code>СЫНИ</code>\n"+
-			"<b>Уақыт:</b>       <code>%s</code>\n"+
-			"%s\n"+
-			"<b>Қате мәліметтері:</b>\n"+
-			"<pre>Дерекқорға қосылу қабылданбады: dial tcp 10.0.1.5:9000: connect: connection refused</pre>\n"+
-			"%s\n"+
-			"<i>POST /api/v1/internal/test-alert арқылы тест хабарландыруы</i>",
-		separator, timestamp, separator, separator,
-	)
-
-	en := fmt.Sprintf(
-		"<b>🇬🇧 🧪 DIAGNOSTIC — ARGUS AI</b>\n"+
-			"%s\n"+
-			"<b>Component:</b>   <code>database-monitor</code>\n"+
-			"<b>Severity:</b>    <code>CRITICAL</code>\n"+
-			"<b>Time:</b>        <code>%s</code>\n"+
-			"%s\n"+
-			"<b>Error Details:</b>\n"+
-			"<pre>Database Connection Refused: dial tcp 10.0.1.5:9000: connect: connection refused</pre>\n"+
-			"%s\n"+
-			"<i>Test alert triggered via POST /api/v1/internal/test-alert</i>",
-		separator, timestamp, separator, separator,
-	)
-
-	return bilingual(kz, en)
-}
-
-// ---------------------------------------------------------------------------
-// 4. Worker Startup
+// 3. Worker Startup
 // ---------------------------------------------------------------------------
 
 func MsgWorkerStartup(version, redisAddr string, concurrency int, timestamp string, handlers []string) string {
