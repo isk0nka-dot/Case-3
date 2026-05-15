@@ -1,6 +1,6 @@
 module github.com/argus-ai/event-collector
 
-go 1.26
+go 1.24.0
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.30.1
