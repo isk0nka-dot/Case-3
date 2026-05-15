@@ -469,6 +469,27 @@ services:
       - argus-network
     restart: unless-stopped
 
+  # ── LiveKit Egress ────────────────────────────────────────────────────────────
+  livekit-egress:
+    image: livekit/egress:latest
+    container_name: argus-livekit-egress
+    environment:
+      - EGRESS_API_KEY=${LIVEKIT_API_KEY:-argus-dev-api-key}
+      - EGRESS_API_SECRET=${LIVEKIT_API_SECRET:-argus-dev-secret-must-be-at-least-32-chars}
+      - EGRESS_WS_URL=ws://livekit:7880
+      - REDIS_HOST=redis:6379
+      # Base settings
+      - EGRESS_INSECURE=true
+      - EGRESS_LOG_LEVEL=info
+    depends_on:
+      livekit:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - argus-network
+    restart: unless-stopped
+
   # ── MinIO ─────────────────────────────────────────────────────────────────────
   minio:
     image: minio/minio:latest
