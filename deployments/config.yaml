@@ -163,7 +163,7 @@ auth:
   # for staging/production. Or set EVENT_COLLECTOR_JWT_SIGNING_KEY env var
   # (auto-enables auth when key is provided).
   enabled: false
-  algorithm: "HS256"
+  algorithm: "RS256"
 
   # HMAC-SHA256 shared secret for JWT verification.
   # Must be at least 32 characters. In production, ALWAYS set via env var:
