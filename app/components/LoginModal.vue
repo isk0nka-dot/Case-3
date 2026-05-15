@@ -19,6 +19,7 @@ const phoneDigits = ref('')
 const password = ref('')
 const errorMessage = ref('')
 const isSubmitting = ref(false)
+const showPassword = ref(false)
 const phoneInput = ref<HTMLInputElement | null>(null)
 
 // Auto-focus phone input when modal opens
@@ -216,13 +217,22 @@ onUnmounted(() => {
             <!-- Password field -->
             <div>
               <label class="block text-sm font-medium text-white/60 mb-2">Пароль</label>
-              <input
-                v-model="password"
-                type="password"
-                placeholder="Введите пароль"
-                autocomplete="current-password"
-                class="login-input w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 outline-none transition-all"
-              >
+              <div class="relative flex items-center">
+                <input
+                  v-model="password"
+                  :type="showPassword ? 'text' : 'password'"
+                  placeholder="Введите пароль"
+                  autocomplete="current-password"
+                  class="login-input w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 outline-none transition-all pr-12"
+                >
+                <button
+                  type="button"
+                  class="absolute right-3 p-1 text-white/40 hover:text-white/80 transition-colors"
+                  @click="showPassword = !showPassword"
+                >
+                  <UIcon :name="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-5" />
+                </button>
+              </div>
             </div>
 
             <!-- Error message -->

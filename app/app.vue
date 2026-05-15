@@ -152,15 +152,17 @@ onUnmounted(() => {
           :class="store.leftSidebarOpen ? 'px-5 gap-2.5' : 'px-0 justify-center'"
           style="border-color: var(--argus-border);"
         >
-          <ArgusLogo :size="30" />
+          <NuxtLink to="/" class="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity">
+            <ArgusLogo :size="30" />
 
-          <span
-            class="text-[15px] font-semibold tracking-tight sidebar-label"
-            :class="store.leftSidebarOpen ? 'sidebar-label-visible' : 'sidebar-label-hidden'"
-            style="color: var(--argus-text);"
-          >
-            Argus AI
-          </span>
+            <span
+              class="text-[15px] font-semibold tracking-tight sidebar-label"
+              :class="store.leftSidebarOpen ? 'sidebar-label-visible' : 'sidebar-label-hidden'"
+              style="color: var(--argus-text);"
+            >
+              Argus AI
+            </span>
+          </NuxtLink>
 
           <button
             v-if="store.leftSidebarOpen"
