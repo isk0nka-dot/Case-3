@@ -1,5 +1,9 @@
 # argus-frontend вЂ” The Dashboard of Argus AI
 
+> [!IMPORTANT]  
+> **ВНИМАНИЕ НОВЫМ ИНЖЕНЕРАМ!** Проект разделен на 4 репозитория (backend, frontend, infra, sdk). Прежде чем изучать код или писать функционал, вы **ОБЯЗАНЫ** прочитать центральный [**DEVELOPER_GUIDE.md**](https://gitlab.com/argus_ai_group/argus-infra/-/blob/main/DEVELOPER_GUIDE.md) в репозитории argus-infra. Любое переписывание существующего кода или непонимание архитектуры из-за непрочтения гайда приведет к отклонению PR.
+
+
 > **You do not need to know Go to work on this repository.**
 > The frontend communicates with the backend exclusively through the REST API defined in
 > `argus-backend/api/openapi.yaml`. That file is your complete contract вЂ” every endpoint,
