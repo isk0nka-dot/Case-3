@@ -502,7 +502,7 @@ the entire Argus AI platform.
 | Appeals | `/api/v1/appeals` | 4 | `proctor` |
 | Consent | `/api/v1/consent` | 2 | `proctor` |
 | Integrity | `/api/v1/integrity` | 3 | `org_admin` |
-| Media (LiveKit) | `/api/v1/media` | 2 | `proctor` |
+| Media (LiveKit) | `/api/v1/media`, `/api/v1/livekit/webhook` | 5 | `proctor` / LiveKit |
 | Ingest (Chunk Upload) | `/api/v1/ingest/chunk` | 2 | Any (API key) |
 | Health | `/healthz`, `/readyz` | 2 | None |
 
@@ -525,6 +525,27 @@ Roles and their access scope:
 | `org_admin` | Own organization | Manage users, API keys, export, integrity |
 | `proctor` | Own organization | Monitor sessions, review, archive |
 | `viewer` | Own organization | Read-only access to analytics + archive |
+### LiveKit Egress Recording
+
+The media subsystem covers both WebRTC room access and selective recording:
+
+| Endpoint | Caller | Purpose |
+|----------|--------|---------|
+| `POST /api/v1/media/token` | frontend/admin | Generate LiveKit participant token |
+| `GET /api/v1/media/rooms` | frontend/admin | Return LiveKit connection info |
+| `POST /api/v1/media/recordings/start` | frontend/admin | Start Track Composite Egress for selected student tracks |
+| `POST /api/v1/media/recordings/stop` | frontend/admin | Stop a running egress by `egressId` |
+| `POST /api/v1/livekit/webhook` | LiveKit server | Receive signed `egress_ended` events and persist final file metadata |
+
+Recording output uses MP4 `TrackCompositeEgress` with 720p, 15 FPS, H.264 main profile. Files are written to MinIO/S3 under:
+
+```text
+content/recordings/{roomName}/{sessionId}-{studentId}.mp4
+```
+
+Backend stores the durable mapping in PostgreSQL table `livekit_recordings`. The authoritative join key is `egress_id`; application code must not parse `sessionId` or `studentId` from the S3 path.
+
+Full implementation and operational notes: [`docs/LIVEKIT_EGRESS_RECORDING.md`](docs/LIVEKIT_EGRESS_RECORDING.md)
 
 ---
 
@@ -757,7 +778,10 @@ using the convention `EVENT_COLLECTOR_<SECTION>_<KEY>` (uppercase, underscores).
 | `EVENT_COLLECTOR_MINIO_ENDPOINT` | `localhost:9002` | — | MinIO S3 endpoint |
 | `EVENT_COLLECTOR_MINIO_ACCESS_KEY` | — | ✅ | MinIO access key |
 | `EVENT_COLLECTOR_MINIO_SECRET_KEY` | — | ✅ | MinIO secret key |
-| `EVENT_COLLECTOR_CORS_ORIGINS` | `http://localhost:3000` | ✅ | Comma-separated CORS allowed origins |
+| `EVENT_COLLECTOR_MINIO_BUCKET` | `argus-evidence` | yes | MinIO/S3 bucket for evidence and LiveKit recording output |
+| `LIVEKIT_API_KEY` | `argus-dev-api-key` | yes | LiveKit API key for tokens, egress SDK, and webhook validation |
+| `LIVEKIT_API_SECRET` | - | yes | LiveKit API secret, min 32 chars in production |
+| `LIVEKIT_WS_URL` | `ws://localhost:7880` | yes | Backend-to-LiveKit WebSocket URL || `EVENT_COLLECTOR_CORS_ORIGINS` | `http://localhost:3000` | ✅ | Comma-separated CORS allowed origins |
 | `EVENT_COLLECTOR_LOG_LEVEL` | `info` | — | `debug` / `info` / `warn` / `error` |
 | `EVENT_COLLECTOR_WORKER_POOL_SIZE` | `512` | — | gRPC worker pool goroutine count |
 | `EVENT_COLLECTOR_SERVER_TLS` | `false` | — | Enable HSTS header (only if terminating TLS here) |

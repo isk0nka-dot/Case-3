@@ -65,7 +65,7 @@ tags:
   - name: Integrity
     description: Forensic integrity verification (S3 ↔ ClickHouse cross-reference)
   - name: Media
-    description: LiveKit WebRTC token generation for video streaming
+    description: LiveKit WebRTC token generation and selective egress recording
   - name: Ingest
     description: Chunked binary evidence upload for degraded network conditions
   - name: Health
@@ -922,7 +922,7 @@ paths:
     get:
       tags: [Evidence]
       summary: Get presigned download URL
-      description: Returns a time-limited presigned S3 URL (default TTL: 5 minutes).
+      description: "Returns a time-limited presigned S3 URL (default TTL: 5 minutes)."
       operationId: getEvidencePresignedURL
       responses:
         '200':
@@ -1360,6 +1360,95 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/v1/media/recordings/start:
+    post:
+      tags: [Media]
+      summary: Start LiveKit egress recording
+      description: |
+        Starts a LiveKit Track Composite Egress for selected student tracks.
+
+        The backend writes an initial row to PostgreSQL table `livekit_recordings`
+        keyed by the returned `egressId`. Recording output is MP4 at 720p, 15 FPS,
+        written to MinIO/S3 under:
+
+        `content/recordings/{roomName}/{sessionId}-{studentId}.mp4`
+
+        If PostgreSQL persistence fails after LiveKit starts, backend attempts to
+        stop the new egress immediately to avoid orphan recordings.
+      operationId: startMediaRecording
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartRecordingRequest'
+      responses:
+        '202':
+          description: Recording accepted and egress started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '502':
+          description: LiveKit failed to start the egress
+
+  /api/v1/media/recordings/stop:
+    post:
+      tags: [Media]
+      summary: Stop LiveKit egress recording
+      description: |
+        Stops a running LiveKit egress by `egressId` and marks the local
+        metadata row as `EGRESS_ENDING`. The final file URL and final status are
+        written later by the signed LiveKit `egress_ended` webhook.
+      operationId: stopMediaRecording
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StopRecordingRequest'
+      responses:
+        '200':
+          description: Stop request accepted by LiveKit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '502':
+          description: LiveKit failed to stop the egress
+
+  /api/v1/livekit/webhook:
+    post:
+      tags: [Media]
+      summary: Receive LiveKit server webhook
+      description: |
+        Internal route called by the self-hosted LiveKit server.
+
+        The handler validates the LiveKit webhook signature with
+        `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET`. For `egress_ended` events it
+        updates `livekit_recordings` by `egress_id`; unknown events are
+        acknowledged without side effects.
+      operationId: receiveLiveKitWebhook
+      responses:
+        '200':
+          description: Webhook accepted
+        '401':
+          description: Invalid LiveKit webhook signature
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   # ── Ingest (Chunked Upload) ───────────────────────────────────────────────
 
   /api/v1/ingest/chunk:
@@ -1527,6 +1616,15 @@ components:
           example:
             error: "invalid request body"
 
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "internal server error"
+
     TooManyRequests:
       description: Rate limit exceeded
       headers:
@@ -1592,7 +1690,7 @@ components:
       properties:
         token:
           type: string
-          description: Signed JWT (HS256). Include as `Authorization: Bearer <token>`.
+          description: "Signed JWT (HS256). Include as `Authorization: Bearer <token>`."
         user:
           $ref: '#/components/schemas/User'
 
@@ -2396,7 +2494,7 @@ components:
           type: string
         url:
           type: string
-          description: Presigned HTTPS URL (default TTL: 5 minutes)
+          description: "Presigned HTTPS URL (default TTL: 5 minutes)"
         expiresAt:
           type: string
           format: date-time
@@ -2647,6 +2745,44 @@ components:
         room:
           type: string
           description: Room name derived from sessionId
+
+    StartRecordingRequest:
+      type: object
+      required: [sessionId, studentId, videoTrackId]
+      properties:
+        sessionId:
+          type: string
+          description: Argus proctoring session ID
+        studentId:
+          type: string
+          description: Student/user ID associated with the recording
+        roomName:
+          type: string
+          description: Optional LiveKit room name. Defaults to `argus-session-{sessionId}`.
+        videoTrackId:
+          type: string
+          description: LiveKit video track ID to record
+        audioTrackId:
+          type: string
+          description: Optional LiveKit audio track ID to include
+
+    StopRecordingRequest:
+      type: object
+      required: [egressId]
+      properties:
+        egressId:
+          type: string
+          description: LiveKit Egress ID returned by the start endpoint
+
+    RecordingResponse:
+      type: object
+      properties:
+        egressId:
+          type: string
+          description: LiveKit Egress ID
+        status:
+          type: string
+          description: Local recording status such as `EGRESS_ACTIVE` or `EGRESS_ENDING`
 
     # ── Ingest (Chunk) ───────────────────────────────────────────────────────
 
