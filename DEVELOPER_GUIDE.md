@@ -44,8 +44,51 @@
 
 ---
 
-## 🎥 4. LiveKit Egress (Запись видео) — Важные предупреждения
-Функционал сохранения видеопотоков через LiveKit Egress настроен на **Track Egress** (без тяжелого UI-рендеринга). При дальнейшем развитии этого модуля инженеры обязаны учитывать два критических фактора:
+## 🎥 4. LiveKit Egress (Запись видео) — архитектура и правила
+Функционал сохранения видеопотоков через LiveKit Egress настроен на **Track Composite Egress** (без тяжелого UI-рендеринга). Это не continuous full-session recording, а механизм для выборочной записи нужных треков студента.
+
+### Компоненты
+
+| Компонент | Где находится | Ответственность |
+|-----------|----------------|-----------------|
+| `livekit` | `docker/docker-compose.yaml` | WebRTC комнаты, Redis state, signed webhooks |
+| `livekit-egress` | `docker/docker-compose.yaml` | Запись выбранных audio/video tracks в MP4 |
+| `backend` | `argus-backend` | API start/stop, LiveKit SDK, webhook receiver |
+| `postgres` | `migrations/postgres/000007_livekit_recordings.up.sql` | Таблица `livekit_recordings`, mapping `egress_id -> session/user/file` |
+| `minio` | `docker/docker-compose.yaml` | S3-compatible storage для MP4 |
+
+### Backend API
+
+| Endpoint | Кто вызывает | Что делает |
+|----------|--------------|------------|
+| `POST /api/v1/media/recordings/start` | Frontend/admin | Запускает `StartTrackCompositeEgress`, сохраняет `egress_id` в PostgreSQL |
+| `POST /api/v1/media/recordings/stop` | Frontend/admin | Останавливает egress по `egressId` |
+| `POST /api/v1/livekit/webhook` | LiveKit server | Принимает signed `egress_ended`, обновляет `livekit_recordings` |
+
+### Storage path
+
+Backend просит LiveKit сохранить MP4 в:
+
+```text
+content/recordings/{roomName}/{sessionId}-{studentId}.mp4
+```
+
+Этот путь нужен только для удобной структуры MinIO. Логика приложения должна связывать запись с сессией только через `egress_id`, потому что webhook гарантированно возвращает `egress_id`.
+
+### Обязательные настройки LiveKit
+
+LiveKit server должен отправлять webhook в backend:
+
+```yaml
+webhook:
+  api_key: ${LIVEKIT_API_KEY}
+  urls:
+    - http://backend:8080/api/v1/livekit/webhook
+```
+
+`livekit-egress` должен иметь `EGRESS_CONFIG_BODY` с `api_key`, `api_secret`, `ws_url`, Redis и S3/MinIO настройками. Backend дополнительно передает S3 output в каждом `TrackCompositeEgressRequest`.
+
+### Правила развития
 
 1. ✂️ **Selective Recording (Экономия ресурсов):**
    Не пишите непрерывные 1-2 часовые сессии тестирования! В будущем необходимо реализовать логику сохранения видео **ТОЛЬКО в момент обнаружения AI-нарушения** (например, телефон в кадре). Сохраняйте только 30-секундный фрагмент. Это снизит нагрузку на диск и CPU серверов в 10 раз.
@@ -55,5 +98,7 @@
    LiveKit self-hosted должен иметь `webhook.urls` на `http://backend:8080/api/v1/livekit/webhook`. Backend сохраняет `egress_id` в PostgreSQL таблицу `livekit_recordings`, а событие `egress_ended` обновляет эту же запись по `egress_id`. Не парсите `session_id` из S3 filepath — это ненадежно.
 4. 🪣 **S3 / MinIO output:**
    `livekit-egress` получает MinIO настройки через `EGRESS_CONFIG_BODY`, а backend дополнительно передает S3 output в каждом `TrackCompositeEgressRequest`. Это нужно, чтобы запись работала одинаково при локальном MinIO и будущих production S3-compatible хранилищах.
+5. ✅ **Verification перед merge/deploy:**
+   Для backend обязательно выполнить `go test ./...`. Для infra обязательно выполнить `docker compose -f docker/docker-compose.yaml config --quiet` с заполненными `MINIO_ROOT_PASSWORD`, `LIVEKIT_API_SECRET`, `JWT_SIGNING_KEY`.
 
 **Нарушение этих правил приведет к немедленному отклонению вашего PR.**

@@ -540,6 +540,45 @@ open http://localhost:3000               # → Argus AI dashboard
 | `POSTGRES_PASSWORD` | PostgreSQL password |
 | `MINIO_ROOT_PASSWORD` | MinIO admin password (min 8 characters) |
 | `LIVEKIT_API_SECRET` | LiveKit server secret (min 32 characters) |
+### LiveKit Egress Recording Stack
+
+The Docker stack includes the full recording path used by the backend:
+
+| Service | Compose name | Role |
+|---------|--------------|------|
+| LiveKit server | `livekit` | Hosts WebRTC rooms and emits signed webhooks |
+| LiveKit Egress | `livekit-egress` | Records selected tracks to MP4 |
+| Redis | `redis` | Shared LiveKit/Egress state |
+| MinIO | `minio` | S3-compatible recording output |
+| Backend | `backend` | Start/stop API and `/api/v1/livekit/webhook` receiver |
+| PostgreSQL | `postgres` | `livekit_recordings` metadata table |
+
+The self-hosted LiveKit server is generated from `docker/docker-compose.yaml` with this webhook target:
+
+```yaml
+webhook:
+  api_key: ${LIVEKIT_API_KEY}
+  urls:
+    - http://backend:8080/api/v1/livekit/webhook
+```
+
+`livekit-egress` receives runtime config through `EGRESS_CONFIG_BODY`:
+
+```yaml
+api_key: ${LIVEKIT_API_KEY}
+api_secret: ${LIVEKIT_API_SECRET}
+ws_url: ws://livekit:7880
+redis:
+  address: redis:6379
+storage:
+  s3:
+    endpoint: http://minio:9000
+    access_key: ${MINIO_ROOT_USER}
+    secret: ${MINIO_ROOT_PASSWORD}
+    bucket: ${MINIO_BUCKET}
+```
+
+The backend also passes S3 output settings in each `TrackCompositeEgressRequest`. Recording metadata migration is `migrations/postgres/000007_livekit_recordings.up.sql`; the table is keyed by `egress_id`. Do not parse session/user identity from S3 object paths.
 
 **Optional:**
 
@@ -590,6 +629,8 @@ npm run dev
 | MinIO API | 9002 | HTTP |
 | MinIO Console | 9010 | HTTP |
 | LiveKit | 7880 | HTTP/WS |
+| LiveKit RTC TCP | 7881 | TCP |
+| LiveKit RTC UDP | 7882 | UDP |
 
 ### Makefile Targets
 
