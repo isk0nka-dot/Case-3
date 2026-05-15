@@ -58,8 +58,7 @@ async function fetchExports() {
     exports.value = data
   } catch (err: unknown) {
     error.value = err instanceof Error ? err.message : 'Failed to fetch exports'
-    // Use demo data for development
-    exports.value = getDemoExports()
+    exports.value = []
   } finally {
     loading.value = false
   }
