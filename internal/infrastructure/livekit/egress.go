@@ -42,11 +42,15 @@ func NewEgressService(cfg EgressConfig, logger *zap.Logger) *EgressService {
 // с минимальной нагрузкой на CPU (так как нет рендеринга всего UI браузера).
 func (s *EgressService) StartRecording(ctx context.Context, roomName, videoTrackID, audioTrackID, userID, sessionID string) (string, error) {
 	req := buildTrackCompositeRequest(s.cfg, roomName, videoTrackID, audioTrackID, userID, sessionID)
+	filepath := ""
+	if fileOutputs := req.GetFileOutputs(); len(fileOutputs) > 0 && fileOutputs[0] != nil {
+		filepath = fileOutputs[0].GetFilepath()
+	}
 
 	s.logger.Info("запуск записи LiveKit Egress",
 		zap.String("room", roomName),
 		zap.String("session_id", sessionID),
-		zap.String("filepath", req.GetFile().GetFilepath()),
+		zap.String("filepath", filepath),
 	)
 
 	info, err := s.client.StartTrackCompositeEgress(ctx, req)
@@ -70,6 +74,19 @@ func buildTrackCompositeRequest(cfg EgressConfig, roomName, videoTrackID, audioT
 		VideoBitrate: 1500,
 	}
 
+	fileOutput := &livekit.EncodedFileOutput{
+		FileType: livekit.EncodedFileType_MP4,
+		Filepath: filepath,
+		Output: &livekit.EncodedFileOutput_S3{
+			S3: &livekit.S3Upload{
+				AccessKey: cfg.S3AccessKey,
+				Secret:    cfg.S3SecretKey,
+				Endpoint:  cfg.S3Endpoint,
+				Bucket:    cfg.S3Bucket,
+			},
+		},
+	}
+
 	return &livekit.TrackCompositeEgressRequest{
 		RoomName:     roomName,
 		VideoTrackId: videoTrackID,
@@ -77,20 +94,7 @@ func buildTrackCompositeRequest(cfg EgressConfig, roomName, videoTrackID, audioT
 		Options: &livekit.TrackCompositeEgressRequest_Advanced{
 			Advanced: encodingOptions,
 		},
-		Output: &livekit.TrackCompositeEgressRequest_File{
-			File: &livekit.EncodedFileOutput{
-				FileType: livekit.EncodedFileType_MP4,
-				Filepath: filepath,
-				Output: &livekit.EncodedFileOutput_S3{
-					S3: &livekit.S3Upload{
-						AccessKey: cfg.S3AccessKey,
-						Secret:    cfg.S3SecretKey,
-						Endpoint:  cfg.S3Endpoint,
-						Bucket:    cfg.S3Bucket,
-					},
-				},
-			},
-		},
+		FileOutputs: []*livekit.EncodedFileOutput{fileOutput},
 	}
 }
 

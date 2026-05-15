@@ -81,8 +81,8 @@ func handleEgressEnded(ctx context.Context, repo EvidenceStorePort, egressInfo *
 	}
 
 	fileURL := ""
-	if fileRes := egressInfo.GetFile(); fileRes != nil {
-		fileURL = fileRes.GetFilename()
+	if fileResults := egressInfo.GetFileResults(); len(fileResults) > 0 && fileResults[0] != nil {
+		fileURL = fileResults[0].GetFilename()
 	}
 
 	return repo.UpdateRecordingEnded(

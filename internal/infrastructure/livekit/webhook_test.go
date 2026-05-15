@@ -29,8 +29,8 @@ func TestHandleEgressEndedUpdatesRecordingByEgressID(t *testing.T) {
 	info := &livekitpb.EgressInfo{
 		EgressId: "egress-123",
 		Status:   livekitpb.EgressStatus_EGRESS_COMPLETE,
-		Result: &livekitpb.EgressInfo_File{
-			File: &livekitpb.FileInfo{
+		FileResults: []*livekitpb.FileInfo{
+			{
 				Filename: "content/recordings/room/session-student.mp4",
 			},
 		},

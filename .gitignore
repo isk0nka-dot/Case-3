@@ -67,11 +67,14 @@ secrets.yml
 
 # ── CI cache ──────────────────────────────────────────────────────────────
 .go-cache/
+.go-build-cache/
+.golangci-cache/
 
 # ── Ad-hoc SQL / query artifacts ──────────────────────────────────────────
 combined.sql
 
 # ── Temporary / Generated ───────────────────────────────────────────────────
+gosec.sarif
 *.log
 *.tmp
 *.bak

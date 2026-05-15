@@ -37,7 +37,11 @@ func TestBuildTrackCompositeRequestUsesStableRecordingPathAndEncoding(t *testing
 		t.Fatalf("VideoCodec = %s, want H264_MAIN", advanced.VideoCodec)
 	}
 
-	file := req.GetFile()
+	files := req.GetFileOutputs()
+	if len(files) != 1 {
+		t.Fatalf("file output count = %d, want 1", len(files))
+	}
+	file := files[0]
 	if file == nil {
 		t.Fatal("file output is nil")
 	}
