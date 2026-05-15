@@ -7,7 +7,7 @@
 #  Stage 1: Build
 #  Compile the Go binary in a full build environment with all dependencies.
 # ---------------------------------------------------------------------------
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 # Install build dependencies.
 # - git: required for version embedding via `git describe`
