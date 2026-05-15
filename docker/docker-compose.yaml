@@ -68,9 +68,8 @@ services:
       - EVENT_COLLECTOR_PG_DATABASE=${POSTGRES_DB:-argus}
       - EVENT_COLLECTOR_PG_USERNAME=${POSTGRES_USER:-argus}
       - EVENT_COLLECTOR_PG_PASSWORD=${POSTGRES_PASSWORD:-argus_secret}
-      # ── JWT RSA-256 (asymmetric) ──────────────────────────────────────────
-      - EVENT_COLLECTOR_JWT_PRIVATE_KEY_PATH=/app/keys/jwt_private.pem
-      - EVENT_COLLECTOR_JWT_PUBLIC_KEY_PATH=/app/keys/jwt_public.pem
+      # ── JWT HMAC-SHA256 (shared secret) ──────────────────────────────────
+      - EVENT_COLLECTOR_JWT_SIGNING_KEY=${JWT_SIGNING_KEY:?JWT_SIGNING_KEY is required}
       # ── Service config ────────────────────────────────────────────────────
       - EVENT_COLLECTOR_GRPC_PORT=50051
       - EVENT_COLLECTOR_HTTP_PORT=8080
