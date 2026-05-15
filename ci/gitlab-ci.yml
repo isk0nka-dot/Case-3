@@ -147,20 +147,44 @@ deploy-production:
         cd ${BUILD_DIR}
         docker build --no-cache -t argus/${SERVICE}:latest -f Dockerfile . 2>&1
 
-        # Auto-initialize infra if it doesn't exist
+        # Keep the server-side infra checkout in sync with argus-infra/main.
+        # Frontend restart depends on the shared compose file from that repo.
+        INFRA_REPO_URL="https://oauth2:REDACTED_GITLAB_TOKEN@gitlab.com/argus_ai_group/argus-infra.git"
         INFRA_DIR="\$HOME/argus-infra"
         INFRA_DOCKER_DIR="\$INFRA_DIR/docker"
-        if [ ! -d "\$INFRA_DOCKER_DIR" ]; then
+        if [ ! -d "\$INFRA_DIR/.git" ]; then
           echo "→ Auto-initializing ~/argus-infra infrastructure repository..."
-          mkdir -p "\$INFRA_DIR"
+          rm -rf "\$INFRA_DIR"
+          git clone "\$INFRA_REPO_URL" "\$INFRA_DIR"
+          cp "\$INFRA_DOCKER_DIR/.env.example" "\$INFRA_DOCKER_DIR/.env"
+        else
+          echo "→ Updating ~/argus-infra to origin/main..."
           cd "\$INFRA_DIR"
-          if [ ! -d ".git" ]; then
-            git clone https://oauth2:REDACTED_GITLAB_TOKEN@gitlab.com/argus_ai_group/argus-infra.git .
-            cp docker/.env.example docker/.env || true
+          git remote set-url origin "\$INFRA_REPO_URL"
+          dirty_files="\$( (git diff --name-only; git diff --cached --name-only) | sort -u )"
+          unexpected_dirty="\$(printf '%s\n' "\$dirty_files" | grep -vx 'docker/config.yaml' || true)"
+          if [ -n "\$unexpected_dirty" ]; then
+            echo 'DEPLOY FAILED: ~/argus-infra has local tracked changes; refusing to overwrite production infra files.'
+            git status --short
+            exit 1
           fi
+          if printf '%s\n' "\$dirty_files" | grep -qx 'docker/config.yaml'; then
+            echo '→ Resetting generated docker/config.yaml before pulling infra updates...'
+            git checkout -- docker/config.yaml
+          fi
+          git fetch --depth=1 origin main
+          git checkout main
+          git pull --ff-only origin main
         fi
 
         cd "\$INFRA_DOCKER_DIR"
+        if [ ! -f .env ]; then
+          echo 'DEPLOY FAILED: ~/argus-infra/docker/.env is missing'
+          exit 1
+        fi
+        docker compose config --quiet
+        docker compose config --services | grep -qx ${SERVICE}
+
         docker compose up -d --no-deps --no-build ${SERVICE} 2>&1
 
         echo '→ Waiting for container to become healthy...'
