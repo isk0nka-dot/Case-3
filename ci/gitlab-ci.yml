@@ -161,7 +161,9 @@ deploy-production:
           echo "→ Updating ~/argus-infra to origin/main..."
           cd "\$INFRA_DIR"
           git remote set-url origin "\$INFRA_REPO_URL"
-          dirty_files="\$( (git diff --name-only; git diff --cached --name-only) | sort -u )"
+          dirty_files="\$(git diff --name-only)"
+          cached_dirty_files="\$(git diff --cached --name-only)"
+          dirty_files="\$(printf '%s\n%s\n' "\$dirty_files" "\$cached_dirty_files" | sed '/^$/d' | sort -u)"
           unexpected_dirty="\$(printf '%s\n' "\$dirty_files" | grep -vx 'docker/config.yaml' || true)"
           if [ -n "\$unexpected_dirty" ]; then
             echo 'DEPLOY FAILED: ~/argus-infra has local tracked changes; refusing to overwrite production infra files.'
