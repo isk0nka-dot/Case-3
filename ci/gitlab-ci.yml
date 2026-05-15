@@ -148,17 +148,19 @@ deploy-production:
         docker build --no-cache -t argus/${SERVICE}:latest -f Dockerfile . 2>&1
 
         # Auto-initialize infra if it doesn't exist
-        if [ ! -d "~/argus-infra/docker" ]; then
+        INFRA_DIR="\$HOME/argus-infra"
+        INFRA_DOCKER_DIR="\$INFRA_DIR/docker"
+        if [ ! -d "\$INFRA_DOCKER_DIR" ]; then
           echo "→ Auto-initializing ~/argus-infra infrastructure repository..."
-          mkdir -p ~/argus-infra
-          cd ~/argus-infra
+          mkdir -p "\$INFRA_DIR"
+          cd "\$INFRA_DIR"
           if [ ! -d ".git" ]; then
             git clone https://oauth2:REDACTED_GITLAB_TOKEN@gitlab.com/argus_ai_group/argus-infra.git .
             cp docker/.env.example docker/.env || true
           fi
         fi
 
-        cd ~/argus-infra/docker
+        cd "\$INFRA_DOCKER_DIR"
         docker compose up -d --no-deps --no-build ${SERVICE} 2>&1
 
         echo '→ Waiting for container to become healthy...'
