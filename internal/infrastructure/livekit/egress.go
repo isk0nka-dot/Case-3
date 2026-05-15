@@ -41,21 +41,36 @@ func NewEgressService(cfg EgressConfig, logger *zap.Logger) *EgressService {
 // Использует TrackCompositeEgress для применения жестких лимитов (720p, 15fps)
 // с минимальной нагрузкой на CPU (так как нет рендеринга всего UI браузера).
 func (s *EgressService) StartRecording(ctx context.Context, roomName, videoTrackID, audioTrackID, userID, sessionID string) (string, error) {
-	// Формируем путь сохранения в Minio как требовалось:
-	// content/recordings/{session_id}/{user_id}.mp4
-	filepath := fmt.Sprintf("content/recordings/%s/%s.mp4", sessionID, userID)
+	req := buildTrackCompositeRequest(s.cfg, roomName, videoTrackID, audioTrackID, userID, sessionID)
 
-	// Настраиваем оптимизированный пресет для экономии CPU: 720p, 15fps
+	s.logger.Info("запуск записи LiveKit Egress",
+		zap.String("room", roomName),
+		zap.String("session_id", sessionID),
+		zap.String("filepath", req.GetFile().GetFilepath()),
+	)
+
+	info, err := s.client.StartTrackCompositeEgress(ctx, req)
+	if err != nil {
+		s.logger.Error("ошибка запуска Egress", zap.Error(err))
+		return "", fmt.Errorf("failed to start track composite egress: %w", err)
+	}
+
+	return info.EgressId, nil
+}
+
+func buildTrackCompositeRequest(cfg EgressConfig, roomName, videoTrackID, audioTrackID, userID, sessionID string) *livekit.TrackCompositeEgressRequest {
+	filepath := fmt.Sprintf("content/recordings/%s/%s-%s.mp4", roomName, sessionID, userID)
+
 	encodingOptions := &livekit.EncodingOptions{
 		Width:        1280,
 		Height:       720,
 		Depth:        24,
 		Framerate:    15,
 		VideoCodec:   livekit.VideoCodec_H264_MAIN,
-		VideoBitrate: 1500, // 1.5 Mbps
+		VideoBitrate: 1500,
 	}
 
-	req := &livekit.TrackCompositeEgressRequest{
+	return &livekit.TrackCompositeEgressRequest{
 		RoomName:     roomName,
 		VideoTrackId: videoTrackID,
 		AudioTrackId: audioTrackID,
@@ -68,29 +83,15 @@ func (s *EgressService) StartRecording(ctx context.Context, roomName, videoTrack
 				Filepath: filepath,
 				Output: &livekit.EncodedFileOutput_S3{
 					S3: &livekit.S3Upload{
-						AccessKey: s.cfg.S3AccessKey,
-						Secret:    s.cfg.S3SecretKey,
-						Endpoint:  s.cfg.S3Endpoint,
-						Bucket:    s.cfg.S3Bucket,
+						AccessKey: cfg.S3AccessKey,
+						Secret:    cfg.S3SecretKey,
+						Endpoint:  cfg.S3Endpoint,
+						Bucket:    cfg.S3Bucket,
 					},
 				},
 			},
 		},
 	}
-
-	s.logger.Info("запуск записи LiveKit Egress",
-		zap.String("room", roomName),
-		zap.String("session_id", sessionID),
-		zap.String("filepath", filepath),
-	)
-
-	info, err := s.client.StartTrackCompositeEgress(ctx, req)
-	if err != nil {
-		s.logger.Error("ошибка запуска Egress", zap.Error(err))
-		return "", fmt.Errorf("failed to start track composite egress: %w", err)
-	}
-
-	return info.EgressId, nil
 }
 
 // StopRecording останавливает процесс записи
@@ -100,7 +101,7 @@ func (s *EgressService) StopRecording(ctx context.Context, egressID string) erro
 	_, err := s.client.StopEgress(ctx, &livekit.StopEgressRequest{
 		EgressId: egressID,
 	})
-	
+
 	if err != nil {
 		s.logger.Error("ошибка остановки Egress", zap.Error(err))
 		return fmt.Errorf("failed to stop egress: %w", err)

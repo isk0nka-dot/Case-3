@@ -5,13 +5,14 @@ import (
 	"net/http"
 
 	"github.com/livekit/protocol/auth"
+	livekitpb "github.com/livekit/protocol/livekit"
 	"github.com/livekit/protocol/webhook"
 	"go.uber.org/zap"
 )
 
 // EvidenceStorePort — интерфейс для обновления базы данных после завершения Egress
 type EvidenceStorePort interface {
-	UpdateEvidenceURL(ctx context.Context, sessionID, userID, url string) error
+	UpdateRecordingEnded(ctx context.Context, egressID, status, fileURL, errorMessage string) error
 }
 
 // WebhookHandler обрабатывает входящие хуки от LiveKit
@@ -61,22 +62,34 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			zap.String("status", egressInfo.Status.String()),
 		)
 
-		// Достаем результаты: нам нужен путь к файлу в S3
-		if fileRes := egressInfo.GetFile(); fileRes != nil {
-			filepath := fileRes.GetFilename()
-			
-			// ВАЖНО: Мы сохраняли файл как content/recordings/{sessionID}/{userID}.mp4
-			// Если база данных подключена, мы вызываем обновление URL
-			if h.evidenceRepo != nil {
-				// В реальной системе нужно распарсить sessionID и userID из filepath
-				// или передавать их через egressInfo.RoomName, но сейчас для примера:
-				h.logger.Info("файл успешно сохранен, обновляем БД", zap.String("filepath", filepath))
-				
-				// Заглушка:
-				// h.evidenceRepo.UpdateEvidenceURL(r.Context(), sessionID, userID, filepath)
-			}
+		if err := handleEgressEnded(r.Context(), h.evidenceRepo, egressInfo); err != nil {
+			h.logger.Error("ошибка обновления записи LiveKit Egress",
+				zap.String("egress_id", egressInfo.EgressId),
+				zap.Error(err),
+			)
+			http.Error(w, "failed to update recording", http.StatusInternalServerError)
+			return
 		}
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func handleEgressEnded(ctx context.Context, repo EvidenceStorePort, egressInfo *livekitpb.EgressInfo) error {
+	if repo == nil || egressInfo == nil {
+		return nil
+	}
+
+	fileURL := ""
+	if fileRes := egressInfo.GetFile(); fileRes != nil {
+		fileURL = fileRes.GetFilename()
+	}
+
+	return repo.UpdateRecordingEnded(
+		ctx,
+		egressInfo.GetEgressId(),
+		egressInfo.GetStatus().String(),
+		fileURL,
+		egressInfo.GetError(),
+	)
 }

@@ -64,37 +64,38 @@ import (
 	pb "github.com/argus-ai/event-collector/api/proto/v1"
 	"github.com/argus-ai/event-collector/internal/application/port"
 	"github.com/argus-ai/event-collector/internal/application/usecase"
+	"github.com/argus-ai/event-collector/internal/domain/entity"
+	"github.com/argus-ai/event-collector/internal/domain/valueobject"
 	"github.com/argus-ai/event-collector/internal/infrastructure/alerting"
 	"github.com/argus-ai/event-collector/internal/infrastructure/chunk"
 	"github.com/argus-ai/event-collector/internal/infrastructure/clickhouse"
 	"github.com/argus-ai/event-collector/internal/infrastructure/config"
+	"github.com/argus-ai/event-collector/internal/infrastructure/dlq"
 	"github.com/argus-ai/event-collector/internal/infrastructure/evidence"
 	exportInfra "github.com/argus-ai/event-collector/internal/infrastructure/export"
 	"github.com/argus-ai/event-collector/internal/infrastructure/forensic"
 	"github.com/argus-ai/event-collector/internal/infrastructure/health"
 	integrityInfra "github.com/argus-ai/event-collector/internal/infrastructure/integrity"
-	"github.com/argus-ai/event-collector/internal/infrastructure/dlq"
 	"github.com/argus-ai/event-collector/internal/infrastructure/kafka"
+	livekitInfra "github.com/argus-ai/event-collector/internal/infrastructure/livekit"
 	metricsInfra "github.com/argus-ai/event-collector/internal/infrastructure/metrics"
 	minioStore "github.com/argus-ai/event-collector/internal/infrastructure/minio"
+	"github.com/argus-ai/event-collector/internal/infrastructure/postgres"
 	"github.com/argus-ai/event-collector/internal/infrastructure/recorder"
 	"github.com/argus-ai/event-collector/internal/infrastructure/session"
 	"github.com/argus-ai/event-collector/internal/infrastructure/sidecam"
 	webhookInfra "github.com/argus-ai/event-collector/internal/infrastructure/webhook"
-	"github.com/argus-ai/event-collector/internal/infrastructure/postgres"
-	"github.com/argus-ai/event-collector/internal/domain/entity"
-	"github.com/argus-ai/event-collector/internal/domain/valueobject"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	grpcTransport "github.com/argus-ai/event-collector/internal/transport/grpc"
 	"github.com/argus-ai/event-collector/internal/transport/grpcweb"
 	adminHTTP "github.com/argus-ai/event-collector/internal/transport/http"
 	"github.com/argus-ai/event-collector/pkg/auth"
 	"github.com/argus-ai/event-collector/pkg/circuitbreaker"
 	"github.com/argus-ai/event-collector/pkg/cors"
+	httpMiddleware "github.com/argus-ai/event-collector/pkg/middleware"
 	"github.com/argus-ai/event-collector/pkg/randutil"
 	"github.com/argus-ai/event-collector/pkg/ratelimiter"
-	httpMiddleware "github.com/argus-ai/event-collector/pkg/middleware"
 	"github.com/argus-ai/event-collector/pkg/securityheaders"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Build-time variables injected via ldflags:
@@ -575,16 +576,16 @@ func run() error {
 	// a rolling deployment.
 	// =================================================================
 	kaParams := keepalive.ServerParameters{
-		MaxConnectionIdle:     5 * time.Minute,    // Close idle connections after 5 min.
-		MaxConnectionAge:      30 * time.Minute,   // Force reconnect after 30 min (load balancing).
-		MaxConnectionAgeGrace: 10 * time.Second,   // Allow 10s for in-flight RPCs to complete.
-		Time:                  1 * time.Minute,    // Send keepalive ping every 1 min.
-		Timeout:               20 * time.Second,   // Wait 20s for keepalive ACK.
+		MaxConnectionIdle:     5 * time.Minute,  // Close idle connections after 5 min.
+		MaxConnectionAge:      30 * time.Minute, // Force reconnect after 30 min (load balancing).
+		MaxConnectionAgeGrace: 10 * time.Second, // Allow 10s for in-flight RPCs to complete.
+		Time:                  1 * time.Minute,  // Send keepalive ping every 1 min.
+		Timeout:               20 * time.Second, // Wait 20s for keepalive ACK.
 	}
 
 	kaPolicy := keepalive.EnforcementPolicy{
-		MinTime:             10 * time.Second,  // Minimum time between client pings.
-		PermitWithoutStream: true,              // Allow pings even without active streams.
+		MinTime:             10 * time.Second, // Minimum time between client pings.
+		PermitWithoutStream: true,             // Allow pings even without active streams.
 	}
 
 	grpcServer := grpc.NewServer(
@@ -662,6 +663,9 @@ func run() error {
 		if len(adminJWTKey) == 0 {
 			adminJWTKey = []byte("argus-dev-admin-jwt-key-CHANGE-IN-PRODUCTION!")
 		}
+		livekitAPIKey := envOr("LIVEKIT_API_KEY", "argus-dev-api-key")
+		livekitAPISecret := envOr("LIVEKIT_API_SECRET", "argus-dev-api-secret-must-be-at-least-32-characters-long")
+		livekitWSURL := envOr("LIVEKIT_WS_URL", "ws://localhost:7880")
 
 		// =============================================================
 		// Asynq Client (Redis-backed job queue) — optional.
@@ -796,9 +800,30 @@ func run() error {
 		mediaHandler := adminHTTP.NewMediaHandler(pgRepo, logger, adminJWTKey)
 		mediaHandler.RegisterRoutes(httpMux)
 
+		if err := pgRepo.EnsureLiveKitRecordingsTable(context.Background()); err != nil {
+			logger.Error("failed to create livekit_recordings table", zap.Error(err))
+		} else {
+			logger.Info("livekit_recordings table ensured")
+		}
+
+		egressService := livekitInfra.NewEgressService(livekitInfra.EgressConfig{
+			Host:        livekitWSURL,
+			APIKey:      livekitAPIKey,
+			APISecret:   livekitAPISecret,
+			S3Endpoint:  cfg.MinIO.Endpoint,
+			S3AccessKey: cfg.MinIO.AccessKey,
+			S3SecretKey: cfg.MinIO.SecretKey,
+			S3Bucket:    cfg.MinIO.Bucket,
+		}, logger)
+		recordingHandler := adminHTTP.NewRecordingHandler(egressService, pgRepo, logger, adminJWTKey, pgRepo)
+		recordingHandler.RegisterRoutes(httpMux)
+
+		livekitWebhookHandler := livekitInfra.NewWebhookHandler(livekitAPIKey, livekitAPISecret, pgRepo, logger)
+		httpMux.Handle("POST /api/v1/livekit/webhook", livekitWebhookHandler)
+
 		logger.Info("media api registered",
 			zap.String("base_path", "/api/v1/media"),
-			zap.Int("endpoints", 2),
+			zap.Int("endpoints", 5),
 		)
 
 		// Archive API endpoints (REST) — Historical session review and export.
@@ -928,18 +953,18 @@ func run() error {
 
 			now := time.Now().UTC()
 			evt := &entity.ProctoringEvent{
-				EventID:        eid,
-				SessionID:      sessionID,
-				StudentID:      studentID,
-				ExamID:         examID,
-				OrgID:          orgID,
-				EventType:      et,
-				Severity:       sev,
-				Source:         valueobject.SourceSideCamera,
+				EventID:         eid,
+				SessionID:       sessionID,
+				StudentID:       studentID,
+				ExamID:          examID,
+				OrgID:           orgID,
+				EventType:       et,
+				Severity:        sev,
+				Source:          valueobject.SourceSideCamera,
 				ServerTimestamp: now,
 				ClientTimestamp: now,
-				Label:          label,
-				Confidence:     1.0,
+				Label:           label,
+				Confidence:      1.0,
 			}
 
 			if chWriter != nil {
@@ -1110,8 +1135,8 @@ func run() error {
 
 	// CORS middleware — wraps the gRPC-Web proxy.
 	corsConfig := cors.Config{
-		AllowedOrigins:   cfg.CORS.AllowedOrigins,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedOrigins: cfg.CORS.AllowedOrigins,
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{
 			"Accept",
 			"Accept-Language",
@@ -1163,10 +1188,10 @@ func run() error {
 		Addr:              fmt.Sprintf(":%d", cfg.Server.HTTPPort),
 		Handler:           requestIDHandler,
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       0,               // Disabled for streaming (gRPC-Web streams can be long-lived).
-		WriteTimeout:      0,               // Disabled for streaming.
+		ReadTimeout:       0, // Disabled for streaming (gRPC-Web streams can be long-lived).
+		WriteTimeout:      0, // Disabled for streaming.
 		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    1 << 16,         // 64 KiB (accommodates large JWT tokens).
+		MaxHeaderBytes:    1 << 16, // 64 KiB (accommodates large JWT tokens).
 	}
 
 	logger.Info("http server created (gRPC-Web + CORS + health)",
@@ -1439,6 +1464,13 @@ func run() error {
 		zap.String("version", version),
 	)
 	return nil
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 // ---------------------------------------------------------------------------

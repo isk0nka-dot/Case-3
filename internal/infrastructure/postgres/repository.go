@@ -137,6 +137,104 @@ func (r *Repository) Ping(ctx context.Context) error {
 	return r.db.PingContext(ctx)
 }
 
+// EnsureLiveKitRecordingsTable creates the recording metadata table used to map
+// LiveKit Egress webhooks back to proctoring sessions.
+func (r *Repository) EnsureLiveKitRecordingsTable(ctx context.Context) error {
+	query := `
+		CREATE TABLE IF NOT EXISTS livekit_recordings (
+			egress_id      TEXT PRIMARY KEY,
+			session_id     TEXT NOT NULL,
+			user_id        TEXT NOT NULL,
+			room_name      TEXT NOT NULL,
+			video_track_id TEXT NOT NULL DEFAULT '',
+			audio_track_id TEXT NOT NULL DEFAULT '',
+			status         TEXT NOT NULL,
+			file_url       TEXT NOT NULL DEFAULT '',
+			error_message  TEXT NOT NULL DEFAULT '',
+			started_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			ended_at       TIMESTAMPTZ,
+			created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_livekit_recordings_session
+			ON livekit_recordings (session_id, created_at DESC);
+
+		CREATE INDEX IF NOT EXISTS idx_livekit_recordings_user
+			ON livekit_recordings (user_id, created_at DESC);
+	`
+	if _, err := r.db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("postgres: ensure livekit_recordings table: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) CreateRecording(ctx context.Context, rec *entity.Recording) error {
+	query := `
+		INSERT INTO livekit_recordings (
+			egress_id, session_id, user_id, room_name,
+			video_track_id, audio_track_id, status
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (egress_id) DO UPDATE SET
+			session_id = EXCLUDED.session_id,
+			user_id = EXCLUDED.user_id,
+			room_name = EXCLUDED.room_name,
+			video_track_id = EXCLUDED.video_track_id,
+			audio_track_id = EXCLUDED.audio_track_id,
+			status = EXCLUDED.status,
+			updated_at = NOW()
+		RETURNING started_at, created_at, updated_at`
+
+	if err := r.db.QueryRowContext(ctx, query,
+		rec.EgressID,
+		rec.SessionID,
+		rec.UserID,
+		rec.RoomName,
+		rec.VideoTrackID,
+		rec.AudioTrackID,
+		rec.Status,
+	).Scan(&rec.StartedAt, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
+		return fmt.Errorf("postgres: create livekit recording: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) UpdateRecordingStopped(ctx context.Context, egressID string) error {
+	query := `
+		UPDATE livekit_recordings
+		SET status = 'EGRESS_ENDING',
+			updated_at = NOW()
+		WHERE egress_id = $1`
+	res, err := r.db.ExecContext(ctx, query, egressID)
+	if err != nil {
+		return fmt.Errorf("postgres: mark livekit recording stopping: %w", err)
+	}
+	if rows, err := res.RowsAffected(); err == nil && rows == 0 {
+		r.logger.Warn("livekit recording not found when marking stopping", zap.String("egress_id", egressID))
+	}
+	return nil
+}
+
+func (r *Repository) UpdateRecordingEnded(ctx context.Context, egressID, status, fileURL, errorMessage string) error {
+	query := `
+		UPDATE livekit_recordings
+		SET status = $2,
+			file_url = COALESCE(NULLIF($3, ''), file_url),
+			error_message = COALESCE(NULLIF($4, ''), error_message),
+			ended_at = COALESCE(ended_at, NOW()),
+			updated_at = NOW()
+		WHERE egress_id = $1`
+	res, err := r.db.ExecContext(ctx, query, egressID, status, fileURL, errorMessage)
+	if err != nil {
+		return fmt.Errorf("postgres: update livekit recording ended: %w", err)
+	}
+	if rows, err := res.RowsAffected(); err == nil && rows == 0 {
+		r.logger.Warn("livekit recording not found for egress webhook", zap.String("egress_id", egressID))
+	}
+	return nil
+}
+
 // ==========================================================================
 // Organization Repository Implementation
 // ==========================================================================
