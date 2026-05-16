@@ -20,7 +20,7 @@
 # Required CI variables (set at GitLab Group level):
 #   DEPLOY_HOST       Production server IP (e.g. 157.180.46.33)
 #   DEPLOY_USER       SSH user (e.g. root or deploy)
-#   DEPLOY_SSH_KEY    SSH private key (type: File, protected + masked)
+#   ARGUS_DEPLOY_SSH_KEY SSH private key (type: File, protected)
 #
 # No container registry is used. Images build on the server from source.
 # All secrets live in /opt/argus/docker/.env — never transiting through CI.
@@ -132,9 +132,9 @@ deploy-production:
   before_script:
     - apk add --no-cache openssh-client rsync
     - eval $(ssh-agent -s)
-    - chmod 600 "${DEPLOY_SSH_KEY}"
-    - ssh-keygen -lf "${DEPLOY_SSH_KEY}"
-    - ssh-add "${DEPLOY_SSH_KEY}"
+    - chmod 600 "${ARGUS_DEPLOY_SSH_KEY}"
+    - ssh-keygen -lf "${ARGUS_DEPLOY_SSH_KEY}"
+    - ssh-add "${ARGUS_DEPLOY_SSH_KEY}"
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - ssh-keyscan -H ${ARGUS_DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null
   script:
