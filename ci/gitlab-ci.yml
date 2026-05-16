@@ -34,6 +34,7 @@ stages:
 
 variables:
   GO_CACHE: ${CI_PROJECT_DIR}/.go-cache
+  ARGUS_DEPLOY_HOST: "89.167.96.246"
 
 cache:
   key: go-${CI_COMMIT_REF_SLUG}
@@ -134,58 +135,62 @@ deploy-production:
     - chmod 600 "${DEPLOY_SSH_KEY}"
     - ssh-add "${DEPLOY_SSH_KEY}"
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - ssh-keyscan -H ${DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null
+    - ssh-keyscan -H ${ARGUS_DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null
   script:
     - |
       SERVICE="backend"
       BUILD_DIR="/home/${DEPLOY_USER}/builds/${SERVICE}"
 
       echo "═══════════════════════════════════════════════════════════"
-      echo "  Deploying backend to ${DEPLOY_HOST}"
+      echo "  Deploying backend to ${ARGUS_DEPLOY_HOST}"
       echo "  Commit: ${CI_COMMIT_SHORT_SHA}"
       echo "═══════════════════════════════════════════════════════════"
 
       # Step 1: Rsync to deploy user's home (writable)
       echo "→ Syncing code to ${BUILD_DIR}..."
-      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p ${BUILD_DIR}"
+      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${ARGUS_DEPLOY_HOST} "mkdir -p ${BUILD_DIR}"
       rsync -azO --delete \
         --exclude='.git' \
         --exclude='.go-cache' \
         ${CI_PROJECT_DIR}/ \
-        ${DEPLOY_USER}@${DEPLOY_HOST}:${BUILD_DIR}/
+        ${DEPLOY_USER}@${ARGUS_DEPLOY_HOST}:${BUILD_DIR}/
 
       # Step 2: Build Docker image from build dir, then restart via compose
       echo "→ Rebuilding Docker container..."
-      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "
+      INFRA_REPO_URL="https://oauth2:REDACTED_GITLAB_TOKEN@gitlab.com/argus_ai_group/argus-infra.git"
+      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${ARGUS_DEPLOY_HOST} sh -s -- "${BUILD_DIR}" "${SERVICE}" "${INFRA_REPO_URL}" <<'REMOTE_SCRIPT'
         set -e
-        cd ${BUILD_DIR}
-        docker build --no-cache -t argus/${SERVICE}:latest -f Dockerfile . 2>&1
+        BUILD_DIR="$1"
+        SERVICE="$2"
+        INFRA_REPO_URL="$3"
+
+        cd "$BUILD_DIR"
+        docker build --no-cache -t "argus/${SERVICE}:latest" -f Dockerfile . 2>&1
 
         # Keep the server-side infra checkout in sync with argus-infra/main.
         # The compose file is part of that repo; using a stale checkout can
         # deploy a new backend image with old environment wiring.
-        INFRA_REPO_URL="https://oauth2:REDACTED_GITLAB_TOKEN@gitlab.com/argus_ai_group/argus-infra.git"
-        INFRA_DIR="\$HOME/argus-infra"
-        INFRA_DOCKER_DIR="\$INFRA_DIR/docker"
-        if [ ! -d "\$INFRA_DIR/.git" ]; then
+        INFRA_DIR="$HOME/argus-infra"
+        INFRA_DOCKER_DIR="$INFRA_DIR/docker"
+        if [ ! -d "$INFRA_DIR/.git" ]; then
           echo "→ Auto-initializing ~/argus-infra infrastructure repository..."
-          rm -rf "\$INFRA_DIR"
-          git clone "\$INFRA_REPO_URL" "\$INFRA_DIR"
-          cp "\$INFRA_DOCKER_DIR/.env.example" "\$INFRA_DOCKER_DIR/.env"
+          rm -rf "$INFRA_DIR"
+          git clone "$INFRA_REPO_URL" "$INFRA_DIR"
+          cp "$INFRA_DOCKER_DIR/.env.example" "$INFRA_DOCKER_DIR/.env"
         else
           echo "→ Updating ~/argus-infra to origin/main..."
-          cd "\$INFRA_DIR"
-          git remote set-url origin "\$INFRA_REPO_URL"
-          dirty_files="\$(git diff --name-only)"
-          cached_dirty_files="\$(git diff --cached --name-only)"
-          dirty_files="\$(printf '%s\n%s\n' "\$dirty_files" "\$cached_dirty_files" | sed '/^$/d' | sort -u)"
-          unexpected_dirty="\$(printf '%s\n' "\$dirty_files" | grep -vx 'docker/config.yaml' || true)"
-          if [ -n "\$unexpected_dirty" ]; then
+          cd "$INFRA_DIR"
+          git remote set-url origin "$INFRA_REPO_URL"
+          dirty_files="$(git diff --name-only)"
+          cached_dirty_files="$(git diff --cached --name-only)"
+          dirty_files="$(printf '%s\n%s\n' "$dirty_files" "$cached_dirty_files" | sed '/^$/d' | sort -u)"
+          unexpected_dirty="$(printf '%s\n' "$dirty_files" | grep -vx 'docker/config.yaml' || true)"
+          if [ -n "$unexpected_dirty" ]; then
             echo 'DEPLOY FAILED: ~/argus-infra has local tracked changes; refusing to overwrite production infra files.'
             git status --short
             exit 1
           fi
-          if printf '%s\n' "\$dirty_files" | grep -qx 'docker/config.yaml'; then
+          if printf '%s\n' "$dirty_files" | grep -qx 'docker/config.yaml'; then
             echo '→ Resetting generated docker/config.yaml before pulling infra updates...'
             git checkout -- docker/config.yaml
           fi
@@ -194,14 +199,14 @@ deploy-production:
           git pull --ff-only origin main
         fi
 
-        cd "\$INFRA_DOCKER_DIR"
+        cd "$INFRA_DOCKER_DIR"
 
         # docker compose creates a directory when a bind-mounted source file is
         # missing. Ensure config.yaml is always a real file before restarting.
         if [ -d config.yaml ]; then
           rm -rf config.yaml
         fi
-        cp ${BUILD_DIR}/deployments/config.yaml config.yaml
+        cp "$BUILD_DIR/deployments/config.yaml" config.yaml
         chmod 644 config.yaml
 
         if [ ! -f .env ]; then
@@ -213,24 +218,25 @@ deploy-production:
           exit 1
         fi
         docker compose config --quiet
-        docker compose config --services | grep -qx ${SERVICE}
+        docker compose config --services | grep -qx "$SERVICE"
 
-        docker compose up -d --no-deps --no-build ${SERVICE} 2>&1
+        docker compose up -d --no-deps --no-build "$SERVICE" 2>&1
 
         echo '→ Waiting for container to become healthy...'
-        for i in \$(seq 1 20); do
+        for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
           sleep 6
-          health=\$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' argus-${SERVICE} 2>/dev/null)
-          if [ \"\$health\" = 'healthy' ]; then
-            echo \"✓ Container healthy after \$((i * 6))s\"
+          health="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "argus-${SERVICE}" 2>/dev/null)"
+          if [ "$health" = 'healthy' ]; then
+            elapsed="$(expr "$i" '*' 6)"
+            echo "Container healthy after ${elapsed}s"
             exit 0
           fi
-          echo \"  Attempt \$i/20: health=\$health\"
+          echo "  Attempt $i/20: health=$health"
         done
         echo 'DEPLOY FAILED: container did not become healthy'
-        docker logs --tail=20 argus-${SERVICE} 2>&1
+        docker logs --tail=20 "argus-${SERVICE}" 2>&1
         exit 1
-      "
+REMOTE_SCRIPT
 
       echo "═══════════════════════════════════════════════════════════"
       echo "  ✓ DEPLOY SUCCESS: backend (${CI_COMMIT_SHORT_SHA})"
