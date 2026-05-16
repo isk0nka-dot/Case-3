@@ -236,7 +236,7 @@ deploy-production:
         echo 'DEPLOY FAILED: container did not become healthy'
         docker logs --tail=20 "argus-${SERVICE}" 2>&1
         exit 1
-REMOTE_SCRIPT
+      REMOTE_SCRIPT
 
       echo "═══════════════════════════════════════════════════════════"
       echo "  ✓ DEPLOY SUCCESS: backend (${CI_COMMIT_SHORT_SHA})"
