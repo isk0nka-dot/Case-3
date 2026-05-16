@@ -133,6 +133,7 @@ deploy-production:
     - apk add --no-cache openssh-client rsync
     - eval $(ssh-agent -s)
     - chmod 600 "${DEPLOY_SSH_KEY}"
+    - ssh-keygen -lf "${DEPLOY_SSH_KEY}"
     - ssh-add "${DEPLOY_SSH_KEY}"
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - ssh-keyscan -H ${ARGUS_DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null
