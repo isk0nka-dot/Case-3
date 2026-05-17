@@ -5,7 +5,7 @@
 //
 //   - StubEngine    — returns synthetic detections for development and testing
 //   - ONNXEngine    — ONNX Runtime Go bindings for GPU-accelerated inference (future)
-//   - PythonBridge  — calls a Python gRPC sidecar for PyTorch models (future)
+//   - PythonBridge  — calls the Python ONNX HTTP sidecar
 package inference
 
 import "context"
@@ -49,7 +49,7 @@ type FaceResult struct {
 
 // ObjectResult represents a single detected object.
 type ObjectResult struct {
-	ObjectType string  // "phone" | "book" | "earbuds" | "screen_reflection" | "person"
+	ObjectType string // "phone" | "book" | "earbuds" | "screen_reflection" | "person"
 	Confidence float32
 	BBox       BoundingBox
 }

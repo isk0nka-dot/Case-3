@@ -28,21 +28,21 @@ import (
 // It aggregates all sub-system configs into a single, strongly-typed tree that
 // is loaded once at startup and treated as immutable for the process lifetime.
 type Config struct {
-	Server     ServerConfig     `yaml:"server"`
-	Kafka      KafkaConfig      `yaml:"kafka"`
-	ClickHouse ClickHouseConfig `yaml:"clickhouse"`
-	Postgres   PostgresConfig   `yaml:"postgres"`
-	MinIO      MinIOConfig      `yaml:"minio"`
-	Logger     LoggerConfig     `yaml:"logger"`
-	RateLimit  RateLimitConfig  `yaml:"rate_limit"`
-	WorkerPool WorkerPoolConfig `yaml:"worker_pool"`
-	Auth       AuthConfig       `yaml:"auth"`
-	Session    SessionConfig    `yaml:"session"`
-	CORS       CORSConfig       `yaml:"cors"`
-	Chunk      ChunkConfig      `yaml:"chunk"`
-	Export     ExportConfig     `yaml:"export"`
-	Telegram   TelegramConfig   `yaml:"telegram"`
-	DLQ        DLQConfig        `yaml:"dlq"`
+	Server      ServerConfig      `yaml:"server"`
+	Kafka       KafkaConfig       `yaml:"kafka"`
+	ClickHouse  ClickHouseConfig  `yaml:"clickhouse"`
+	Postgres    PostgresConfig    `yaml:"postgres"`
+	MinIO       MinIOConfig       `yaml:"minio"`
+	Logger      LoggerConfig      `yaml:"logger"`
+	RateLimit   RateLimitConfig   `yaml:"rate_limit"`
+	WorkerPool  WorkerPoolConfig  `yaml:"worker_pool"`
+	Auth        AuthConfig        `yaml:"auth"`
+	Session     SessionConfig     `yaml:"session"`
+	CORS        CORSConfig        `yaml:"cors"`
+	Chunk       ChunkConfig       `yaml:"chunk"`
+	Export      ExportConfig      `yaml:"export"`
+	Telegram    TelegramConfig    `yaml:"telegram"`
+	DLQ         DLQConfig         `yaml:"dlq"`
 	Redis       RedisConfig       `yaml:"redis"`
 	Inference   InferenceConfig   `yaml:"inference"`
 	CryptoErase CryptoEraseConfig `yaml:"crypto_erasure"`
@@ -198,8 +198,18 @@ type InferenceConfig struct {
 	// Options: "stub" (synthetic results), "onnx" (ONNX Runtime), "python_bridge" (Python sidecar).
 	EngineType string `yaml:"engine_type"`
 
+	// AllowStub must be explicitly enabled for local development. Production
+	// inference fails fast when engine_type=stub and allow_stub=false.
+	AllowStub bool `yaml:"allow_stub"`
+
 	// ModelDir is the filesystem path to ONNX model files. Default: "".
 	ModelDir string `yaml:"model_dir"`
+
+	// PythonBridgeURL is the HTTP endpoint for the Python ONNX sidecar.
+	PythonBridgeURL string `yaml:"python_bridge_url"`
+
+	// BridgeTimeoutSec limits startup health checks and per-frame sidecar calls.
+	BridgeTimeoutSec int `yaml:"bridge_timeout_sec"`
 
 	// MaxFrameBytes is the maximum allowed size for a single frame. Default: 10 MiB.
 	MaxFrameBytes int `yaml:"max_frame_bytes"`
@@ -209,6 +219,16 @@ type InferenceConfig struct {
 
 	// FrameSampleRate controls frame sampling for deep scan: analyze every Nth frame. Default: 2.
 	FrameSampleRate int `yaml:"frame_sample_rate"`
+
+	// FrameSampleIntervalSec limits expensive video frame extraction. Default: 5.
+	FrameSampleIntervalSec int `yaml:"frame_sample_interval_sec"`
+
+	// Configurable anomaly thresholds. Defaults are conservative and can be
+	// tuned without code changes as false-positive rates change.
+	FaceMismatchThreshold     float32 `yaml:"face_mismatch_threshold"`
+	LivenessThreshold         float32 `yaml:"liveness_threshold"`
+	ObjectConfidenceThreshold float32 `yaml:"object_confidence_threshold"`
+	SpoofConfidenceThreshold  float32 `yaml:"spoof_confidence_threshold"`
 
 	// Concurrency is the number of parallel inference workers. Default: 4.
 	Concurrency int `yaml:"concurrency"`
@@ -962,6 +982,12 @@ func applyDefaults(cfg *Config) {
 	if cfg.Inference.EngineType == "" {
 		cfg.Inference.EngineType = "stub"
 	}
+	if cfg.Inference.PythonBridgeURL == "" {
+		cfg.Inference.PythonBridgeURL = "http://localhost:8091"
+	}
+	if cfg.Inference.BridgeTimeoutSec == 0 {
+		cfg.Inference.BridgeTimeoutSec = 5
+	}
 	if cfg.Inference.MaxFrameBytes == 0 {
 		cfg.Inference.MaxFrameBytes = 10 * 1024 * 1024 // 10 MiB
 	}
@@ -970,6 +996,21 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Inference.FrameSampleRate == 0 {
 		cfg.Inference.FrameSampleRate = 2
+	}
+	if cfg.Inference.FrameSampleIntervalSec == 0 {
+		cfg.Inference.FrameSampleIntervalSec = 5
+	}
+	if cfg.Inference.FaceMismatchThreshold == 0 {
+		cfg.Inference.FaceMismatchThreshold = 0.6
+	}
+	if cfg.Inference.LivenessThreshold == 0 {
+		cfg.Inference.LivenessThreshold = 0.3
+	}
+	if cfg.Inference.ObjectConfidenceThreshold == 0 {
+		cfg.Inference.ObjectConfidenceThreshold = 0.7
+	}
+	if cfg.Inference.SpoofConfidenceThreshold == 0 {
+		cfg.Inference.SpoofConfidenceThreshold = 0.7
 	}
 	if cfg.Inference.Concurrency == 0 {
 		cfg.Inference.Concurrency = 4
@@ -1199,8 +1240,44 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_ENGINE_TYPE"); v != "" {
 		cfg.Inference.EngineType = v
 	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_ALLOW_STUB"); v != "" {
+		cfg.Inference.AllowStub = v == "true" || v == "1"
+	}
 	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_MODEL_DIR"); v != "" {
 		cfg.Inference.ModelDir = v
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL"); v != "" {
+		cfg.Inference.PythonBridgeURL = v
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_BRIDGE_TIMEOUT_SEC"); v != "" {
+		if seconds, err := strconv.Atoi(v); err == nil {
+			cfg.Inference.BridgeTimeoutSec = seconds
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC"); v != "" {
+		if seconds, err := strconv.Atoi(v); err == nil {
+			cfg.Inference.FrameSampleIntervalSec = seconds
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_FACE_MISMATCH_THRESHOLD"); v != "" {
+		if threshold, err := strconv.ParseFloat(v, 32); err == nil {
+			cfg.Inference.FaceMismatchThreshold = float32(threshold)
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_LIVENESS_THRESHOLD"); v != "" {
+		if threshold, err := strconv.ParseFloat(v, 32); err == nil {
+			cfg.Inference.LivenessThreshold = float32(threshold)
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_OBJECT_CONFIDENCE_THRESHOLD"); v != "" {
+		if threshold, err := strconv.ParseFloat(v, 32); err == nil {
+			cfg.Inference.ObjectConfidenceThreshold = float32(threshold)
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_SPOOF_CONFIDENCE_THRESHOLD"); v != "" {
+		if threshold, err := strconv.ParseFloat(v, 32); err == nil {
+			cfg.Inference.SpoofConfidenceThreshold = float32(threshold)
+		}
 	}
 	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_CONCURRENCY"); v != "" {
 		if c, err := strconv.Atoi(v); err == nil {
@@ -1333,6 +1410,41 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("worker_pool.queue_size must be at least 1, got %d", cfg.WorkerPool.QueueSize)
 	}
 
+	// --- Inference ---
+	if cfg.Inference.GRPCPort < 1 || cfg.Inference.GRPCPort > 65535 {
+		return fmt.Errorf("inference.grpc_port must be between 1 and 65535, got %d", cfg.Inference.GRPCPort)
+	}
+	if cfg.Inference.EngineType == "python_bridge" && strings.TrimSpace(cfg.Inference.PythonBridgeURL) == "" {
+		return fmt.Errorf("inference.python_bridge_url is required when engine_type=python_bridge")
+	}
+	if cfg.Inference.BridgeTimeoutSec < 1 {
+		return fmt.Errorf("inference.bridge_timeout_sec must be at least 1, got %d", cfg.Inference.BridgeTimeoutSec)
+	}
+	if cfg.Inference.MaxFrameBytes < 1 {
+		return fmt.Errorf("inference.max_frame_bytes must be positive, got %d", cfg.Inference.MaxFrameBytes)
+	}
+	if cfg.Inference.FrameSampleRate < 1 {
+		return fmt.Errorf("inference.frame_sample_rate must be at least 1, got %d", cfg.Inference.FrameSampleRate)
+	}
+	if cfg.Inference.FrameSampleIntervalSec < 1 {
+		return fmt.Errorf("inference.frame_sample_interval_sec must be at least 1, got %d", cfg.Inference.FrameSampleIntervalSec)
+	}
+	if cfg.Inference.Concurrency < 1 {
+		return fmt.Errorf("inference.concurrency must be at least 1, got %d", cfg.Inference.Concurrency)
+	}
+	if err := validateUnitThreshold("inference.face_mismatch_threshold", cfg.Inference.FaceMismatchThreshold); err != nil {
+		return err
+	}
+	if err := validateUnitThreshold("inference.liveness_threshold", cfg.Inference.LivenessThreshold); err != nil {
+		return err
+	}
+	if err := validateUnitThreshold("inference.object_confidence_threshold", cfg.Inference.ObjectConfidenceThreshold); err != nil {
+		return err
+	}
+	if err := validateUnitThreshold("inference.spoof_confidence_threshold", cfg.Inference.SpoofConfidenceThreshold); err != nil {
+		return err
+	}
+
 	// --- Auth ---
 	if cfg.Auth.Enabled {
 		alg := cfg.Auth.Algorithm
@@ -1383,4 +1495,11 @@ func splitAndTrim(s string) []string {
 		}
 	}
 	return result
+}
+
+func validateUnitThreshold(name string, value float32) error {
+	if value <= 0 || value > 1 {
+		return fmt.Errorf("%s must be > 0 and <= 1, got %f", name, value)
+	}
+	return nil
 }

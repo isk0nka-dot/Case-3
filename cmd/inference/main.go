@@ -89,14 +89,9 @@ func run() error {
 	// =================================================================
 	// STEP 4: Initialise AI inference engine.
 	// =================================================================
-	var engine inference.Engine
-	switch cfg.Inference.EngineType {
-	case "stub":
-		engine = inference.NewStubEngine()
-	// Future: case "onnx": engine = inference.NewONNXEngine(cfg.Inference.ModelDir)
-	// Future: case "python_bridge": engine = inference.NewPythonBridge(...)
-	default:
-		return fmt.Errorf("unknown inference engine type: %q (supported: stub)", cfg.Inference.EngineType)
+	engine, err := newInferenceEngine(cfg.Inference)
+	if err != nil {
+		return err
 	}
 	defer engine.Close()
 
@@ -135,11 +130,15 @@ func run() error {
 	// =================================================================
 	// STEP 7: Register InferenceService.
 	// =================================================================
-	inferenceServer := grpcTransport.NewInferenceServer(engine, logger, cfg.Inference.MaxFrameBytes)
+	inferenceServer := grpcTransport.NewInferenceServerWithOptions(engine, logger, grpcTransport.InferenceServerOptions{
+		MaxFrameBytes:       cfg.Inference.MaxFrameBytes,
+		MaxConcurrentFrames: cfg.Inference.Concurrency,
+	})
 	inferencepb.RegisterInferenceServiceServer(grpcServer, inferenceServer)
 
 	logger.Info("inference service registered",
 		zap.Int("max_frame_bytes", cfg.Inference.MaxFrameBytes),
+		zap.Int("max_concurrent_frames", cfg.Inference.Concurrency),
 	)
 
 	// =================================================================
@@ -221,6 +220,25 @@ func run() error {
 
 	logger.Info("argus-inference stopped gracefully")
 	return serveErr
+}
+
+func newInferenceEngine(cfg config.InferenceConfig) (inference.Engine, error) {
+	switch cfg.EngineType {
+	case "stub":
+		if !cfg.AllowStub {
+			return nil, fmt.Errorf("stub inference engine is disabled; set inference.allow_stub=true or EVENT_COLLECTOR_INFERENCE_ALLOW_STUB=true only for local development")
+		}
+		return inference.NewStubEngine(), nil
+	case "python_bridge":
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.BridgeTimeoutSec)*time.Second)
+		defer cancel()
+		return inference.NewPythonBridgeEngine(ctx, inference.PythonBridgeConfig{
+			BaseURL: cfg.PythonBridgeURL,
+			Timeout: time.Duration(cfg.BridgeTimeoutSec) * time.Second,
+		})
+	default:
+		return nil, fmt.Errorf("unknown inference engine type: %q (supported: stub, python_bridge)", cfg.EngineType)
+	}
 }
 
 // ---------------------------------------------------------------------------

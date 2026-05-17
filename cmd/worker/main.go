@@ -210,6 +210,12 @@ func run() error {
 		chWriter.Conn(), chWriter, pgRepo,
 		minioClient, cfg.MinIO.Bucket,
 		logger, telegramAlerter,
+		worker.AIAnalysisThresholds{
+			FaceMismatch:     cfg.Inference.FaceMismatchThreshold,
+			Liveness:         cfg.Inference.LivenessThreshold,
+			ObjectConfidence: cfg.Inference.ObjectConfidenceThreshold,
+			SpoofConfidence:  cfg.Inference.SpoofConfidenceThreshold,
+		},
 	)
 
 	// =================================================================

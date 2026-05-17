@@ -37,6 +37,14 @@ type AIAnalysisHandler struct {
 	minioBucket   string
 	alerter       alerting.Provider
 	logger        *zap.Logger
+	thresholds    AIAnalysisThresholds
+}
+
+type AIAnalysisThresholds struct {
+	FaceMismatch     float32
+	Liveness         float32
+	ObjectConfidence float32
+	SpoofConfidence  float32
 }
 
 // NewAIAnalysisHandler creates a new asynq handler for AI deep scan jobs.
@@ -49,6 +57,7 @@ func NewAIAnalysisHandler(
 	minioBucket string,
 	logger *zap.Logger,
 	alerter alerting.Provider,
+	thresholds ...AIAnalysisThresholds,
 ) *AIAnalysisHandler {
 	return &AIAnalysisHandler{
 		inferenceAddr: inferenceAddr,
@@ -60,6 +69,7 @@ func NewAIAnalysisHandler(
 		minioBucket:   minioBucket,
 		alerter:       alerter,
 		logger:        logger.Named("asynq_ai_analysis"),
+		thresholds:    normalizeAIAnalysisThresholds(firstAIAnalysisThresholds(thresholds)),
 	}
 }
 
@@ -293,75 +303,12 @@ func (h *AIAnalysisHandler) writeBackAnomalies(
 	now := time.Now().UTC()
 
 	for _, frame := range frames {
-		// Check for face mismatches.
-		for _, face := range frame.Faces {
-			if face.Similarity > 0 && face.Similarity < 0.6 {
-				evt := h.buildEvent(payload, now, frame.TimestampSec,
-					valueobject.BackendAIFaceMismatch, valueobject.SeverityCritical,
-					fmt.Sprintf("Backend AI: face mismatch (similarity=%.2f)", face.Similarity),
-					face.Confidence,
-				)
-				if err := h.chWriter.Write(ctx, evt); err != nil {
-					h.logger.Warn("failed to write face mismatch event", zap.Error(err))
-					continue
-				}
-				count++
-			}
-
-			// Check for spoof.
-			if face.IsSpoof {
-				label := fmt.Sprintf("Backend AI: spoof detected (type=%s)", face.SpoofType)
-				var evtType valueobject.EventType
-				if face.SpoofType == "deepfake" {
-					evtType = valueobject.BackendAIDeepfakeDetected
-				} else {
-					evtType = valueobject.BackendAIFaceMismatch
-				}
-				evt := h.buildEvent(payload, now, frame.TimestampSec,
-					evtType, valueobject.SeverityCritical,
-					label, face.Confidence,
-				)
-				if err := h.chWriter.Write(ctx, evt); err != nil {
-					h.logger.Warn("failed to write spoof event", zap.Error(err))
-					continue
-				}
-				count++
-			}
-		}
-
-		// Check for objects.
-		for _, obj := range frame.Objects {
-			var evtType valueobject.EventType
-			switch obj.ObjectType {
-			case "phone", "book", "earbuds":
-				evtType = valueobject.BackendAIHiddenObject
-			case "screen_reflection", "person":
-				evtType = valueobject.BackendAIScreenReflection
-			default:
-				evtType = valueobject.BackendAIHiddenObject
-			}
-
+		for _, anomaly := range classifyFrameAnomalies(frame, h.thresholds) {
 			evt := h.buildEvent(payload, now, frame.TimestampSec,
-				evtType, valueobject.SeverityWarning,
-				fmt.Sprintf("Backend AI: %s detected (conf=%.2f)", obj.ObjectType, obj.Confidence),
-				obj.Confidence,
+				anomaly.eventType, anomaly.severity, anomaly.label, anomaly.confidence,
 			)
 			if err := h.chWriter.Write(ctx, evt); err != nil {
-				h.logger.Warn("failed to write object event", zap.Error(err))
-				continue
-			}
-			count++
-		}
-
-		// Check liveness.
-		if frame.Liveness != nil && !frame.Liveness.IsLive && frame.Liveness.Score < 0.3 {
-			evt := h.buildEvent(payload, now, frame.TimestampSec,
-				valueobject.BackendAIFaceMismatch, valueobject.SeverityCritical,
-				fmt.Sprintf("Backend AI: liveness failed (score=%.2f, method=%s)", frame.Liveness.Score, frame.Liveness.Method),
-				1.0-frame.Liveness.Score,
-			)
-			if err := h.chWriter.Write(ctx, evt); err != nil {
-				h.logger.Warn("failed to write liveness event", zap.Error(err))
+				h.logger.Warn("failed to write AI anomaly event", zap.Error(err))
 				continue
 			}
 			count++
@@ -369,6 +316,104 @@ func (h *AIAnalysisHandler) writeBackAnomalies(
 	}
 
 	return count, nil
+}
+
+type detectedAIAnomaly struct {
+	eventType  valueobject.EventType
+	severity   valueobject.Severity
+	label      string
+	confidence float32
+}
+
+func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnalysisThresholds) []detectedAIAnomaly {
+	if frame == nil {
+		return nil
+	}
+
+	thresholds = normalizeAIAnalysisThresholds(thresholds)
+	anomalies := make([]detectedAIAnomaly, 0, len(frame.Faces)+len(frame.Objects)+1)
+
+	for _, face := range frame.Faces {
+		if face.Similarity > 0 && face.Similarity < thresholds.FaceMismatch {
+			anomalies = append(anomalies, detectedAIAnomaly{
+				eventType:  valueobject.BackendAIFaceMismatch,
+				severity:   valueobject.SeverityCritical,
+				label:      fmt.Sprintf("Backend AI: face mismatch (similarity=%.2f)", face.Similarity),
+				confidence: face.Confidence,
+			})
+		}
+
+		if face.IsSpoof && face.Confidence >= thresholds.SpoofConfidence {
+			label := fmt.Sprintf("Backend AI: spoof detected (type=%s)", face.SpoofType)
+			evtType := valueobject.BackendAIFaceMismatch
+			if face.SpoofType == "deepfake" {
+				evtType = valueobject.BackendAIDeepfakeDetected
+			}
+			anomalies = append(anomalies, detectedAIAnomaly{
+				eventType:  evtType,
+				severity:   valueobject.SeverityCritical,
+				label:      label,
+				confidence: face.Confidence,
+			})
+		}
+	}
+
+	for _, obj := range frame.Objects {
+		if obj.Confidence < thresholds.ObjectConfidence {
+			continue
+		}
+
+		var evtType valueobject.EventType
+		switch obj.ObjectType {
+		case "phone", "book", "earbuds":
+			evtType = valueobject.BackendAIHiddenObject
+		case "screen_reflection", "person":
+			evtType = valueobject.BackendAIScreenReflection
+		default:
+			evtType = valueobject.BackendAIHiddenObject
+		}
+
+		anomalies = append(anomalies, detectedAIAnomaly{
+			eventType:  evtType,
+			severity:   valueobject.SeverityWarning,
+			label:      fmt.Sprintf("Backend AI: %s detected (conf=%.2f)", obj.ObjectType, obj.Confidence),
+			confidence: obj.Confidence,
+		})
+	}
+
+	if frame.Liveness != nil && !frame.Liveness.IsLive && frame.Liveness.Score < thresholds.Liveness {
+		anomalies = append(anomalies, detectedAIAnomaly{
+			eventType:  valueobject.BackendAIFaceMismatch,
+			severity:   valueobject.SeverityCritical,
+			label:      fmt.Sprintf("Backend AI: liveness failed (score=%.2f, method=%s)", frame.Liveness.Score, frame.Liveness.Method),
+			confidence: 1.0 - frame.Liveness.Score,
+		})
+	}
+
+	return anomalies
+}
+
+func firstAIAnalysisThresholds(thresholds []AIAnalysisThresholds) AIAnalysisThresholds {
+	if len(thresholds) == 0 {
+		return AIAnalysisThresholds{}
+	}
+	return thresholds[0]
+}
+
+func normalizeAIAnalysisThresholds(thresholds AIAnalysisThresholds) AIAnalysisThresholds {
+	if thresholds.FaceMismatch <= 0 || thresholds.FaceMismatch > 1 {
+		thresholds.FaceMismatch = 0.6
+	}
+	if thresholds.Liveness <= 0 || thresholds.Liveness > 1 {
+		thresholds.Liveness = 0.3
+	}
+	if thresholds.ObjectConfidence <= 0 || thresholds.ObjectConfidence > 1 {
+		thresholds.ObjectConfidence = 0.7
+	}
+	if thresholds.SpoofConfidence <= 0 || thresholds.SpoofConfidence > 1 {
+		thresholds.SpoofConfidence = 0.7
+	}
+	return thresholds
 }
 
 func (h *AIAnalysisHandler) buildEvent(
@@ -381,19 +426,19 @@ func (h *AIAnalysisHandler) buildEvent(
 	confidence float32,
 ) *entity.ProctoringEvent {
 	return &entity.ProctoringEvent{
-		EventID:        randutil.HexToken(16),
-		SessionID:      payload.SessionID,
-		StudentID:      payload.StudentID,
-		ExamID:         payload.ExamID,
-		OrgID:          payload.OrgID,
-		EventType:      eventType,
-		Severity:       severity,
-		Source:         valueobject.SourceBackendAI,
+		EventID:         randutil.HexToken(16),
+		SessionID:       payload.SessionID,
+		StudentID:       payload.StudentID,
+		ExamID:          payload.ExamID,
+		OrgID:           payload.OrgID,
+		EventType:       eventType,
+		Severity:        severity,
+		Source:          valueobject.SourceBackendAI,
 		ServerTimestamp: serverTime,
 		ClientTimestamp: serverTime,
 		VideoTimestamp:  videoTimestamp,
-		Label:          label,
-		Confidence:     confidence,
+		Label:           label,
+		Confidence:      confidence,
 	}
 }
 

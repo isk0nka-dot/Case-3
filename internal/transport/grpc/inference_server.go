@@ -3,7 +3,6 @@ package grpc
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"time"
 
@@ -22,14 +21,32 @@ type InferenceServer struct {
 	engine        inference.Engine
 	logger        *zap.Logger
 	maxFrameBytes int
+	frameSlots    chan struct{}
+}
+
+type InferenceServerOptions struct {
+	MaxFrameBytes       int
+	MaxConcurrentFrames int
 }
 
 // NewInferenceServer creates a new inference gRPC server.
 func NewInferenceServer(engine inference.Engine, logger *zap.Logger, maxFrameBytes int) *InferenceServer {
+	return NewInferenceServerWithOptions(engine, logger, InferenceServerOptions{
+		MaxFrameBytes: maxFrameBytes,
+	})
+}
+
+func NewInferenceServerWithOptions(engine inference.Engine, logger *zap.Logger, options InferenceServerOptions) *InferenceServer {
+	var frameSlots chan struct{}
+	if options.MaxConcurrentFrames > 0 {
+		frameSlots = make(chan struct{}, options.MaxConcurrentFrames)
+	}
+
 	return &InferenceServer{
 		engine:        engine,
 		logger:        logger.Named("inference_grpc"),
-		maxFrameBytes: maxFrameBytes,
+		maxFrameBytes: options.MaxFrameBytes,
+		frameSlots:    frameSlots,
 	}
 }
 
@@ -44,6 +61,15 @@ func (s *InferenceServer) AnalyzeFrame(ctx context.Context, req *inferencepb.Ana
 	if req.SessionId == "" {
 		return nil, status.Error(codes.InvalidArgument, "session_id is required")
 	}
+
+	release, ok := s.tryAcquireFrameSlot()
+	if !ok {
+		s.logger.Warn("inference: frame dropped because worker pool is full",
+			zap.String("session_id", req.SessionId),
+		)
+		return nil, status.Error(codes.ResourceExhausted, "inference worker pool is full; frame dropped")
+	}
+	defer release()
 
 	result, err := s.engine.AnalyzeFrame(ctx, req.FrameData, req.ContentType)
 	if err != nil {
@@ -146,7 +172,16 @@ func (s *InferenceServer) analyzeVideoBuffer(ctx context.Context, data []byte) (
 		}
 		frameData := data[offset:end]
 
+		release, ok := s.tryAcquireFrameSlot()
+		if !ok {
+			s.logger.Warn("inference: video frame dropped because worker pool is full",
+				zap.Int("frame_idx", frameIdx),
+			)
+			frameIdx++
+			continue
+		}
 		result, err := s.engine.AnalyzeFrame(ctx, frameData, "image/jpeg")
+		release()
 		if err != nil {
 			s.logger.Warn("inference: frame analysis error, skipping",
 				zap.Int("frame_idx", frameIdx),
@@ -187,6 +222,19 @@ func (s *InferenceServer) analyzeVideoBuffer(ctx context.Context, data []byte) (
 	}
 
 	return frames, summary
+}
+
+func (s *InferenceServer) tryAcquireFrameSlot() (func(), bool) {
+	if s.frameSlots == nil {
+		return func() {}, true
+	}
+
+	select {
+	case s.frameSlots <- struct{}{}:
+		return func() { <-s.frameSlots }, true
+	default:
+		return nil, false
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -308,15 +356,12 @@ func mapAnalysisSummary(s *analysisSummary) *inferencepb.AnalysisSummary {
 		return &inferencepb.AnalysisSummary{Verdict: "clean"}
 	}
 	return &inferencepb.AnalysisSummary{
-		TotalFramesAnalyzed:  int32(s.TotalFrames),
-		FraudFrames:          int32(s.FraudFrames),
-		FaceMismatchFrames:   int32(s.MismatchFrames),
-		SpoofFrames:          int32(s.SpoofFrames),
+		TotalFramesAnalyzed:   int32(s.TotalFrames),
+		FraudFrames:           int32(s.FraudFrames),
+		FaceMismatchFrames:    int32(s.MismatchFrames),
+		SpoofFrames:           int32(s.SpoofFrames),
 		ObjectDetectionFrames: int32(s.ObjectFrames),
-		MaxFraudConfidence:   s.MaxFraudConf,
-		Verdict:              s.Verdict,
+		MaxFraudConfidence:    s.MaxFraudConf,
+		Verdict:               s.Verdict,
 	}
 }
-
-// Ensure unused imports don't cause compilation errors.
-var _ = fmt.Sprintf
