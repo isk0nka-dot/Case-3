@@ -88,38 +88,34 @@ sync-infra:
         docker/docker-compose.yaml \
         docker/docker-compose.prod.yml \
         docker/redis.conf \
-        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/docker/
+        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/argus-infra/docker/
 
       # Sync clickhouse config XMLs
       rsync -avzO \
         docker/clickhouse/ \
-        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/docker/clickhouse/
+        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/argus-infra/docker/clickhouse/
 
       # ── Nginx config ──
       echo "→ Syncing nginx/"
       rsync -avzO \
         nginx/ \
-        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/nginx/
+        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/argus-infra/nginx/
 
       # ── Migrations ──
       echo "→ Syncing migrations/"
       rsync -avzO \
         migrations/ \
-        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/migrations/
+        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/argus-infra/migrations/
 
       # ── Scripts ──
       echo "→ Syncing scripts/"
       rsync -avzO \
         scripts/ \
-        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/scripts/
+        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/argus-infra/scripts/
 
-      # Ensure deploy script is executable and fix repo ownership
+      # Ensure deploy script is executable
       ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "
-        chmod +x ${DEPLOY_PATH}/scripts/*.sh
-        # Fix git repo ownership so deploy user can fetch/reset
-        sudo chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${DEPLOY_PATH}/backend/ 2>/dev/null || true
-        sudo chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${DEPLOY_PATH}/frontend/ 2>/dev/null || true
-        sudo chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${DEPLOY_PATH}/logs/ 2>/dev/null || true
+        chmod +x ${DEPLOY_PATH}/argus-infra/scripts/*.sh 2>/dev/null || true
       "
 
       echo "═══════════════════════════════════════════════════════════"
@@ -152,13 +148,13 @@ run-migrations:
       ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
         set -e
 
-        MIGRATIONS="/opt/argus-ai/migrations"
+        MIGRATIONS="/opt/argus-ai/argus-infra/migrations"
 
         echo "=== PostgreSQL Migrations ==="
-        if ls "$MIGRATIONS"/postgres/*.sql 1>/dev/null 2>&1; then
-          for f in "$MIGRATIONS"/postgres/*.sql; do
+        if ls "$MIGRATIONS"/postgres/*.up.sql 1>/dev/null 2>&1; then
+          for f in "$MIGRATIONS"/postgres/*.up.sql; do
             echo "  → $(basename "$f")"
-            docker exec -i argus-postgres psql -U argus -d argus < "$f" 2>&1 || \
+            docker exec -i argus-db psql -U admin -d argus_db < "$f" 2>&1 || \
               echo "    ⚠ Warning (expected for idempotent re-runs)"
           done
         else
@@ -167,10 +163,10 @@ run-migrations:
 
         echo ""
         echo "=== ClickHouse Migrations ==="
-        if ls "$MIGRATIONS"/clickhouse/*.sql 1>/dev/null 2>&1; then
-          for f in "$MIGRATIONS"/clickhouse/*.sql; do
+        if ls "$MIGRATIONS"/clickhouse/*.up.sql 1>/dev/null 2>&1; then
+          for f in "$MIGRATIONS"/clickhouse/*.up.sql; do
             echo "  → $(basename "$f")"
-            docker exec -i argus-clickhouse-1 clickhouse-client --multiquery < "$f" 2>&1 || \
+            docker exec -i argus-clickhouse clickhouse-client --multiquery < "$f" 2>&1 || \
               echo "    ⚠ Warning (expected for idempotent re-runs)"
           done
         else

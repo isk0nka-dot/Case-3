@@ -94,6 +94,16 @@ CREATE TABLE IF NOT EXISTS organizations (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at      TIMESTAMPTZ,
 
+    -- Feature flags per org (empty = all enabled).
+    allowed_features JSONB NOT NULL DEFAULT '{}',
+
+    -- Session usage tracking (0 = unlimited).
+    session_limit   INTEGER NOT NULL DEFAULT 0,
+    sessions_used   INTEGER NOT NULL DEFAULT 0,
+
+    -- Trial expiry (NULL = not on trial).
+    trial_ends_at   TIMESTAMPTZ,
+
     -- Who created/modified this record (user ID or 'system').
     created_by      VARCHAR(64) NOT NULL DEFAULT 'system',
     updated_by      VARCHAR(64) NOT NULL DEFAULT 'system'

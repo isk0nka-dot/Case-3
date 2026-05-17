@@ -65,6 +65,9 @@ CREATE TABLE IF NOT EXISTS argus_analytics.proctoring_events
     ip_address          String          DEFAULT '',
     region              LowCardinality(String) DEFAULT '',
 
+    -- Causal ordering (migration 005)
+    causal_sequence     UInt64          DEFAULT 0,
+
     -- AI Vision (migration 003)
     head_yaw            Float32         DEFAULT 0,
     head_pitch          Float32         DEFAULT 0,

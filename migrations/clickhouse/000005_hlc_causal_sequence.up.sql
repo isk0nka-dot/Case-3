@@ -9,6 +9,6 @@
 -- The existing server_timestamp remains for human-readable queries.
 -- =============================================================================
 
-ALTER TABLE proctoring_events
+ALTER TABLE argus_analytics.proctoring_events
     ADD COLUMN IF NOT EXISTS causal_sequence UInt64 DEFAULT 0
     COMMENT 'Hybrid Logical Clock value for causal ordering (physical_ms << 16 | logical)';
