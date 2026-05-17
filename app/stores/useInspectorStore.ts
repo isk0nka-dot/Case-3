@@ -117,6 +117,7 @@ export const useInspectorStore = defineStore('inspector', () => {
       case '3x3': return 3
       case '4x4': return 4
       case '5x5': return 5
+      default: return 3
     }
   }
 

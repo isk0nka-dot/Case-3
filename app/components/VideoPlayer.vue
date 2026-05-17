@@ -153,6 +153,7 @@ const stateLabel = computed(() => {
     case 'reconnecting': return 'Переподключение...'
     case 'disconnected': return 'Отключён'
     case 'error': return 'Ошибка'
+    default: return ''
   }
 })
 

@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import { useAuthStore } from '~/stores/useAuthStore'
-
-const authStore = useAuthStore()
 const { isDark, accentBg, errorBg, successBg, warningBg } = useColors()
-const { formatDateTime, formatTimeAgo, formatFileSize } = useFormatters()
+const { formatDateTime, formatTimeAgo } = useFormatters()
 
 // --- Types ---
 interface ExportJob {

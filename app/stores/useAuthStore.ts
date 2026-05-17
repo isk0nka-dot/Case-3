@@ -93,7 +93,7 @@ export const useAuthStore = defineStore('auth', () => {
    *
    * For backward compatibility, also supports the demo login flow.
    */
-  function login(phone: string, password: string): { success: boolean, error?: string } {
+  function login(phone: string, _password: string): { success: boolean, error?: string } {
     // This is the legacy demo-only flow. Real login goes through useAdminAPI.
     // Keep for backward compat during transition.
     const normalizedPhone = phone.startsWith('+7') ? phone : `+7${phone}`

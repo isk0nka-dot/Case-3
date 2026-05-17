@@ -77,6 +77,15 @@ const tierConfig = computed(() => {
         borderColor: 'border-sky-500/30',
         bgColor: 'bg-sky-500/10'
       }
+    default:
+      return {
+        label: '?',
+        description: 'Неизвестно',
+        dotColor: 'bg-slate-500',
+        textColor: 'text-slate-400',
+        borderColor: 'border-slate-500/30',
+        bgColor: 'bg-slate-500/10'
+      }
   }
 })
 

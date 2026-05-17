@@ -79,6 +79,14 @@ const tierDisplay = computed(() => {
         sublabel: 'Данные сохраняются локально и будут отправлены при восстановлении связи',
         ringClass: 'ring-sky-500/30'
       }
+    default:
+      return {
+        dotClass: 'bg-slate-500',
+        pulseClass: 'bg-slate-400',
+        label: 'Нет данных',
+        sublabel: '',
+        ringClass: 'ring-slate-500/30'
+      }
   }
 })
 

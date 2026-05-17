@@ -236,6 +236,7 @@ export function useLowSpecMode(healthMetrics?: Ref<LowSpecHealthMetrics>, forceP
       case 'manual': return 'Ручной'
       case 'auto': return 'Автоматический'
       case 'none': return 'Выключен'
+      default: return ''
     }
   })
 

@@ -24,7 +24,7 @@ const api = useAdminAPI()
 const authStore = useAuthStore()
 const feedStore = useEventFeedStore()
 const inspectorStore = useInspectorStore()
-const { isDark, accentBg, errorBg, successBg, warningBg } = useColors()
+const { accentBg, errorBg, successBg, warningBg } = useColors()
 
 // ---------------------------------------------------------------------------
 // State
@@ -41,7 +41,7 @@ const selectedExamId = ref('')
 const searchFocused = ref(false)
 
 // Action state
-const actionLoading = ref<Record<string, boolean>>({})
+const _actionLoading = ref<Record<string, boolean>>({})
 
 // Poll timer
 let pollTimer: ReturnType<typeof setInterval> | null = null

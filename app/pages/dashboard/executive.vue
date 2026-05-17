@@ -21,7 +21,6 @@ const api = useAdminAPI()
 const authStore = useAuthStore()
 const { isDark, accentBg, errorBg, successBg, warningBg } = useColors()
 const { formatTimeShort, formatCompactNumber } = useFormatters()
-const toast = useToast()
 
 // --- State ---
 const loading = ref(true)
@@ -64,11 +63,13 @@ async function fetchData() {
   try {
     error.value = null
     data.value = await api.getAnalyticsOverview()
-  } catch (e: any) {
+  } catch (err: unknown) {
     // Backend offline or demo session — show demo data instead of error.
     if (!data.value) {
       data.value = DEMO_DATA
       console.info('[Executive] Backend unavailable, showing demo data.')
+    } else {
+      console.warn('[Executive] Refresh failed:', err)
     }
   } finally {
     loading.value = false

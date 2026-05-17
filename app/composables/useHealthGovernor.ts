@@ -527,6 +527,7 @@ export function useHealthGovernor(config?: Partial<HealthGovernorConfig>) {
       case 'A': return 'Оптимальный'
       case 'B': return 'Облегчённый'
       case 'C': return 'Автономный'
+      default: return 'Неизвестно'
     }
   })
 

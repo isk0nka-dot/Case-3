@@ -86,8 +86,8 @@ build-production:
   script:
     - |
       # Set the API URL — falls back to the production default if not set.
-      export NUXT_PUBLIC_API_URL="${NUXT_PUBLIC_API_URL:-https://argusai.kz/api}"
-      echo "→ Building Nuxt app (API: ${NUXT_PUBLIC_API_URL})..."
+      export NUXT_PUBLIC_API_BASE_URL="${NUXT_PUBLIC_API_BASE_URL:-https://argusai.kz}"
+      echo "→ Building Nuxt app (API: ${NUXT_PUBLIC_API_BASE_URL})..."
       npm run build
       echo "→ Build complete. Output size:"
       du -sh .output/
@@ -121,88 +121,43 @@ deploy-production:
     - ssh-keyscan -H ${DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null
   script:
     - |
-      SERVICE="frontend"
-      BUILD_DIR="/home/${DEPLOY_USER}/builds/${SERVICE}"
+      DEPLOY_TARGET="/opt/argus-ai/argus-frontend"
 
       echo "═══════════════════════════════════════════════════════════"
       echo "  Deploying frontend to ${DEPLOY_HOST}"
       echo "  Commit: ${CI_COMMIT_SHORT_SHA}"
       echo "═══════════════════════════════════════════════════════════"
 
-      # Step 1: Rsync .output/ + Dockerfile to server (writable build dir)
-      echo "→ Syncing built artifacts to ${BUILD_DIR}..."
-      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p ${BUILD_DIR}"
+      echo "→ Syncing built artifacts to ${DEPLOY_TARGET}..."
       rsync -azO --delete \
         --exclude='/.git' \
         --exclude='/node_modules' \
         --exclude='/.npm-cache' \
         --exclude='/.nuxt' \
         ${CI_PROJECT_DIR}/ \
-        ${DEPLOY_USER}@${DEPLOY_HOST}:${BUILD_DIR}/
+        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_TARGET}/
 
-      # Step 2: Build Docker image on server, then restart container via compose
       echo "→ Rebuilding Docker container..."
-      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "
+      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} sh -s <<'REMOTE_SCRIPT'
         set -e
-        cd ${BUILD_DIR}
-        docker build --no-cache -t argus/${SERVICE}:latest -f Dockerfile . 2>&1
-
-        # Keep the server-side infra checkout in sync with argus-infra/main.
-        # Frontend restart depends on the shared compose file from that repo.
-        INFRA_REPO_URL="https://oauth2:REDACTED_GITLAB_TOKEN@gitlab.com/argus_ai_group/argus-infra.git"
-        INFRA_DIR="\$HOME/argus-infra"
-        INFRA_DOCKER_DIR="\$INFRA_DIR/docker"
-        if [ ! -d "\$INFRA_DIR/.git" ]; then
-          echo "→ Auto-initializing ~/argus-infra infrastructure repository..."
-          rm -rf "\$INFRA_DIR"
-          git clone "\$INFRA_REPO_URL" "\$INFRA_DIR"
-          cp "\$INFRA_DOCKER_DIR/.env.example" "\$INFRA_DOCKER_DIR/.env"
-        else
-          echo "→ Updating ~/argus-infra to origin/main..."
-          cd "\$INFRA_DIR"
-          git remote set-url origin "\$INFRA_REPO_URL"
-          dirty_files="\$(git diff --name-only)"
-          cached_dirty_files="\$(git diff --cached --name-only)"
-          dirty_files="\$(printf '%s\n%s\n' "\$dirty_files" "\$cached_dirty_files" | sed '/^$/d' | sort -u)"
-          unexpected_dirty="\$(printf '%s\n' "\$dirty_files" | grep -vx 'docker/config.yaml' || true)"
-          if [ -n "\$unexpected_dirty" ]; then
-            echo 'DEPLOY FAILED: ~/argus-infra has local tracked changes; refusing to overwrite production infra files.'
-            git status --short
-            exit 1
-          fi
-          if printf '%s\n' "\$dirty_files" | grep -qx 'docker/config.yaml'; then
-            echo '→ Resetting generated docker/config.yaml before pulling infra updates...'
-            git checkout -- docker/config.yaml
-          fi
-          git fetch --depth=1 origin main
-          git checkout main
-          git pull --ff-only origin main
-        fi
-
-        cd "\$INFRA_DOCKER_DIR"
-        if [ ! -f .env ]; then
-          echo 'DEPLOY FAILED: ~/argus-infra/docker/.env is missing'
-          exit 1
-        fi
-        docker compose config --quiet
-        docker compose config --services | grep -qx ${SERVICE}
-
-        docker compose up -d --no-deps --no-build ${SERVICE} 2>&1
+        cd /opt/argus-ai/argus-frontend
+        docker build --no-cache -t argus/frontend:latest -f Dockerfile .
+        docker-compose up -d --no-deps --no-build frontend
 
         echo '→ Waiting for container to become healthy...'
-        for i in \$(seq 1 20); do
+        for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
           sleep 6
-          health=\$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' argus-${SERVICE} 2>/dev/null)
-          if [ \"\$health\" = 'healthy' ]; then
-            echo \"✓ Container healthy after \$((i * 6))s\"
+          health="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' argus-frontend-app 2>/dev/null)"
+          if [ "$health" = 'healthy' ]; then
+            echo "Container healthy after $((i * 6))s"
             exit 0
           fi
-          echo \"  Attempt \$i/20: health=\$health\"
+          echo "  Attempt $i/20: health=$health"
         done
         echo 'DEPLOY FAILED: container did not become healthy'
-        docker logs --tail=30 argus-${SERVICE} 2>&1
+        docker logs --tail=20 argus-frontend-app 2>&1
         exit 1
-      "
+      REMOTE_SCRIPT
 
       echo "═══════════════════════════════════════════════════════════"
       echo "  ✓ DEPLOY SUCCESS: frontend (${CI_COMMIT_SHORT_SHA})"

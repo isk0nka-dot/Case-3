@@ -17,7 +17,6 @@ import { useProctoringAlerts, type CriticalAlert } from '~/composables/useProcto
 import { Severity } from '~/lib/proto/types'
 
 const {
-  alerts,
   unreadCount,
   hasCritical,
   recentAlerts,

@@ -20,7 +20,6 @@ const sseSessionId = computed(() => props.session?.id ?? '')
 const sseEnabled = computed(() => !!props.session && (props.isLive ?? props.session?.isOnline ?? true))
 
 const {
-  events: sseEvents,
   score: sseScore,
   verdict: sseVerdict,
   verdictLabel: sseVerdictLabel,
@@ -28,8 +27,7 @@ const {
   terminateReason: sseTerminateReason,
   connected: sseConnected,
   connect: sseConnect,
-  disconnect: sseDisconnect,
-  reset: sseReset
+  disconnect: sseDisconnect
 } = useSessionStream(sseSessionId)
 
 // Connect SSE when session opens and is live
@@ -44,7 +42,8 @@ watch(sseEnabled, (enabled) => {
 // Update session integrity score from SSE in real-time
 watch(sseScore, (newScore) => {
   if (props.session && sseConnected.value) {
-    props.session.integrityScore = newScore
+    const storeSession = store.monitoringSessions.find(s => s.id === props.session!.id)
+    if (storeSession) storeSession.integrityScore = newScore
   }
 })
 
@@ -192,14 +191,17 @@ function handleWarn() {
   warningViolationType.value = getLastViolationType(props.session)
   showStudentWarning.value = true
 
-  props.session.events.unshift({
-    id: `evt-warn-${Date.now()}`,
-    type: 'audio_anomaly',
-    label: 'Отправлено предупреждение проктором',
-    severity: 'warning',
-    timestamp: new Date().toISOString()
-  })
-  props.session.violationCount += 1
+  const storeSessionWarn = store.monitoringSessions.find(s => s.id === props.session!.id)
+  if (storeSessionWarn) {
+    storeSessionWarn.events.unshift({
+      id: `evt-warn-${Date.now()}`,
+      type: 'audio_anomaly',
+      label: 'Отправлено предупреждение проктором',
+      severity: 'warning',
+      timestamp: new Date().toISOString()
+    })
+    storeSessionWarn.violationCount += 1
+  }
 
   toast.add({
     title: 'Предупреждение отправлено студенту',
@@ -218,13 +220,16 @@ function handleTerminate() {
 
 function confirmTerminate() {
   if (!props.session) return
-  props.session.events.unshift({
-    id: `evt-term-${Date.now()}`,
-    type: 'face_mismatch',
-    label: 'Экзамен принудительно завершён проктором',
-    severity: 'critical',
-    timestamp: new Date().toISOString()
-  })
+  const storeSessionTerm = store.monitoringSessions.find(s => s.id === props.session!.id)
+  if (storeSessionTerm) {
+    storeSessionTerm.events.unshift({
+      id: `evt-term-${Date.now()}`,
+      type: 'face_mismatch',
+      label: 'Экзамен принудительно завершён проктором',
+      severity: 'critical',
+      timestamp: new Date().toISOString()
+    })
+  }
   sessionTerminated.value = true
   showTerminateConfirm.value = false
 }
