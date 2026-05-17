@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: argus-db
+    restart: always
+    environment:
+      POSTGRES_DB: argus_db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: argus-clickhouse
+    restart: always
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=password123
+      - CLICKHOUSE_DB=argus_db
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: argus-zookeeper
+    restart: always
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: argus-kafka
+    restart: always
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+  redis:
+    image: redis:7-alpine
+    container_name: argus-redis
+    restart: always
+    command: redis-server --save "" --appendonly no
+
+  app:
+    build: .
+    container_name: argus-backend-app
+    restart: always
+    depends_on:
+      - db
+      - kafka
+      - clickhouse
+      - redis
+    volumes:
+      - ./deployments/config.yaml:/app/deployments/config.yaml
+    ports:
+      - "8080:8080"
+    environment:
+      - EVENT_COLLECTOR_KAFKA_BROKERS=kafka:9092
+      - EVENT_COLLECTOR_PG_HOST=db
+      - EVENT_COLLECTOR_PG_DATABASE=argus_db
+      - EVENT_COLLECTOR_PG_USERNAME=admin
+      - EVENT_COLLECTOR_PG_PASSWORD=password123
+      - EVENT_COLLECTOR_HTTP_PORT=8080
+      - EVENT_COLLECTOR_CH_ADDRS=clickhouse:9000
+      - EVENT_COLLECTOR_CH_DATABASE=argus_analytics
+      - EVENT_COLLECTOR_CH_USERNAME=default
+      - EVENT_COLLECTOR_CH_PASSWORD=password123
+      - EVENT_COLLECTOR_REDIS_ADDR=redis:6379
+      - EVENT_COLLECTOR_JWT_SIGNING_KEY=ad28f750c84ad1df7c0382acae0bdf620fcdceb4358d0de7639b0c3638ee8710
+      - EVENT_COLLECTOR_CORS_ORIGINS=https://argusai.kz,https://www.argusai.kz,http://89.167.96.246:3000
+      - EVENT_COLLECTOR_LOG_LEVEL=info
+
+volumes:
+  postgres_data:

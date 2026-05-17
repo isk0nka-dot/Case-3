@@ -127,9 +127,9 @@ minio:
 # Logger
 # ---------------------------------------------------------------------------
 logger:
-  level: "debug"
-  encoding: "console"
-  development: true
+  level: "info"
+  encoding: "json"
+  development: false
 
 # ---------------------------------------------------------------------------
 # Rate Limiting
@@ -209,10 +209,9 @@ session:
 # ---------------------------------------------------------------------------
 cors:
   # Allowed origins for gRPC-Web requests from the Nuxt 3 frontend.
-  # Use ["*"] for local development ONLY.
-  # Production: ["https://app.argus.ai", "https://staging.argus.ai"]
   allowed_origins:
-    - "*"
+    - "https://argusai.kz"
+    - "https://www.argusai.kz"
 
   # Preflight response cache duration (24 hours). Prevents browsers from
   # sending an OPTIONS request before every gRPC-Web call.
