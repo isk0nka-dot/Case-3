@@ -35,7 +35,7 @@ stages:
   - migrate
 
 variables:
-  DEPLOY_PATH: /opt/argus
+  DEPLOY_PATH: /opt/argus-ai
 
 # ── Stage: validate ──────────────────────────────────────────────────────────
 # Checks that docker-compose.yaml + prod overlay parse without errors.
@@ -152,7 +152,7 @@ run-migrations:
       ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
         set -e
 
-        MIGRATIONS="/opt/argus/migrations"
+        MIGRATIONS="/opt/argus-ai/migrations"
 
         echo "=== PostgreSQL Migrations ==="
         if ls "$MIGRATIONS"/postgres/*.sql 1>/dev/null 2>&1; then
