@@ -79,3 +79,7 @@ gosec.sarif
 *.tmp
 *.bak
 tmp/
+
+# ONNX model weights — large binaries, stored on server only
+ai-sidecar/models/*.onnx
+ai-sidecar/models/*.pt

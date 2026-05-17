@@ -49,6 +49,26 @@ services:
     restart: always
     command: redis-server --save "" --appendonly no
 
+  ai-sidecar:
+    build:
+      context: ./ai-sidecar
+      dockerfile: Dockerfile
+    container_name: argus-ai-sidecar
+    restart: always
+    volumes:
+      - ./ai-sidecar/models:/models:ro
+    environment:
+      - ONNX_MODELS_PATH=/models
+      - MODEL_FAIL_FAST=true
+      - YOLO_MODEL_FILE=yolov8n.onnx
+      - ARCFACE_MODEL_FILE=arcface.onnx
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8091/healthz')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
   app:
     build: .
     container_name: argus-backend-app
@@ -58,6 +78,7 @@ services:
       - kafka
       - clickhouse
       - redis
+      - ai-sidecar
     volumes:
       - ./deployments/config.yaml:/app/deployments/config.yaml
     ports:
@@ -77,6 +98,7 @@ services:
       - EVENT_COLLECTOR_JWT_SIGNING_KEY=ad28f750c84ad1df7c0382acae0bdf620fcdceb4358d0de7639b0c3638ee8710
       - EVENT_COLLECTOR_CORS_ORIGINS=https://argusai.kz,https://www.argusai.kz,http://89.167.96.246:3000
       - EVENT_COLLECTOR_LOG_LEVEL=info
+      - EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL=http://ai-sidecar:8091
 
 volumes:
   postgres_data:
