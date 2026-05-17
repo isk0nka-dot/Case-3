@@ -16,6 +16,7 @@
 #   - Push tag:       verify → deploy (manual gate)
 #
 # Required CI variables (set at GitLab Group level):
+#   DEPLOY_HOST          Production server IP
 #   DEPLOY_USER          SSH user (e.g. root or deploy)
 #   ARGUS_DEPLOY_SSH_KEY SSH private key (type: File, protected)
 # =============================================================================
@@ -28,7 +29,6 @@ stages:
 
 variables:
   GO_CACHE: ${CI_PROJECT_DIR}/.go-cache
-  ARGUS_DEPLOY_HOST: "89.167.96.246"
 
 cache:
   key: go-${CI_COMMIT_REF_SLUG}
@@ -42,7 +42,7 @@ lint:
   timeout: 10 minutes
   before_script:
     - export PATH=$PATH:$(go env GOPATH)/bin
-    - GOBIN="$(go env GOPATH)/bin" go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+    - GOBIN="$(go env GOPATH)/bin" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
   script:
     - golangci-lint run ./...
   allow_failure: true
@@ -132,13 +132,13 @@ deploy-production:
     - ssh-keygen -lf "${ARGUS_DEPLOY_SSH_KEY}"
     - ssh-add "${ARGUS_DEPLOY_SSH_KEY}"
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - ssh-keyscan -H ${ARGUS_DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null
+    - ssh-keyscan -H ${DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null
   script:
     - |
       DEPLOY_TARGET="/opt/argus-ai/argus-backend"
 
       echo "═══════════════════════════════════════════════════════════"
-      echo "  Deploying backend to ${ARGUS_DEPLOY_HOST}"
+      echo "  Deploying backend to ${DEPLOY_HOST}"
       echo "  Commit: ${CI_COMMIT_SHORT_SHA}"
       echo "═══════════════════════════════════════════════════════════"
 
@@ -146,11 +146,12 @@ deploy-production:
       rsync -azO --delete \
         --exclude='.git' \
         --exclude='.go-cache' \
+        --exclude='.env' \
         ${CI_PROJECT_DIR}/ \
-        ${DEPLOY_USER}@${ARGUS_DEPLOY_HOST}:${DEPLOY_TARGET}/
+        ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_TARGET}/
 
       echo "→ Rebuilding Docker container..."
-      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${ARGUS_DEPLOY_HOST} sh -s <<'REMOTE_SCRIPT'
+      ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} sh -s <<'REMOTE_SCRIPT'
         set -e
         cd /opt/argus-ai/argus-backend
         docker-compose build app
