@@ -49,6 +49,22 @@ services:
     restart: always
     command: redis-server --save "" --appendonly no
 
+  minio:
+    image: minio/minio:latest
+    container_name: argus-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=argus-minio-admin
+      - MINIO_ROOT_PASSWORD=argus-minio-secret-change-in-production
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   ai-sidecar:
     build:
       context: ./ai-sidecar
@@ -78,11 +94,16 @@ services:
       - kafka
       - clickhouse
       - redis
+      - minio
       - ai-sidecar
     volumes:
       - ./deployments/config.yaml:/app/deployments/config.yaml
+      - /opt/argus-ai/dlq-data:/data/argus-dlq
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8080:8080"
+    group_add:
+      - "110"
     environment:
       - EVENT_COLLECTOR_KAFKA_BROKERS=kafka:9092
       - EVENT_COLLECTOR_PG_HOST=db
@@ -99,6 +120,13 @@ services:
       - EVENT_COLLECTOR_CORS_ORIGINS=https://argusai.kz,https://www.argusai.kz,http://89.167.96.246:3000
       - EVENT_COLLECTOR_LOG_LEVEL=info
       - EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL=http://ai-sidecar:8091
+      - EVENT_COLLECTOR_MINIO_ENDPOINT=minio:9000
+      - EVENT_COLLECTOR_MINIO_ACCESS_KEY=argus-minio-admin
+      - EVENT_COLLECTOR_MINIO_SECRET_KEY=argus-minio-secret-change-in-production
+      - EVENT_COLLECTOR_MINIO_BUCKET=argus-evidence
+      - EVENT_COLLECTOR_DLQ_ENABLED=true
+      - EVENT_COLLECTOR_DLQ_DATA_DIR=/data/argus-dlq
 
 volumes:
   postgres_data:
+  minio_data:
