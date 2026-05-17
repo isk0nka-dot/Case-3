@@ -356,7 +356,7 @@ export function useVisionEngine(config: VisionEngineConfig) {
   // Animation frame handle
   let animFrameId: number | null = null
   let lastInferenceTime = 0
-  const inferenceInterval = 1000 / inferenceHz
+  let inferenceInterval = 1000 / inferenceHz
 
   // Pre-allocated Float32Array buffer for landmark extraction.
   // Reused across frames to eliminate 5.8KB allocation per frame (478×3×4 bytes).
@@ -386,12 +386,11 @@ export function useVisionEngine(config: VisionEngineConfig) {
     if (modelLoaded.value) return true
     try {
       // Dynamic import to avoid bundling MediaPipe unless used
-      // @ts-expect-error — dynamic import, types not bundled
       const vision = await import('@mediapipe/tasks-vision')
       const { FaceLandmarker, FilesetResolver } = vision
 
       const filesetResolver = await FilesetResolver.forVisionTasks(
-        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm'
       )
 
       faceMesh = await FaceLandmarker.createFromOptions(filesetResolver, {
@@ -624,9 +623,7 @@ export function useVisionEngine(config: VisionEngineConfig) {
 
   function setInferenceRate(hz: number) {
     // Allow dynamic tier-based adjustment
-    const interval = 1000 / Math.max(1, Math.min(30, hz))
-    // Update via closure
-    ;(useVisionEngine as any)._interval = interval
+    inferenceInterval = 1000 / Math.max(1, Math.min(30, hz))
   }
 
   // ---------------------------------------------------------------------------

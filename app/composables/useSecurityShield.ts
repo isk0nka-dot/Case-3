@@ -28,10 +28,23 @@
 //
 // =============================================================================
 
-import { ref, computed, type ComputedRef } from 'vue'
+import { ref, computed, watch, type ComputedRef, type Ref } from 'vue'
 import type { VisionFrame } from './useVisionEngine'
+import { useVisionEngine } from './useVisionEngine'
+import type { AudioFrame } from './useAudioEngine'
+import { useAudioEngine } from './useAudioEngine'
 import { EventType, Severity, EventSource } from '~/lib/proto/types'
 import type { EventPayload } from '~/lib/proto/types'
+import {
+  createDefaultRealtimeAIRuleState,
+  createDefaultRealtimeAIThresholds,
+  createDefaultRealtimeAudioThresholds,
+  evaluateAudioFrame,
+  evaluateVisionFrame,
+  type RealtimeAIEventDecision,
+  type RealtimeAIRuleThresholds,
+  type RealtimeAudioRuleThresholds
+} from '~/lib/ai/realtimeEventRules'
 
 import { useLivenessChallenge, type ChallengeConfig } from './useLivenessChallenge'
 import { useVirtualCameraDetector } from './useVirtualCameraDetector'
@@ -66,6 +79,24 @@ export interface SecurityShieldConfig {
 
   /** Baseline device fingerprint for verification (from session start). */
   baselineFingerprint?: DeviceFingerprint
+
+  /** Existing webcam video element for local MediaPipe inference. */
+  videoElement?: Ref<HTMLVideoElement | null>
+
+  /** Real-time browser AI settings. Defaults are intentionally conservative. */
+  realtimeAI?: {
+    enabled?: boolean
+    inferenceHz?: number
+    thresholds?: Partial<RealtimeAIRuleThresholds>
+  }
+
+  /** Real-time browser audio AI settings. Raw microphone audio never leaves the device. */
+  realtimeAudio?: {
+    enabled?: boolean
+    analysisHz?: number
+    vadThresholdDb?: number
+    thresholds?: Partial<RealtimeAudioRuleThresholds>
+  }
 }
 
 export interface ShieldStatus {
@@ -98,6 +129,28 @@ export function useSecurityShield(config: SecurityShieldConfig) {
   const fingerprint = useDeviceFingerprint()
   const antiSpoof = useAntiSpoofing()
   const browser = useBrowserIntegrity()
+  const realtimeAIEnabled = config.realtimeAI?.enabled ?? true
+  const realtimeAIThresholds: RealtimeAIRuleThresholds = {
+    ...createDefaultRealtimeAIThresholds(),
+    ...config.realtimeAI?.thresholds
+  }
+  const realtimeAudioThresholds: RealtimeAudioRuleThresholds = {
+    ...createDefaultRealtimeAudioThresholds(),
+    ...config.realtimeAudio?.thresholds
+  }
+  const realtimeAIState = createDefaultRealtimeAIRuleState()
+  const vision = realtimeAIEnabled && config.videoElement
+    ? useVisionEngine({
+        videoElement: config.videoElement,
+        inferenceHz: config.realtimeAI?.inferenceHz ?? 2
+      })
+    : null
+  const audio = realtimeAIEnabled && (config.realtimeAudio?.enabled ?? true)
+    ? useAudioEngine({
+        analysisHz: config.realtimeAudio?.analysisHz ?? 4,
+        vadThresholdDb: config.realtimeAudio?.vadThresholdDb
+      })
+    : null
 
   // -------------------------------------------------------------------------
   // Wire event callbacks
@@ -108,6 +161,29 @@ export function useSecurityShield(config: SecurityShieldConfig) {
   fingerprint.onEvent(sendEvent)
   antiSpoof.onEvent(sendEvent)
   browser.onEvent(sendEvent)
+
+  if (vision) {
+    watch(vision.currentFrame, (frame) => {
+      if (!started || !frame) return
+
+      ingestVisionFrame(frame)
+      const decisions = evaluateVisionFrame(frame, realtimeAIThresholds, realtimeAIState)
+      for (const decision of decisions) {
+        emitRealtimeAIDecision(decision, frame)
+      }
+    })
+  }
+
+  if (audio) {
+    watch(audio.currentFrame, (frame) => {
+      if (!started || !frame) return
+
+      const decisions = evaluateAudioFrame(frame, realtimeAudioThresholds, realtimeAIState)
+      for (const decision of decisions) {
+        emitRealtimeAIDecision(decision, undefined, frame)
+      }
+    })
+  }
 
   // -------------------------------------------------------------------------
   // Lifecycle
@@ -175,6 +251,48 @@ export function useSecurityShield(config: SecurityShieldConfig) {
     // 4. Watermark — starts token rotation
     watermark.start()
 
+    // 4b. Browser-local MediaPipe inference. Runs at low frequency by default
+    // and emits structured events only; raw frames never leave the browser.
+    if (vision) {
+      const startedVision = await vision.start()
+      if (!startedVision) {
+        sendEvent(
+          EventType.CAMERA_BLOCKED,
+          Severity.WARNING,
+          {
+            type: 'system',
+            data: {
+              message: 'MediaPipe vision model failed to start'
+            }
+          },
+          'AI vision model unavailable',
+          1.0,
+          EventSource.WEBCAM
+        )
+      }
+    }
+
+    // 4c. Browser-local audio analysis. This sends structured telemetry only:
+    // RMS dB, VAD flags, classifications and speaker count heuristics.
+    if (audio) {
+      const startedAudio = await audio.start()
+      if (!startedAudio) {
+        sendEvent(
+          EventType.AUDIO_ANOMALY,
+          Severity.WARNING,
+          {
+            type: 'system',
+            data: {
+              message: 'Audio analysis engine failed to start'
+            }
+          },
+          'Audio AI model unavailable',
+          1.0,
+          EventSource.BROWSER
+        )
+      }
+    }
+
     // 5. Device fingerprint — capture baseline
     const fp = await fingerprint.capture()
 
@@ -232,6 +350,8 @@ export function useSecurityShield(config: SecurityShieldConfig) {
     liveness.stop()
     antiSpoof.stop()
     watermark.stop()
+    vision?.stop()
+    audio?.stop()
 
     if (periodicVerifyTimer) {
       clearInterval(periodicVerifyTimer)
@@ -256,6 +376,180 @@ export function useSecurityShield(config: SecurityShieldConfig) {
     // Liveness challenge verification
     if (liveness.currentChallenge.value?.status === 'active') {
       liveness.verifyFrame(frame)
+    }
+  }
+
+  function emitRealtimeAIDecision(decision: RealtimeAIEventDecision, frame?: VisionFrame, audioFrame?: AudioFrame): void {
+    switch (decision.kind) {
+      case 'gaze_telemetry':
+        sendEvent(
+          EventType.GAZE_TELEMETRY,
+          Severity.INFO,
+          { type: 'gazeDeviation', data: { direction: 'center', durationMs: 0, angleDegrees: 0, gazeX: decision.gazeX, gazeY: decision.gazeY } },
+          '',
+          1.0,
+          EventSource.WEBCAM
+        )
+        break
+      case 'gaze_deviation':
+        sendEvent(
+          EventType.GAZE_DEVIATION,
+          decision.durationMs > 5000 ? Severity.CRITICAL : Severity.WARNING,
+          {
+            type: 'gazeDeviation',
+            data: {
+              direction: decision.direction,
+              durationMs: decision.durationMs,
+              angleDegrees: decision.angleDegrees,
+              gazeX: decision.gazeX,
+              gazeY: decision.gazeY
+            }
+          },
+          `Взгляд отведён ${decision.direction} на ${(decision.durationMs / 1000).toFixed(1)}с`,
+          0.9,
+          EventSource.WEBCAM
+        )
+        break
+      case 'face_not_detected':
+        sendEvent(
+          EventType.FACE_NOT_DETECTED,
+          Severity.WARNING,
+          { type: 'faceDetection', data: { match: false, similarity: 0, faceCount: 0, isSpoof: false } },
+          `Лицо не обнаружено (${decision.consecutiveFrames} кадров)`,
+          1.0,
+          EventSource.WEBCAM
+        )
+        break
+      case 'multiple_persons':
+        sendEvent(
+          EventType.MULTIPLE_PERSONS,
+          Severity.CRITICAL,
+          { type: 'faceDetection', data: { match: false, similarity: 0, faceCount: decision.faceCount, isSpoof: false } },
+          `Обнаружено несколько лиц: ${decision.faceCount}`,
+          1.0,
+          EventSource.WEBCAM
+        )
+        break
+      case 'head_pose_anomaly':
+        if (!frame) break
+        sendEvent(
+          EventType.HEAD_POSE_ANOMALY,
+          Severity.WARNING,
+          { type: 'headPose', data: vision?.buildHeadPosePayload(frame) ?? buildFallbackHeadPosePayload(frame) },
+          `Положение головы вне допустимого диапазона: yaw=${decision.yaw.toFixed(1)}, pitch=${decision.pitch.toFixed(1)}, roll=${decision.roll.toFixed(1)}`,
+          0.85,
+          EventSource.WEBCAM
+        )
+        break
+      case 'liveness_failed':
+        if (!frame) break
+        sendEvent(
+          EventType.LIVENESS_CHECK_FAILED,
+          Severity.CRITICAL,
+          { type: 'liveness', data: vision?.buildLivenessPayload(frame) ?? buildFallbackLivenessPayload(frame) },
+          `Проверка живости не пройдена: ${(decision.livenessScore * 100).toFixed(0)}%`,
+          1 - decision.livenessScore,
+          EventSource.WEBCAM
+        )
+        break
+      case 'audio_level_telemetry':
+        if (!audioFrame) break
+        sendEvent(
+          EventType.AUDIO_LEVEL_TELEMETRY,
+          Severity.INFO,
+          { type: 'audioAnalysis', data: audio?.buildAudioAnalysisPayload(audioFrame) ?? buildFallbackAudioPayload(audioFrame) },
+          '',
+          1.0,
+          EventSource.BROWSER
+        )
+        break
+      case 'voice_activity':
+        if (!audioFrame) break
+        sendEvent(
+          EventType.VOICE_ACTIVITY,
+          Severity.WARNING,
+          { type: 'audioAnalysis', data: audio?.buildAudioAnalysisPayload(audioFrame) ?? buildFallbackAudioPayload(audioFrame) },
+          `Голос обнаружен: VAD ${(decision.vadConfidence * 100).toFixed(0)}%, RMS ${decision.rmsDb.toFixed(1)} dB`,
+          decision.vadConfidence,
+          EventSource.BROWSER
+        )
+        break
+      case 'audio_anomaly':
+        if (!audioFrame) break
+        sendEvent(
+          EventType.AUDIO_ANOMALY,
+          Severity.WARNING,
+          { type: 'audioAnalysis', data: audio?.buildAudioAnalysisPayload(audioFrame) ?? buildFallbackAudioPayload(audioFrame) },
+          `Аудио аномалия: ${decision.classification}, RMS ${decision.rmsDb.toFixed(1)} dB`,
+          decision.confidence,
+          EventSource.BROWSER
+        )
+        break
+      case 'whisper_detected':
+        if (!audioFrame) break
+        sendEvent(
+          EventType.WHISPER_DETECTED,
+          Severity.WARNING,
+          { type: 'audioAnalysis', data: audio?.buildAudioAnalysisPayload(audioFrame) ?? buildFallbackAudioPayload(audioFrame) },
+          `Шёпот обнаружен: ${(decision.confidence * 100).toFixed(0)}%`,
+          decision.confidence,
+          EventSource.BROWSER
+        )
+        break
+      case 'second_speaker_detected':
+        if (!audioFrame) break
+        sendEvent(
+          EventType.SECOND_SPEAKER_DETECTED,
+          Severity.CRITICAL,
+          { type: 'audioAnalysis', data: audio?.buildAudioAnalysisPayload(audioFrame) ?? buildFallbackAudioPayload(audioFrame) },
+          `Обнаружено несколько голосов: ${decision.speakerCount}`,
+          decision.confidence,
+          EventSource.BROWSER
+        )
+        break
+    }
+  }
+
+  function buildFallbackHeadPosePayload(frame: VisionFrame) {
+    return {
+      yaw: frame.headPose.yaw,
+      pitch: frame.headPose.pitch,
+      roll: frame.headPose.roll,
+      faceX: frame.faceBBox?.x ?? 0,
+      faceY: frame.faceBBox?.y ?? 0,
+      faceW: frame.faceBBox?.w ?? 0,
+      faceH: frame.faceBBox?.h ?? 0,
+      ipdPx: 0,
+      landmarkCount: frame.landmarks ? frame.landmarks.length / 3 : 0,
+      inferenceMs: frame.inferenceMs
+    }
+  }
+
+  function buildFallbackLivenessPayload(frame: VisionFrame) {
+    return {
+      livenessScore: frame.livenessScore,
+      blinkDetected: frame.blink.isBlinking,
+      blinkRatePerMin: frame.blink.blinkRatePerMin,
+      textureScore: frame.frameQuality,
+      depthScore: 0.5,
+      spoofVector: frame.livenessScore < realtimeAIThresholds.livenessThreshold ? 'unknown' : 'none',
+      frameQuality: frame.frameQuality
+    }
+  }
+
+  function buildFallbackAudioPayload(frame: AudioFrame) {
+    return {
+      rmsDb: frame.rmsDb,
+      vadActive: frame.vadActive,
+      vadConfidence: frame.vadConfidence,
+      spectralCentroidHz: frame.spectralCentroidHz,
+      zcr: frame.zcr,
+      classification: frame.classification,
+      classificationConfidence: frame.classificationConfidence,
+      speakerCount: frame.speakerCount,
+      speakerMatch: true,
+      speakerSimilarity: 1.0,
+      segmentDurationMs: Math.round(1000 / (config.realtimeAudio?.analysisHz ?? 4))
     }
   }
 
@@ -360,6 +654,10 @@ export function useSecurityShield(config: SecurityShieldConfig) {
     currentChallenge: liveness.currentChallenge,
     livenessPassRate: liveness.passRate,
     watermarkActive: computed(() => watermark.state.value.isActive),
+    visionFrame: vision?.currentFrame ?? ref<VisionFrame | null>(null),
+    visionActive: computed(() => vision?.isActive.value ?? false),
+    audioFrame: audio?.currentFrame ?? ref<AudioFrame | null>(null),
+    audioActive: computed(() => audio?.isActive.value ?? false),
     challengeHistory: liveness.challengeHistory,
     consecutiveFailures: liveness.consecutiveFailures
   }
