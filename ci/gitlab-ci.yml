@@ -141,6 +141,7 @@ deploy-production:
         --exclude='/node_modules' \
         --exclude='/.npm-cache' \
         --exclude='/.nuxt' \
+        --exclude='/.env' \
         ${CI_PROJECT_DIR}/ \
         ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_TARGET}/
 
