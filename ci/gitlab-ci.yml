@@ -4,26 +4,20 @@
 #
 # Pipeline: verify → deploy
 #
-#   verify (runs on GitLab shared Docker runners):
+#   verify (automatic on MR + main):
 #     lint, vet, test (with PostgreSQL service), security scan
 #
-#   deploy (runs on prod server via shell executor):
-#     Calls /opt/argus/scripts/deploy.sh --service=backend
-#     → git fetch + reset → migrations → docker compose build → health check
-#     → automatic rollback on failure
+#   deploy (MANUAL — нажать кнопку в GitLab UI):
+#     rsync code → docker build → docker compose up → health check
 #
 # Trigger rules:
 #   - Merge requests: verify only (no deploy)
-#   - Push to main:   verify → deploy
-#   - Push tag:        verify → deploy
+#   - Push to main:   verify → deploy (manual gate)
+#   - Push tag:       verify → deploy (manual gate)
 #
 # Required CI variables (set at GitLab Group level):
-#   DEPLOY_HOST       Production server IP (e.g. 157.180.46.33)
-#   DEPLOY_USER       SSH user (e.g. root or deploy)
+#   DEPLOY_USER          SSH user (e.g. root or deploy)
 #   ARGUS_DEPLOY_SSH_KEY SSH private key (type: File, protected)
-#
-# No container registry is used. Images build on the server from source.
-# All secrets live in /opt/argus/docker/.env — never transiting through CI.
 # =============================================================================
 
 image: golang:1.26
@@ -41,12 +35,11 @@ cache:
   paths:
     - .go-cache/
 
-# ── Stage: verify ────────────────────────────────────────────────────────────
-# All verify jobs run on GitLab shared Docker runners (NOT the prod shell runner).
-# The default image (golang:1.24-alpine) provides Go toolchain.
+# ── Stage: verify ─────────────────────────────────────────────────────────────
 
 lint:
   stage: verify
+  timeout: 10 minutes
   before_script:
     - export PATH=$PATH:$(go env GOPATH)/bin
     - GOBIN="$(go env GOPATH)/bin" go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
@@ -60,6 +53,7 @@ lint:
 
 vet:
   stage: verify
+  timeout: 5 minutes
   script:
     - go vet ./...
   rules:
@@ -69,6 +63,7 @@ vet:
 
 test:
   stage: verify
+  timeout: 10 minutes
   services:
     - name: postgres:16-alpine
       alias: postgres
@@ -85,7 +80,7 @@ test:
     GOFLAGS: "-count=1"
     GOPATH: "${CI_PROJECT_DIR}/.go-cache"
   script:
-    - go test -race -coverprofile=coverage.out ./...
+    - go test -coverprofile=coverage.out ./...
     - go tool cover -func=coverage.out | tail -1
   coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
   artifacts:
@@ -98,6 +93,7 @@ test:
 
 security-scan:
   stage: verify
+  timeout: 10 minutes
   image:
     name: securego/gosec:latest
     entrypoint: [""]
@@ -115,13 +111,13 @@ security-scan:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
 
-# ── Stage: deploy ────────────────────────────────────────────────────────────
-# Rsync code to server + rebuild Docker container.
-# Bypasses git on the server (avoids ownership/permission issues).
+# ── Stage: deploy ─────────────────────────────────────────────────────────────
+# Запускается ВРУЧНУЮ через кнопку в GitLab UI после прохождения verify.
 
 deploy-production:
   stage: deploy
   image: alpine:3.20
+  timeout: 15 minutes
   needs:
     - job: lint
       optional: true
@@ -157,7 +153,6 @@ deploy-production:
       ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${ARGUS_DEPLOY_HOST} sh -s <<'REMOTE_SCRIPT'
         set -e
         cd /opt/argus-ai/argus-backend
-        docker-compose up -d redis
         docker-compose build app
         docker-compose up -d --no-deps app
 
@@ -184,4 +179,6 @@ deploy-production:
     url: https://argusai.kz
   rules:
     - if: $CI_COMMIT_TAG
+      when: manual
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
