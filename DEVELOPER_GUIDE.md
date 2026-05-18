@@ -148,7 +148,7 @@ The `AnalyzeFrame` RPC accepts a single image frame and is the preferred backend
 
 The legacy `AnalyzeVideo` streaming RPC is intentionally narrowed for Step 2: it accepts only pre-extracted image frames streamed in chunks with `Content-Type` `image/jpeg`, `image/png`, `image/jpg`, or `image/webp`. Raw `video/mp4` or `video/webm` fragments return `Unimplemented`. This prevents the production sidecar from receiving arbitrary video bytes as fake JPEG frames.
 
-Until a bounded FFmpeg/libav extractor worker is added, `AIAnalysisHandler` may skip raw evidence fragments after logging the inference error. That is safer than blocking student sessions or creating false AI results from invalid frame bytes.
+Until a bounded FFmpeg/libav extractor worker is added, `AIAnalysisHandler` skips raw `video/mp4` and `video/webm` evidence fragments before downloading them from MinIO. That is safer than blocking student sessions or creating false AI results from invalid frame bytes.
 
 ## Safety Rules
 

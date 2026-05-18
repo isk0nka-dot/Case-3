@@ -106,6 +106,8 @@ Place model weights under `argus-backend/models/` for local testing or mount the
 
 The backend does not continuously decode WebM/MP4 evidence fragments. Background workers should send already sampled image frames to the inference gateway, or skip the fragment until the safe extractor worker is available. This keeps the exam session path independent from FFmpeg load and prevents ONNX from receiving invalid raw video bytes.
 
+`AIAnalysisHandler` enforces this at the worker boundary: `image/jpeg`, `image/png`, and `image/webp` evidence fragments may be sent to inference, while `video/mp4` and `video/webm` fragments are skipped until the bounded extractor exists.
+
 Run locally:
 
 ```bash

@@ -3,7 +3,9 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -131,6 +133,15 @@ func (h *AIAnalysisHandler) ProcessTask(ctx context.Context, t *asynq.Task) erro
 	for _, frag := range fragments {
 		resp, err := h.analyzeFragment(ctx, client, payload, frag)
 		if err != nil {
+			if errors.Is(err, errUnsupportedEvidenceContentType) {
+				h.logger.Info("skipping evidence fragment until bounded frame extractor is available",
+					zap.String("session_id", payload.SessionID),
+					zap.String("object_key", frag.ObjectKey),
+					zap.String("content_type", frag.ContentType),
+				)
+				continue
+			}
+
 			h.logger.Warn("failed to analyze fragment, skipping",
 				zap.String("session_id", payload.SessionID),
 				zap.String("object_key", frag.ObjectKey),
@@ -234,12 +245,18 @@ func (h *AIAnalysisHandler) queryEvidenceFragments(ctx context.Context, sessionI
 // Fragment analysis via inference gateway
 // ---------------------------------------------------------------------------
 
+var errUnsupportedEvidenceContentType = errors.New("unsupported evidence content type for frame inference")
+
 func (h *AIAnalysisHandler) analyzeFragment(
 	ctx context.Context,
 	client inferencepb.InferenceServiceClient,
 	payload AIAnalysisPayload,
 	frag evidenceFragment,
 ) (*inferencepb.AnalyzeVideoResponse, error) {
+	if !isSupportedEvidenceFrameContentType(frag.ContentType) {
+		return nil, fmt.Errorf("%w: %s", errUnsupportedEvidenceContentType, frag.ContentType)
+	}
+
 	// Download fragment from MinIO.
 	obj, err := h.minioClient.GetObject(ctx, h.minioBucket, frag.ObjectKey, minio.GetObjectOptions{})
 	if err != nil {
@@ -288,6 +305,16 @@ func (h *AIAnalysisHandler) analyzeFragment(
 	}
 
 	return resp, nil
+}
+
+func isSupportedEvidenceFrameContentType(contentType string) bool {
+	mediaType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
+	switch mediaType {
+	case "image/jpeg", "image/jpg", "image/png", "image/webp":
+		return true
+	default:
+		return false
+	}
 }
 
 // ---------------------------------------------------------------------------
