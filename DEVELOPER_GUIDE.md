@@ -146,6 +146,8 @@ inference:
 
 `Dockerfile.inference` runs `cmd/inference`, which exposes the Go gRPC inference gateway and calls the Python sidecar over HTTP. `Dockerfile.worker` runs `cmd/worker`, installs `ffmpeg`, consumes Asynq jobs, extracts bounded video frames, and calls the inference gateway. The local `docker-compose.yml` declares `ai-sidecar`, `inference`, and `worker` as separate services so model execution stays isolated from the API server.
 
+The root `.dockerignore` intentionally excludes `models/`, `ai-sidecar/`, `.git/`, Go cache files, and large media/model artifacts from Go image builds. The sidecar image is built from `ai-sidecar/` as a separate context, and runtime models are mounted from `./models:/models:ro`.
+
 ## Inference Gateway Contract
 
 The `AnalyzeFrame` RPC accepts a single image frame and is the preferred backend inference entry point.

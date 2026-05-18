@@ -39,6 +39,20 @@ class GitLabCiContractTests(unittest.TestCase):
         self.assertIn("./cmd/inference", inference_dockerfile)
         self.assertIn('ENTRYPOINT ["/app/argus-inference"]', inference_dockerfile)
 
+    def test_root_dockerignore_keeps_go_build_context_small(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        dockerignore = (repo_root / ".dockerignore").read_text(encoding="utf-8")
+
+        for ignored_path in (
+            ".git",
+            ".gocache",
+            "ai-sidecar",
+            "models",
+            "*.onnx",
+            "*.mp4",
+        ):
+            self.assertIn(ignored_path, dockerignore)
+
 
 if __name__ == "__main__":
     unittest.main()
