@@ -22,6 +22,7 @@ The exam session path does not wait on ONNX inference. MediaPipe and audio VAD r
 - **Circuit breaker:** `cmd/inference` applies `inference.concurrency` as a bounded worker pool. If the pool is full, the frame is rejected with `ResourceExhausted` and can be dropped or retried by background workers.
 - **Fail-fast:** production cannot silently fall back to synthetic inference. `engine_type=stub` requires `allow_stub=true`; `python_bridge` checks `/healthz` and refuses startup unless YOLO and ArcFace are loaded.
 - **Frame economy:** video segments must be sampled by interval or explicit event trigger. `FRAME_EXTRACTION_INTERVAL_SEC`/`inference.frame_sample_interval_sec` are the control knobs.
+- **No raw-video pseudo frames:** the Go `AnalyzeVideo` RPC currently accepts only pre-extracted `image/jpeg`, `image/png`, or `image/webp` frames. Raw `video/*` blobs return `Unimplemented` instead of pretending arbitrary bytes are JPEG frames.
 - **Backward compatibility:** existing event contracts are not changed. Audio anomalies reuse the existing `AudioAnalysisPayload` fields and ClickHouse columns.
 
 ## Model Inventory
@@ -103,6 +104,8 @@ The AI layer does not write to PostgreSQL transactions in the student session pa
 
 Place model weights under `argus-backend/models/` for local testing or mount them at `/models` in the sidecar container. Do not commit large `.onnx` binaries unless Git LFS is explicitly configured.
 
+The backend does not continuously decode WebM/MP4 evidence fragments. Background workers should send already sampled image frames to the inference gateway, or skip the fragment until the safe extractor worker is available. This keeps the exam session path independent from FFmpeg load and prevents ONNX from receiving invalid raw video bytes.
+
 Run locally:
 
 ```bash
@@ -121,3 +124,9 @@ docker run --rm -p 8091:8091 -v "$PWD/models:/models:ro" argus/ai-sidecar:local
 ```
 
 Future GPU deployment can switch the sidecar image to a CUDA runtime and use ONNX Runtime GPU providers without changing the Go event ingestion contract.
+
+## Remaining Work
+
+- Add a bounded FFmpeg/libav frame extractor worker that samples at `FRAME_EXTRACTION_INTERVAL_SEC` or only around critical frontend events.
+- Persist extracted frame metadata so retries do not decode the same evidence fragment repeatedly.
+- Extend ClickHouse analytics columns only after the existing event payload contract has stayed backward-compatible in staging.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -83,7 +84,11 @@ func (s *InferenceServer) AnalyzeFrame(ctx context.Context, req *inferencepb.Ana
 	return mapFrameResult(result), nil
 }
 
-// AnalyzeVideo receives a client-streamed video and returns frame-by-frame analysis.
+// AnalyzeVideo accepts a streamed, pre-extracted image frame and returns analysis.
+//
+// Raw video segment decoding is intentionally not performed here. Full video
+// extraction must happen in a bounded background worker that samples frames by
+// interval or explicit event trigger.
 func (s *InferenceServer) AnalyzeVideo(stream inferencepb.InferenceService_AnalyzeVideoServer) error {
 	start := time.Now()
 
@@ -104,14 +109,29 @@ func (s *InferenceServer) AnalyzeVideo(stream inferencepb.InferenceService_Analy
 			return status.Errorf(codes.Internal, "recv error: %v", err)
 		}
 
-		// Capture metadata from the first chunk.
-		if sessionID == "" {
+		// Capture metadata from the first data chunk.
+		if sessionID == "" && chunk.SessionId != "" {
 			sessionID = chunk.SessionId
 			orgID = chunk.OrgId
 			contentType = chunk.ContentType
+			if !isSupportedStreamedFrameContentType(contentType) {
+				return status.Errorf(
+					codes.Unimplemented,
+					"AnalyzeVideo accepts pre-extracted image frames only; got content_type %q",
+					contentType,
+				)
+			}
 		}
 
-		buf.Write(chunk.Data)
+		if len(chunk.Data) > 0 {
+			if sessionID == "" {
+				return status.Error(codes.InvalidArgument, "session_id is required on the first data chunk")
+			}
+			if buf.Len()+len(chunk.Data) > s.maxFrameBytes {
+				return status.Errorf(codes.InvalidArgument, "streamed frame data exceeds maximum size (%d bytes)", s.maxFrameBytes)
+			}
+			buf.Write(chunk.Data)
+		}
 
 		if chunk.IsLast {
 			break
@@ -122,26 +142,24 @@ func (s *InferenceServer) AnalyzeVideo(stream inferencepb.InferenceService_Analy
 		return status.Error(codes.InvalidArgument, "session_id is required (set on first chunk)")
 	}
 	if buf.Len() == 0 {
-		return status.Error(codes.InvalidArgument, "no video data received")
+		return status.Error(codes.InvalidArgument, "no frame data received")
 	}
 
-	s.logger.Info("inference: analyzing video segment",
+	s.logger.Info("inference: analyzing streamed image frame",
 		zap.String("session_id", sessionID),
 		zap.String("org_id", orgID),
 		zap.String("content_type", contentType),
 		zap.Int("total_bytes", buf.Len()),
 	)
 
-	// ── Extract frames and analyze ────────────────────────────────────────
-	// For MVP, treat the entire buffer as a single "frame" for the stub engine.
-	// A real implementation would use ffmpeg to extract frames at the configured
-	// sample rate. This placeholder simulates multi-frame analysis by splitting
-	// the buffer into fixed-size chunks and analyzing each.
-	frames, summary := s.analyzeVideoBuffer(stream.Context(), buf.Bytes())
+	frames, summary, err := s.analyzeStreamedImageFrame(stream.Context(), buf.Bytes(), contentType)
+	if err != nil {
+		return err
+	}
 
 	totalTime := float64(time.Since(start).Microseconds()) / 1000.0
 
-	s.logger.Info("inference: video analysis complete",
+	s.logger.Info("inference: streamed image analysis complete",
 		zap.String("session_id", sessionID),
 		zap.Int("frames_analyzed", len(frames)),
 		zap.String("verdict", summary.Verdict),
@@ -155,73 +173,42 @@ func (s *InferenceServer) AnalyzeVideo(stream inferencepb.InferenceService_Analy
 	})
 }
 
-// analyzeVideoBuffer simulates frame extraction and per-frame analysis.
-// In a real implementation, this would use ffmpeg/libav to decode the video
-// and extract frames at the configured sample rate.
-func (s *InferenceServer) analyzeVideoBuffer(ctx context.Context, data []byte) ([]*inferencepb.FrameAnalysis, *analysisSummary) {
-	// Simulate frame extraction by splitting into ~50KB pseudo-frames.
-	const pseudoFrameSize = 50 * 1024
-	var frames []*inferencepb.FrameAnalysis
-	summary := &analysisSummary{}
+func (s *InferenceServer) analyzeStreamedImageFrame(ctx context.Context, data []byte, contentType string) ([]*inferencepb.FrameAnalysis, *analysisSummary, error) {
+	release, ok := s.tryAcquireFrameSlot()
+	if !ok {
+		s.logger.Warn("inference: streamed frame dropped because worker pool is full")
+		return nil, nil, status.Error(codes.ResourceExhausted, "inference worker pool is full; frame dropped")
+	}
+	defer release()
 
-	frameIdx := 0
-	for offset := 0; offset < len(data); offset += pseudoFrameSize {
-		end := offset + pseudoFrameSize
-		if end > len(data) {
-			end = len(data)
-		}
-		frameData := data[offset:end]
+	result, err := s.engine.AnalyzeFrame(ctx, data, contentType)
+	if err != nil {
+		s.logger.Error("inference: streamed frame analysis failed", zap.Error(err))
+		return nil, nil, status.Errorf(codes.Internal, "streamed frame analysis failed: %v", err)
+	}
 
-		release, ok := s.tryAcquireFrameSlot()
-		if !ok {
-			s.logger.Warn("inference: video frame dropped because worker pool is full",
-				zap.Int("frame_idx", frameIdx),
-			)
-			frameIdx++
-			continue
-		}
-		result, err := s.engine.AnalyzeFrame(ctx, frameData, "image/jpeg")
-		release()
-		if err != nil {
-			s.logger.Warn("inference: frame analysis error, skipping",
-				zap.Int("frame_idx", frameIdx),
-				zap.Error(err),
-			)
-			frameIdx++
-			continue
-		}
+	summary := &analysisSummary{TotalFrames: 1}
+	summary.updateFromResult(result)
+	summary.finalize()
 
-		fa := &inferencepb.FrameAnalysis{
-			TimestampSec: float64(frameIdx) * 0.5, // Assume 2 FPS sampling
+	return []*inferencepb.FrameAnalysis{
+		{
+			TimestampSec: 0,
 			Faces:        mapFaceDetections(result.Faces),
 			Objects:      mapObjectDetections(result.Objects),
 			Liveness:     mapLivenessResult(result.Liveness),
-		}
-		frames = append(frames, fa)
+		},
+	}, summary, nil
+}
 
-		// Update summary counters.
-		summary.TotalFrames++
-		summary.updateFromResult(result)
-
-		frameIdx++
+func isSupportedStreamedFrameContentType(contentType string) bool {
+	mediaType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
+	switch mediaType {
+	case "image/jpeg", "image/jpg", "image/png", "image/webp":
+		return true
+	default:
+		return false
 	}
-
-	// Determine verdict.
-	if summary.TotalFrames > 0 {
-		fraudRate := float64(summary.FraudFrames) / float64(summary.TotalFrames)
-		switch {
-		case fraudRate > 0.15 || summary.MaxFraudConf > 0.9:
-			summary.Verdict = "fraud"
-		case fraudRate > 0.05 || summary.MaxFraudConf > 0.7:
-			summary.Verdict = "suspicious"
-		default:
-			summary.Verdict = "clean"
-		}
-	} else {
-		summary.Verdict = "clean"
-	}
-
-	return frames, summary
 }
 
 func (s *InferenceServer) tryAcquireFrameSlot() (func(), bool) {
@@ -285,6 +272,23 @@ func (s *analysisSummary) updateFromResult(r *inference.FrameResult) {
 
 	if isFraud {
 		s.FraudFrames++
+	}
+}
+
+func (s *analysisSummary) finalize() {
+	if s.TotalFrames == 0 {
+		s.Verdict = "clean"
+		return
+	}
+
+	fraudRate := float64(s.FraudFrames) / float64(s.TotalFrames)
+	switch {
+	case fraudRate > 0.15 || s.MaxFraudConf > 0.9:
+		s.Verdict = "fraud"
+	case fraudRate > 0.05 || s.MaxFraudConf > 0.7:
+		s.Verdict = "suspicious"
+	default:
+		s.Verdict = "clean"
 	}
 }
 

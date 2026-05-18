@@ -142,11 +142,20 @@ inference:
   allow_stub: false
 ```
 
+## Inference Gateway Contract
+
+The `AnalyzeFrame` RPC accepts a single image frame and is the preferred backend inference entry point.
+
+The legacy `AnalyzeVideo` streaming RPC is intentionally narrowed for Step 2: it accepts only pre-extracted image frames streamed in chunks with `Content-Type` `image/jpeg`, `image/png`, `image/jpg`, or `image/webp`. Raw `video/mp4` or `video/webm` fragments return `Unimplemented`. This prevents the production sidecar from receiving arbitrary video bytes as fake JPEG frames.
+
+Until a bounded FFmpeg/libav extractor worker is added, `AIAnalysisHandler` may skip raw evidence fragments after logging the inference error. That is safer than blocking student sessions or creating false AI results from invalid frame bytes.
+
 ## Safety Rules
 
 - Never enable `allow_stub=true` in production.
 - Omitted inference config defaults to `python_bridge`; use `engine_type: "stub"` only in explicit local development configs with `allow_stub: true`.
 - Keep audio and vision event payloads structured; do not transmit raw microphone audio.
 - Keep frame extraction interval-based or event-triggered. Do not continuously decode full video streams.
+- Do not reintroduce pseudo-frame splitting of raw video bytes in `AnalyzeVideo`; add a bounded extractor worker instead.
 - If inference capacity is saturated, drop frames and keep the student session alive.
 - Tune thresholds through config/env first; do not hardcode production sensitivity in handlers.
