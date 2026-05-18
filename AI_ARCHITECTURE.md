@@ -36,6 +36,16 @@ Source references:
 - InsightFace: https://github.com/deepinsight/insightface
 - ONNX Runtime: https://onnxruntime.ai/
 
+`ai-sidecar/model_manifest.json` is the source of truth for local model filenames and private artifact configuration. Large model binaries are excluded by `.gitignore`; store them in `models/` locally, mount them at `/models` in Docker, or download them from an internal artifact store before starting the sidecar.
+
+The downloader validates minimum file size for every model and SHA256 when a checksum is supplied:
+
+```bash
+python ai-sidecar/scripts/download_models.py --models-path models --check-only --require-sha256
+```
+
+Use `ARGUS_YOLO_ONNX_URL` and `ARGUS_ARCFACE_ONNX_URL` for private model URLs, with matching `ARGUS_YOLO_ONNX_SHA256` and `ARGUS_ARCFACE_ONNX_SHA256` values in production. The ArcFace URL may point to a zip archive; set `ARGUS_ARCFACE_ARCHIVE_MEMBER` when the archive contains multiple ONNX files.
+
 ## Environment And Config Mapping
 
 Backend Go config:

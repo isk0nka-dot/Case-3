@@ -16,14 +16,20 @@ This avoids blocking exam sessions when ONNX inference is slow or unavailable.
 ```text
 ai-sidecar/
   Dockerfile
+  model_manifest.json
   requirements.txt
+  requirements-dev.txt
   app/
     config.py
     inference.py
     main.py
     models.py
+  scripts/
+    download_models.py
   tests/
     test_model_inventory.py
+    test_model_manifest_and_downloader.py
+    test_synthetic_onnx_runtime.py
 ```
 
 The sidecar fails at startup when `MODEL_FAIL_FAST=true` and either required model is missing or cannot be loaded by ONNX Runtime.
@@ -38,6 +44,27 @@ models/arcface.onnx
 ```
 
 Do not commit large model binaries directly unless the repository is configured for Git LFS. For production, mount `/models` read-only into the sidecar container.
+
+The repository intentionally tracks only `ai-sidecar/model_manifest.json`, not the model weights. The manifest records expected filenames, source references, minimum size checks, and environment-variable names for private artifact URLs and SHA256 values.
+
+Download or validate models:
+
+```bash
+python ai-sidecar/scripts/download_models.py --models-path models
+python ai-sidecar/scripts/download_models.py --models-path models --check-only --require-sha256
+```
+
+The downloader reads these optional variables:
+
+| Variable | Description |
+| --- | --- |
+| `ARGUS_YOLO_ONNX_URL` | Private artifact URL or `file://` URL for `yolov8n.onnx`. |
+| `ARGUS_YOLO_ONNX_SHA256` | Expected SHA256 for the YOLO ONNX file. |
+| `ARGUS_ARCFACE_ONNX_URL` | Private artifact URL or archive URL for `arcface.onnx`. |
+| `ARGUS_ARCFACE_ONNX_SHA256` | Expected SHA256 for the extracted ArcFace ONNX file. |
+| `ARGUS_ARCFACE_ARCHIVE_MEMBER` | Exact member path inside an ArcFace zip archive, if the URL is an archive. |
+
+Production should use checksummed internal artifacts. Public model sources move over time; do not hardcode an unverified third-party binary URL into deployment config.
 
 ## Running Tests
 
@@ -64,7 +91,15 @@ Sidecar:
 python -m unittest discover ai-sidecar/tests -v
 ```
 
-Full ONNX runtime tests require real `.onnx` files in `models/`. The included sidecar test verifies fail-fast inventory behavior without downloading model weights.
+Install sidecar dev dependencies for synthetic ONNX runtime loading tests:
+
+```bash
+python -m venv ai-sidecar/.venv
+ai-sidecar/.venv/bin/pip install -r ai-sidecar/requirements.txt -r ai-sidecar/requirements-dev.txt
+ai-sidecar/.venv/bin/python -m unittest discover ai-sidecar/tests -v
+```
+
+On Windows PowerShell, use `ai-sidecar\.venv\Scripts\python.exe` instead of `ai-sidecar/.venv/bin/python`. The synthetic ONNX test skips when `onnx` or `onnxruntime` is not installed; the downloader and fail-fast tests still run without external model weights.
 
 ## Ubuntu Dependencies
 

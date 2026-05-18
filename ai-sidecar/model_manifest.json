@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "name": "yolo",
+      "filename": "yolov8n.onnx",
+      "source": "Ultralytics YOLOv8n COCO ONNX export",
+      "source_url": "https://docs.ultralytics.com/models/yolov8/",
+      "download_url_env": "ARGUS_YOLO_ONNX_URL",
+      "sha256_env": "ARGUS_YOLO_ONNX_SHA256",
+      "min_bytes": 1000000,
+      "notes": "Export yolov8n.pt to ONNX with Ultralytics or provide an internal artifact URL through ARGUS_YOLO_ONNX_URL."
+    },
+    {
+      "name": "arcface",
+      "filename": "arcface.onnx",
+      "source": "InsightFace ArcFace model zoo ONNX export",
+      "source_url": "https://github.com/deepinsight/insightface",
+      "download_url_env": "ARGUS_ARCFACE_ONNX_URL",
+      "sha256_env": "ARGUS_ARCFACE_ONNX_SHA256",
+      "archive_member_env": "ARGUS_ARCFACE_ARCHIVE_MEMBER",
+      "archive_member_suffix": "w600k_r50.onnx",
+      "min_bytes": 1000000,
+      "notes": "Use an internal artifact URL for the ONNX file or an archive containing w600k_r50.onnx."
+    }
+  ]
+}

@@ -17,6 +17,7 @@ loadtest
 
 # ── Test artifacts ───────────────────────────────────────────────────────────
 *.test
+coverage
 coverage.*
 *.out
 coverage.html
@@ -49,6 +50,13 @@ secrets.yml
 
 # ── Docker build cache ──────────────────────────────────────────────────────
 *.pid
+
+# ── AI model weights (large binaries; mount or download outside Git) ────────
+models/
+*.onnx
+*.pt
+ai-sidecar/.test-tmp/
+ai-sidecar/.venv*/
 
 # ── Vendor (if not committing Go vendor dir) ────────────────────────────────
 # vendor/
