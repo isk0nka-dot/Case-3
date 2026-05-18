@@ -217,6 +217,10 @@ func run() error {
 			SpoofConfidence:  cfg.Inference.SpoofConfidenceThreshold,
 		},
 	)
+	aiAnalysisHandler.ConfigureFrameExtraction(worker.FrameExtractionConfig{
+		IntervalSec:    cfg.Inference.FrameSampleIntervalSec,
+		MaxVideoDurSec: cfg.Inference.MaxVideoDurSec,
+	})
 
 	// =================================================================
 	// STEP 10: Create and configure asynq servers.

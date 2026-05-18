@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -30,16 +31,17 @@ import (
 // analysis, writes detected anomalies back to ClickHouse as source=BACKEND_AI
 // events, and fires CRITICAL Telegram alerts for fraud.
 type AIAnalysisHandler struct {
-	inferenceAddr string
-	chConn        driver.Conn
-	chWriter      *clickhouse.Writer
-	scorer        *forensic.Scorer
-	pgRepo        *postgres.Repository
-	minioClient   *minio.Client
-	minioBucket   string
-	alerter       alerting.Provider
-	logger        *zap.Logger
-	thresholds    AIAnalysisThresholds
+	inferenceAddr  string
+	chConn         driver.Conn
+	chWriter       *clickhouse.Writer
+	scorer         *forensic.Scorer
+	pgRepo         *postgres.Repository
+	minioClient    *minio.Client
+	minioBucket    string
+	alerter        alerting.Provider
+	logger         *zap.Logger
+	thresholds     AIAnalysisThresholds
+	frameExtractor FrameExtractor
 }
 
 type AIAnalysisThresholds struct {
@@ -61,7 +63,7 @@ func NewAIAnalysisHandler(
 	alerter alerting.Provider,
 	thresholds ...AIAnalysisThresholds,
 ) *AIAnalysisHandler {
-	return &AIAnalysisHandler{
+	h := &AIAnalysisHandler{
 		inferenceAddr: inferenceAddr,
 		chConn:        chConn,
 		chWriter:      chWriter,
@@ -73,6 +75,12 @@ func NewAIAnalysisHandler(
 		logger:        logger.Named("asynq_ai_analysis"),
 		thresholds:    normalizeAIAnalysisThresholds(firstAIAnalysisThresholds(thresholds)),
 	}
+	h.ConfigureFrameExtraction(FrameExtractionConfig{})
+	return h
+}
+
+func (h *AIAnalysisHandler) ConfigureFrameExtraction(cfg FrameExtractionConfig) {
+	h.frameExtractor = NewFFmpegFrameExtractor(cfg)
 }
 
 // ProcessTask implements the asynq.Handler interface.
@@ -253,7 +261,7 @@ func (h *AIAnalysisHandler) analyzeFragment(
 	payload AIAnalysisPayload,
 	frag evidenceFragment,
 ) (*inferencepb.AnalyzeVideoResponse, error) {
-	if !isSupportedEvidenceFrameContentType(frag.ContentType) {
+	if !isSupportedEvidenceContentType(frag.ContentType) {
 		return nil, fmt.Errorf("%w: %s", errUnsupportedEvidenceContentType, frag.ContentType)
 	}
 
@@ -263,6 +271,10 @@ func (h *AIAnalysisHandler) analyzeFragment(
 		return nil, fmt.Errorf("get object %s: %w", frag.ObjectKey, err)
 	}
 	defer obj.Close()
+
+	if isSupportedEvidenceVideoContentType(frag.ContentType) {
+		return h.analyzeVideoEvidence(ctx, client, payload, frag, obj)
+	}
 
 	// Stream to inference gateway via AnalyzeVideo client-streaming RPC.
 	stream, err := client.AnalyzeVideo(ctx)
@@ -307,10 +319,72 @@ func (h *AIAnalysisHandler) analyzeFragment(
 	return resp, nil
 }
 
+func (h *AIAnalysisHandler) analyzeVideoEvidence(
+	ctx context.Context,
+	client inferencepb.InferenceServiceClient,
+	payload AIAnalysisPayload,
+	frag evidenceFragment,
+	videoReader io.Reader,
+) (*inferencepb.AnalyzeVideoResponse, error) {
+	extractor := h.frameExtractor
+	if extractor == nil {
+		extractor = NewFFmpegFrameExtractor(FrameExtractionConfig{})
+	}
+
+	extractedFrames, err := extractor.ExtractFrames(ctx, videoReader, frag.ContentType)
+	if err != nil {
+		return nil, fmt.Errorf("extract frames from %s: %w", frag.ObjectKey, err)
+	}
+
+	frames := make([]*inferencepb.FrameAnalysis, 0, len(extractedFrames))
+	totalProcessingMs := 0.0
+	for _, frame := range extractedFrames {
+		resp, err := client.AnalyzeFrame(ctx, &inferencepb.AnalyzeFrameRequest{
+			SessionId:         payload.SessionID,
+			StudentId:         payload.StudentID,
+			ExamId:            payload.ExamID,
+			OrgId:             payload.OrgID,
+			FrameData:         frame.Data,
+			ContentType:       frame.ContentType,
+			VideoTimestampSec: frame.TimestampSec,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("analyze extracted frame at %.2fs: %w", frame.TimestampSec, err)
+		}
+		totalProcessingMs += resp.ProcessingTimeMs
+		frames = append(frames, &inferencepb.FrameAnalysis{
+			TimestampSec: frame.TimestampSec,
+			Faces:        resp.Faces,
+			Objects:      resp.Objects,
+			Liveness:     resp.Liveness,
+		})
+	}
+
+	return &inferencepb.AnalyzeVideoResponse{
+		Frames:                frames,
+		Summary:               summarizeAIFrames(frames, h.thresholds),
+		TotalProcessingTimeMs: totalProcessingMs,
+	}, nil
+}
+
+func isSupportedEvidenceContentType(contentType string) bool {
+	return isSupportedEvidenceFrameContentType(contentType) || isSupportedEvidenceVideoContentType(contentType)
+}
+
 func isSupportedEvidenceFrameContentType(contentType string) bool {
 	mediaType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
 	switch mediaType {
 	case "image/jpeg", "image/jpg", "image/png", "image/webp":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSupportedEvidenceVideoContentType(contentType string) bool {
+	mediaType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
+	switch mediaType {
+	case "video/mp4", "video/webm":
 		return true
 	default:
 		return false
@@ -418,6 +492,57 @@ func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnaly
 	}
 
 	return anomalies
+}
+
+func summarizeAIFrames(frames []*inferencepb.FrameAnalysis, thresholds AIAnalysisThresholds) *inferencepb.AnalysisSummary {
+	thresholds = normalizeAIAnalysisThresholds(thresholds)
+
+	summary := &inferencepb.AnalysisSummary{
+		TotalFramesAnalyzed: int32(len(frames)),
+		Verdict:             "clean",
+	}
+
+	for _, frame := range frames {
+		if frame == nil {
+			continue
+		}
+		if len(frame.Objects) > 0 {
+			summary.ObjectDetectionFrames++
+		}
+		for _, face := range frame.Faces {
+			if face.Similarity > 0 && face.Similarity < thresholds.FaceMismatch {
+				summary.FaceMismatchFrames++
+			}
+			if face.IsSpoof && face.Confidence >= thresholds.SpoofConfidence {
+				summary.SpoofFrames++
+			}
+		}
+
+		anomalies := classifyFrameAnomalies(frame, thresholds)
+		if len(anomalies) == 0 {
+			continue
+		}
+
+		summary.FraudFrames++
+		for _, anomaly := range anomalies {
+			if anomaly.confidence > summary.MaxFraudConfidence {
+				summary.MaxFraudConfidence = anomaly.confidence
+			}
+		}
+	}
+
+	if summary.TotalFramesAnalyzed == 0 {
+		return summary
+	}
+
+	fraudRate := float64(summary.FraudFrames) / float64(summary.TotalFramesAnalyzed)
+	switch {
+	case fraudRate > 0.15 || summary.MaxFraudConfidence > 0.9:
+		summary.Verdict = "fraud"
+	case fraudRate > 0.05 || summary.MaxFraudConfidence > 0.7:
+		summary.Verdict = "suspicious"
+	}
+	return summary
 }
 
 func firstAIAnalysisThresholds(thresholds []AIAnalysisThresholds) AIAnalysisThresholds {

@@ -106,7 +106,9 @@ Place model weights under `argus-backend/models/` for local testing or mount the
 
 The backend does not continuously decode WebM/MP4 evidence fragments. Background workers should send already sampled image frames to the inference gateway, or skip the fragment until the safe extractor worker is available. This keeps the exam session path independent from FFmpeg load and prevents ONNX from receiving invalid raw video bytes.
 
-`AIAnalysisHandler` enforces this at the worker boundary: `image/jpeg`, `image/png`, and `image/webp` evidence fragments may be sent to inference, while `video/mp4` and `video/webm` fragments are skipped until the bounded extractor exists.
+`AIAnalysisHandler` enforces this at the worker boundary: `image/jpeg`, `image/png`, and `image/webp` evidence fragments may be sent directly to inference, while `video/mp4` and `video/webm` fragments are sampled through the bounded FFmpeg extractor first. Unsupported content types are skipped before storage download.
+
+The extractor uses the configured `inference.frame_sample_interval_sec` and `inference.max_video_dur_sec` values to build a bounded FFmpeg command with `-nostdin`, `fps=1/N`, and `-frames:v max`. The worker then sends each extracted JPEG through `AnalyzeFrame`, preserving the sampled timestamp in `video_timestamp_sec`.
 
 Run locally:
 
@@ -129,6 +131,6 @@ Future GPU deployment can switch the sidecar image to a CUDA runtime and use ONN
 
 ## Remaining Work
 
-- Add a bounded FFmpeg/libav frame extractor worker that samples at `FRAME_EXTRACTION_INTERVAL_SEC` or only around critical frontend events.
 - Persist extracted frame metadata so retries do not decode the same evidence fragment repeatedly.
+- Add event-triggered extraction windows around critical frontend MediaPipe/audio anomalies.
 - Extend ClickHouse analytics columns only after the existing event payload contract has stayed backward-compatible in staging.

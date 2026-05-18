@@ -146,9 +146,11 @@ inference:
 
 The `AnalyzeFrame` RPC accepts a single image frame and is the preferred backend inference entry point.
 
-The legacy `AnalyzeVideo` streaming RPC is intentionally narrowed for Step 2: it accepts only pre-extracted image frames streamed in chunks with `Content-Type` `image/jpeg`, `image/png`, `image/jpg`, or `image/webp`. Raw `video/mp4` or `video/webm` fragments return `Unimplemented`. This prevents the production sidecar from receiving arbitrary video bytes as fake JPEG frames.
+The legacy `AnalyzeVideo` streaming RPC is intentionally narrowed for Step 2: it accepts only pre-extracted image frames streamed in chunks with `Content-Type` `image/jpeg`, `image/png`, `image/jpg`, or `image/webp`. Raw `video/mp4` or `video/webm` fragments return `Unimplemented` at the gateway. This prevents the production sidecar from receiving arbitrary video bytes as fake JPEG frames.
 
-Until a bounded FFmpeg/libav extractor worker is added, `AIAnalysisHandler` skips raw `video/mp4` and `video/webm` evidence fragments before downloading them from MinIO. That is safer than blocking student sessions or creating false AI results from invalid frame bytes.
+`AIAnalysisHandler` handles raw `video/mp4` and `video/webm` evidence through a bounded FFmpeg extractor before calling inference. The extractor samples at `inference.frame_sample_interval_sec`, caps output with `inference.max_video_dur_sec / inference.frame_sample_interval_sec`, and sends each JPEG to `AnalyzeFrame` with its sampled timestamp. Unsupported content types are skipped before MinIO download.
+
+Worker hosts that run backend video deep scans must have `ffmpeg` on `PATH`. If the worker runs in Docker, install `ffmpeg` in that worker image before enabling video evidence analysis.
 
 ## Safety Rules
 
