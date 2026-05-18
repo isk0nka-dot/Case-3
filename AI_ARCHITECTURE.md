@@ -110,6 +110,8 @@ The backend does not continuously decode WebM/MP4 evidence fragments. Background
 
 The extractor uses the configured `inference.frame_sample_interval_sec` and `inference.max_video_dur_sec` values to build a bounded FFmpeg command with `-nostdin`, `fps=1/N`, and `-frames:v max`. The worker then sends each extracted JPEG through `AnalyzeFrame`, preserving the sampled timestamp in `video_timestamp_sec`.
 
+Docker runtime is split by responsibility: `Dockerfile.worker` runs the Asynq worker with `ffmpeg`, `Dockerfile.inference` runs the Go gRPC gateway, and `ai-sidecar/Dockerfile` runs ONNX Runtime. `docker-compose.yml` wires worker → inference → ai-sidecar.
+
 Run locally:
 
 ```bash

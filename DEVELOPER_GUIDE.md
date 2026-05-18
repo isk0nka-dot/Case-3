@@ -131,6 +131,8 @@ CI pushes code only. Server deployment should be done separately after the pipel
 git pull
 docker build -t argus/backend:latest .
 docker build -t argus/ai-sidecar:latest ai-sidecar
+docker build -f Dockerfile.inference -t argus/inference:latest .
+docker build -f Dockerfile.worker -t argus/worker:latest .
 ```
 
 The backend config must point to the sidecar:
@@ -141,6 +143,8 @@ inference:
   python_bridge_url: "http://ai-sidecar:8091"
   allow_stub: false
 ```
+
+`Dockerfile.inference` runs `cmd/inference`, which exposes the Go gRPC inference gateway and calls the Python sidecar over HTTP. `Dockerfile.worker` runs `cmd/worker`, installs `ffmpeg`, consumes Asynq jobs, extracts bounded video frames, and calls the inference gateway. The local `docker-compose.yml` declares `ai-sidecar`, `inference`, and `worker` as separate services so model execution stays isolated from the API server.
 
 ## Inference Gateway Contract
 

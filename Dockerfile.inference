@@ -1,0 +1,42 @@
+# =============================================================================
+# Argus Inference Gateway — gRPC wrapper around the Python ONNX sidecar
+# =============================================================================
+
+FROM golang:1.26-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+COPY . .
+
+ARG VERSION=dev
+ARG BUILD_TIME=unknown
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -trimpath \
+    -ldflags="-s -w -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \
+    -o /build/bin/argus-inference \
+    ./cmd/inference
+
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tzdata
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+RUN mkdir -p /app/deployments && chown -R appuser:appgroup /app
+
+WORKDIR /app
+
+COPY --from=builder /build/bin/argus-inference /app/argus-inference
+
+RUN chmod +x /app/argus-inference
+
+USER appuser
+
+EXPOSE 50061
+
+ENTRYPOINT ["/app/argus-inference"]

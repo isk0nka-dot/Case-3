@@ -1,0 +1,42 @@
+# =============================================================================
+# Argus Worker — Asynq jobs for exports, reports, and backend AI analysis
+# =============================================================================
+
+FROM golang:1.26-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+COPY . .
+
+ARG VERSION=dev
+ARG BUILD_TIME=unknown
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -trimpath \
+    -ldflags="-s -w -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \
+    -o /build/bin/argus-worker \
+    ./cmd/worker
+
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tzdata ffmpeg
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && addgroup -g 999 -S docker || true \
+    && addgroup appuser docker || true
+
+RUN mkdir -p /app/deployments /data/argus-dlq && chown -R appuser:appgroup /app /data/argus-dlq
+
+WORKDIR /app
+
+COPY --from=builder /build/bin/argus-worker /app/argus-worker
+
+RUN chmod +x /app/argus-worker
+
+USER appuser
+
+ENTRYPOINT ["/app/argus-worker"]
