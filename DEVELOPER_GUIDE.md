@@ -36,6 +36,8 @@ ai-sidecar/
 
 The sidecar fails at startup when `MODEL_FAIL_FAST=true` and either required model is missing or cannot be loaded by ONNX Runtime.
 
+The YOLO parser supports Ultralytics-style `[1,84,N]` outputs and objectness-column `[1,85,N]` outputs. In the objectness format, final confidence is `objectness * class_score`, which keeps YOLOv5/custom exports compatible without changing the Go inference contract.
+
 ## Required Model Files
 
 Default local paths:

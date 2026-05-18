@@ -94,9 +94,16 @@ def _run_yolo(session: Any, image: Any, confidence_threshold: float) -> list[dic
         if row.shape[0] < 6:
             continue
 
-        scores = row[4:]
-        class_id = int(np.argmax(scores))
-        confidence = float(scores[class_id])
+        if row.shape[0] >= 85:
+            objectness = float(row[4])
+            scores = row[5:]
+            class_id = int(np.argmax(scores))
+            confidence = objectness * float(scores[class_id])
+        else:
+            scores = row[4:]
+            class_id = int(np.argmax(scores))
+            confidence = float(scores[class_id])
+
         mapped = COCO_CLASS_MAP.get(class_id)
         if mapped is None or confidence < confidence_threshold:
             continue

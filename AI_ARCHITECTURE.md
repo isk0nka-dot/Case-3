@@ -32,7 +32,7 @@ The exam session path does not wait on ONNX inference. MediaPipe and audio VAD r
 
 | Model | File | Source | Purpose | Input | Output |
 | --- | --- | --- | --- | --- | --- |
-| YOLOv8n ONNX | `models/yolov8n.onnx` | Ultralytics YOLOv8 export | Object detection for `person`, `cell phone`, `book`; custom future exports can add earbuds/headphones | usually `[1,3,640,640]` FP32 RGB | YOLO detections, commonly `[1,84,8400]` |
+| YOLOv8n ONNX | `models/yolov8n.onnx` | Ultralytics YOLOv8 export | Object detection for `person`, `cell phone`, `book`; custom future exports can add earbuds/headphones | usually `[1,3,640,640]` FP32 RGB | YOLO detections, commonly `[1,84,N]`; objectness-column exports `[1,85,N]` are also supported |
 | ArcFace/InsightFace ONNX | `models/arcface.onnx` | InsightFace model zoo | Face embedding and identity verification against enrolled reference embedding | commonly `[1,3,112,112]` FP32 RGB | embedding vector, commonly 512 floats |
 
 Source references:
