@@ -194,8 +194,8 @@ type InferenceConfig struct {
 	// GRPCPort is the port the inference gRPC server listens on. Default: 50061.
 	GRPCPort int `yaml:"grpc_port"`
 
-	// EngineType selects the AI inference backend. Default: "stub".
-	// Options: "stub" (synthetic results), "onnx" (ONNX Runtime), "python_bridge" (Python sidecar).
+	// EngineType selects the AI inference backend. Default: "python_bridge".
+	// Options: "stub" (synthetic local dev only), "python_bridge" (Python ONNX sidecar).
 	EngineType string `yaml:"engine_type"`
 
 	// AllowStub must be explicitly enabled for local development. Production
@@ -980,7 +980,7 @@ func applyDefaults(cfg *Config) {
 		cfg.Inference.GRPCPort = 50061
 	}
 	if cfg.Inference.EngineType == "" {
-		cfg.Inference.EngineType = "stub"
+		cfg.Inference.EngineType = "python_bridge"
 	}
 	if cfg.Inference.PythonBridgeURL == "" {
 		cfg.Inference.PythonBridgeURL = "http://localhost:8091"

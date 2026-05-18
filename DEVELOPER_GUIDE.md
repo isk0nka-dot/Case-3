@@ -144,6 +144,7 @@ inference:
 ## Safety Rules
 
 - Never enable `allow_stub=true` in production.
+- Omitted inference config defaults to `python_bridge`; use `engine_type: "stub"` only in explicit local development configs with `allow_stub: true`.
 - Keep audio and vision event payloads structured; do not transmit raw microphone audio.
 - Keep frame extraction interval-based or event-triggered. Do not continuously decode full video streams.
 - If inference capacity is saturated, drop frames and keep the student session alive.

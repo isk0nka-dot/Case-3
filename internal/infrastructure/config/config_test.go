@@ -2,6 +2,22 @@ package config
 
 import "testing"
 
+func TestInferenceDefaultEngineIsPythonBridge(t *testing.T) {
+	cfg := &Config{}
+
+	applyDefaults(cfg)
+
+	if cfg.Inference.EngineType != "python_bridge" {
+		t.Fatalf("expected production-safe python_bridge default, got %q", cfg.Inference.EngineType)
+	}
+	if cfg.Inference.PythonBridgeURL == "" {
+		t.Fatal("expected python bridge URL default")
+	}
+	if cfg.Inference.AllowStub {
+		t.Fatal("allow_stub must default to false")
+	}
+}
+
 func TestDeploymentConfigLoadsPythonBridgeInference(t *testing.T) {
 	cfg, err := Load("../../../deployments/config.yaml")
 	if err != nil {

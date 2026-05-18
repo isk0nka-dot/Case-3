@@ -52,7 +52,7 @@ Backend Go config:
 
 | YAML | Environment | Default | Description |
 | --- | --- | --- | --- |
-| `inference.engine_type` | `EVENT_COLLECTOR_INFERENCE_ENGINE_TYPE` | `stub` in code, `python_bridge` in production YAML | Selects `stub` or `python_bridge`. |
+| `inference.engine_type` | `EVENT_COLLECTOR_INFERENCE_ENGINE_TYPE` | `python_bridge` | Selects `stub` or `python_bridge`; `stub` is accepted only when `allow_stub=true`. |
 | `inference.allow_stub` | `EVENT_COLLECTOR_INFERENCE_ALLOW_STUB` | `false` | Enables stub only for local development. |
 | `inference.python_bridge_url` | `EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL` | `http://localhost:8091` | Python sidecar base URL. |
 | `inference.bridge_timeout_sec` | `EVENT_COLLECTOR_INFERENCE_BRIDGE_TIMEOUT_SEC` | `5` | Health check and inference HTTP timeout. |
