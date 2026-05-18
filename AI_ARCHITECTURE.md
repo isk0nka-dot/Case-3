@@ -114,6 +114,18 @@ Audio and AI events continue to flow through the existing `events` schema. The r
 
 Browser audio events arrive through the existing `sendEvent`/gRPC-Web path as `AudioAnalysisPayload`. The backend audio bridge observes `AUDIO_LEVEL_TELEMETRY`, and when sustained RMS/VAD thresholds are exceeded, it appends a derived `audio_anomaly` event to ClickHouse only. Kafka still receives only the original frontend event, so downstream realtime consumers and API contracts remain unchanged.
 
+Backend vision deep-scan events are emitted by `AIAnalysisHandler` after the Asynq worker samples evidence frames and receives inference results:
+
+| Backend AI result | Event type | Payload type | ClickHouse fields |
+| --- | --- | --- | --- |
+| YOLO `phone`, `book`, `earbuds`, custom hidden object | `BACKEND_AI_HIDDEN_OBJECT` | `object_detection` | `payload.object_type`, normalized bbox, `detection_confidence` |
+| YOLO `person` or `screen_reflection` | `BACKEND_AI_SCREEN_REFLECTION` | `object_detection` | `payload.object_type`, normalized bbox, `detection_confidence` |
+| ArcFace similarity below threshold | `BACKEND_AI_FACE_MISMATCH` | `face_detection` | `face_similarity`, `face_bbox`, optional `face_embedding` |
+| Spoof/deepfake face result | `BACKEND_AI_FACE_MISMATCH` or `BACKEND_AI_DEEPFAKE_DETECTED` | `face_detection` | `face_similarity` when available, `face_bbox`, optional `face_embedding` |
+| Liveness score below threshold | `BACKEND_AI_FACE_MISMATCH` | `liveness` | `liveness_score` |
+
+For backend AI events, unused AI columns are initialized with the same sentinel values used by frontend-mapped events: `face_similarity=-1`, `liveness_score=-1`, and `audio_rms_db=-100`. This prevents empty vision events from looking like low-confidence face or audio readings in ClickHouse queries.
+
 The AI layer does not write to PostgreSQL transactions in the student session path. ClickHouse writes remain asynchronous and best-effort.
 
 ## Operational Notes

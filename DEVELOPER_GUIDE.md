@@ -185,6 +185,38 @@ The legacy `AnalyzeVideo` streaming RPC is intentionally narrowed for Step 2: it
 
 Worker hosts that run backend video deep scans must have `ffmpeg` on `PATH`. If the worker runs in Docker, install `ffmpeg` in that worker image before enabling video evidence analysis.
 
+## Backend AI Event Mapping
+
+`AIAnalysisHandler` writes model findings back to ClickHouse as `source=backend_ai` events. These events are not sent through Kafka and do not change the student-facing session API.
+
+Object detections use `payload_type=object_detection` with this JSON shape:
+
+```json
+{
+  "object_type": "phone",
+  "bbox_x": 0.11,
+  "bbox_y": 0.22,
+  "bbox_w": 0.33,
+  "bbox_h": 0.44,
+  "detection_confidence": 0.91
+}
+```
+
+Face mismatch/spoof detections use `payload_type=face_detection` and also populate denormalized ClickHouse fields where available:
+
+```json
+{
+  "match": false,
+  "similarity": 0.42,
+  "face_count": 1,
+  "is_spoof": false
+}
+```
+
+The worker sets `face_similarity`, `face_bbox`, and optional `face_embedding` for ArcFace results. Liveness failures use `payload_type=liveness` and populate `liveness_score`.
+
+Unused denormalized AI columns are deliberately initialized with sentinel values before insert: `face_similarity=-1`, `liveness_score=-1`, and `audio_rms_db=-100`. Do not remove these sentinels; otherwise ClickHouse analytics may interpret empty backend vision events as real zero-valued face or audio readings.
+
 ## Audio Bridge Contract
 
 Frontend `useAudioEngine` emits structured audio features through the existing `sendEvent` pipeline. The backend bridge observes only `AUDIO_LEVEL_TELEMETRY`; it does not ingest raw microphone samples.

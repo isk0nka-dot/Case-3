@@ -1,7 +1,9 @@
 package worker
 
 import (
+	"encoding/json"
 	"testing"
+	"time"
 
 	inferencepb "github.com/argus-ai/event-collector/api/proto/v1/inferencepb"
 	"github.com/argus-ai/event-collector/internal/domain/valueobject"
@@ -59,5 +61,120 @@ func TestClassifyFrameAnomaliesAllowsThresholdTuning(t *testing.T) {
 
 	if len(anomalies) != 3 {
 		t.Fatalf("expected tuned thresholds to emit spoof, object, and liveness, got %d anomalies: %#v", len(anomalies), anomalies)
+	}
+}
+
+func TestClassifyFrameAnomaliesCarriesObjectDetectionPayloadForClickHouse(t *testing.T) {
+	frame := &inferencepb.FrameAnalysis{
+		TimestampSec: 12,
+		Objects: []*inferencepb.ObjectDetection{
+			{
+				ObjectType: "phone",
+				Confidence: 0.91,
+				BboxX:      0.11,
+				BboxY:      0.22,
+				BboxW:      0.33,
+				BboxH:      0.44,
+			},
+		},
+	}
+
+	anomalies := classifyFrameAnomalies(frame, AIAnalysisThresholds{ObjectConfidence: 0.7})
+
+	if len(anomalies) != 1 {
+		t.Fatalf("expected one object anomaly, got %d", len(anomalies))
+	}
+	if anomalies[0].payloadType != "object_detection" {
+		t.Fatalf("payload type = %q, want object_detection", anomalies[0].payloadType)
+	}
+
+	var objectPayload struct {
+		ObjectType          string  `json:"object_type"`
+		BboxX               float32 `json:"bbox_x"`
+		BboxY               float32 `json:"bbox_y"`
+		BboxW               float32 `json:"bbox_w"`
+		BboxH               float32 `json:"bbox_h"`
+		DetectionConfidence float32 `json:"detection_confidence"`
+	}
+	if err := json.Unmarshal(anomalies[0].payload, &objectPayload); err != nil {
+		t.Fatalf("object payload is not valid JSON: %v", err)
+	}
+	if objectPayload.ObjectType != "phone" || objectPayload.DetectionConfidence != 0.91 {
+		t.Fatalf("unexpected object payload: %#v", objectPayload)
+	}
+	if objectPayload.BboxX != 0.11 || objectPayload.BboxY != 0.22 || objectPayload.BboxW != 0.33 || objectPayload.BboxH != 0.44 {
+		t.Fatalf("object bbox was not preserved: %#v", objectPayload)
+	}
+
+	event := (&AIAnalysisHandler{}).buildEvent(
+		AIAnalysisPayload{SessionID: "session-1", StudentID: "student-1", ExamID: "exam-1", OrgID: "org-1"},
+		time.Unix(100, 0).UTC(),
+		frame.TimestampSec,
+		anomalies[0],
+	)
+	if event.PayloadType != "object_detection" || len(event.Payload) == 0 {
+		t.Fatalf("event payload was not attached: type=%q payload=%s", event.PayloadType, string(event.Payload))
+	}
+	if event.FaceSimilarity != -1 || event.LivenessScore != -1 || event.AudioRmsDb != -100 {
+		t.Fatalf("event sentinels not initialized: face_similarity=%f liveness=%f audio=%f", event.FaceSimilarity, event.LivenessScore, event.AudioRmsDb)
+	}
+}
+
+func TestClassifyFrameAnomaliesCarriesFacePayloadAndDenormalizedFields(t *testing.T) {
+	frame := &inferencepb.FrameAnalysis{
+		TimestampSec: 18,
+		Faces: []*inferencepb.FaceDetection{
+			{
+				Confidence: 0.88,
+				Similarity: 0.42,
+				BboxX:      0.12,
+				BboxY:      0.23,
+				BboxW:      0.34,
+				BboxH:      0.45,
+				Embedding:  []float32{0.1, 0.2, 0.3},
+			},
+		},
+	}
+
+	anomalies := classifyFrameAnomalies(frame, AIAnalysisThresholds{FaceMismatch: 0.6})
+
+	if len(anomalies) != 1 {
+		t.Fatalf("expected one face mismatch anomaly, got %d", len(anomalies))
+	}
+	if anomalies[0].payloadType != "face_detection" {
+		t.Fatalf("payload type = %q, want face_detection", anomalies[0].payloadType)
+	}
+
+	var facePayload struct {
+		Match      bool    `json:"match"`
+		Similarity float32 `json:"similarity"`
+		FaceCount  int32   `json:"face_count"`
+		IsSpoof    bool    `json:"is_spoof"`
+		SpoofType  string  `json:"spoof_type"`
+	}
+	if err := json.Unmarshal(anomalies[0].payload, &facePayload); err != nil {
+		t.Fatalf("face payload is not valid JSON: %v", err)
+	}
+	if facePayload.Match || facePayload.Similarity != 0.42 || facePayload.FaceCount != 1 {
+		t.Fatalf("unexpected face payload: %#v", facePayload)
+	}
+
+	event := (&AIAnalysisHandler{}).buildEvent(
+		AIAnalysisPayload{SessionID: "session-1", StudentID: "student-1", ExamID: "exam-1", OrgID: "org-1"},
+		time.Unix(100, 0).UTC(),
+		frame.TimestampSec,
+		anomalies[0],
+	)
+	if event.PayloadType != "face_detection" || len(event.Payload) == 0 {
+		t.Fatalf("event payload was not attached: type=%q payload=%s", event.PayloadType, string(event.Payload))
+	}
+	if event.FaceSimilarity != 0.42 {
+		t.Fatalf("face similarity = %f, want 0.42", event.FaceSimilarity)
+	}
+	if event.FaceBBox != `{"x":0.120000,"y":0.230000,"w":0.340000,"h":0.450000}` {
+		t.Fatalf("face bbox was not denormalized: %s", event.FaceBBox)
+	}
+	if len(event.FaceEmbedding) != 3 {
+		t.Fatalf("face embedding was not preserved, got len=%d", len(event.FaceEmbedding))
 	}
 }

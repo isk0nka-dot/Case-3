@@ -405,9 +405,7 @@ func (h *AIAnalysisHandler) writeBackAnomalies(
 
 	for _, frame := range frames {
 		for _, anomaly := range classifyFrameAnomalies(frame, h.thresholds) {
-			evt := h.buildEvent(payload, now, frame.TimestampSec,
-				anomaly.eventType, anomaly.severity, anomaly.label, anomaly.confidence,
-			)
+			evt := h.buildEvent(payload, now, frame.TimestampSec, anomaly)
 			if err := h.chWriter.Write(ctx, evt); err != nil {
 				h.logger.Warn("failed to write AI anomaly event", zap.Error(err))
 				continue
@@ -420,10 +418,43 @@ func (h *AIAnalysisHandler) writeBackAnomalies(
 }
 
 type detectedAIAnomaly struct {
-	eventType  valueobject.EventType
-	severity   valueobject.Severity
-	label      string
-	confidence float32
+	eventType         valueobject.EventType
+	severity          valueobject.Severity
+	label             string
+	confidence        float32
+	payload           []byte
+	payloadType       string
+	faceBBox          string
+	faceEmbedding     []float32
+	faceSimilarity    float32
+	faceSimilaritySet bool
+	livenessScore     float32
+	livenessScoreSet  bool
+	headYaw           float32
+	headPitch         float32
+	headRoll          float32
+}
+
+type aiFaceDetectionPayload struct {
+	Match      bool    `json:"match"`
+	Similarity float32 `json:"similarity,omitempty"`
+	FaceCount  int32   `json:"face_count,omitempty"`
+	IsSpoof    bool    `json:"is_spoof,omitempty"`
+	SpoofType  string  `json:"spoof_type,omitempty"`
+}
+
+type aiObjectDetectionPayload struct {
+	ObjectType          string  `json:"object_type"`
+	BboxX               float32 `json:"bbox_x,omitempty"`
+	BboxY               float32 `json:"bbox_y,omitempty"`
+	BboxW               float32 `json:"bbox_w,omitempty"`
+	BboxH               float32 `json:"bbox_h,omitempty"`
+	DetectionConfidence float32 `json:"detection_confidence"`
+}
+
+type aiLivenessPayload struct {
+	LivenessScore float32 `json:"liveness_score"`
+	SpoofVector   string  `json:"spoof_vector,omitempty"`
 }
 
 func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnalysisThresholds) []detectedAIAnomaly {
@@ -433,14 +464,29 @@ func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnaly
 
 	thresholds = normalizeAIAnalysisThresholds(thresholds)
 	anomalies := make([]detectedAIAnomaly, 0, len(frame.Faces)+len(frame.Objects)+1)
+	faceCount := int32(len(frame.Faces))
 
 	for _, face := range frame.Faces {
 		if face.Similarity > 0 && face.Similarity < thresholds.FaceMismatch {
+			payload := aiFaceDetectionPayload{
+				Match:      false,
+				Similarity: face.Similarity,
+				FaceCount:  faceCount,
+			}
 			anomalies = append(anomalies, detectedAIAnomaly{
-				eventType:  valueobject.BackendAIFaceMismatch,
-				severity:   valueobject.SeverityCritical,
-				label:      fmt.Sprintf("Backend AI: face mismatch (similarity=%.2f)", face.Similarity),
-				confidence: face.Confidence,
+				eventType:         valueobject.BackendAIFaceMismatch,
+				severity:          valueobject.SeverityCritical,
+				label:             fmt.Sprintf("Backend AI: face mismatch (similarity=%.2f)", face.Similarity),
+				confidence:        face.Confidence,
+				payload:           marshalAIAnomalyPayload(payload),
+				payloadType:       "face_detection",
+				faceBBox:          faceBBoxJSON(face),
+				faceEmbedding:     append([]float32(nil), face.Embedding...),
+				faceSimilarity:    face.Similarity,
+				faceSimilaritySet: true,
+				headYaw:           face.HeadYaw,
+				headPitch:         face.HeadPitch,
+				headRoll:          face.HeadRoll,
 			})
 		}
 
@@ -450,11 +496,27 @@ func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnaly
 			if face.SpoofType == "deepfake" {
 				evtType = valueobject.BackendAIDeepfakeDetected
 			}
+			payload := aiFaceDetectionPayload{
+				Match:      face.Similarity == 0 || face.Similarity >= thresholds.FaceMismatch,
+				Similarity: face.Similarity,
+				FaceCount:  faceCount,
+				IsSpoof:    true,
+				SpoofType:  face.SpoofType,
+			}
 			anomalies = append(anomalies, detectedAIAnomaly{
-				eventType:  evtType,
-				severity:   valueobject.SeverityCritical,
-				label:      label,
-				confidence: face.Confidence,
+				eventType:         evtType,
+				severity:          valueobject.SeverityCritical,
+				label:             label,
+				confidence:        face.Confidence,
+				payload:           marshalAIAnomalyPayload(payload),
+				payloadType:       "face_detection",
+				faceBBox:          faceBBoxJSON(face),
+				faceEmbedding:     append([]float32(nil), face.Embedding...),
+				faceSimilarity:    face.Similarity,
+				faceSimilaritySet: face.Similarity > 0,
+				headYaw:           face.HeadYaw,
+				headPitch:         face.HeadPitch,
+				headRoll:          face.HeadRoll,
 			})
 		}
 	}
@@ -474,24 +536,57 @@ func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnaly
 			evtType = valueobject.BackendAIHiddenObject
 		}
 
+		payload := aiObjectDetectionPayload{
+			ObjectType:          obj.ObjectType,
+			BboxX:               obj.BboxX,
+			BboxY:               obj.BboxY,
+			BboxW:               obj.BboxW,
+			BboxH:               obj.BboxH,
+			DetectionConfidence: obj.Confidence,
+		}
 		anomalies = append(anomalies, detectedAIAnomaly{
-			eventType:  evtType,
-			severity:   valueobject.SeverityWarning,
-			label:      fmt.Sprintf("Backend AI: %s detected (conf=%.2f)", obj.ObjectType, obj.Confidence),
-			confidence: obj.Confidence,
+			eventType:   evtType,
+			severity:    valueobject.SeverityWarning,
+			label:       fmt.Sprintf("Backend AI: %s detected (conf=%.2f)", obj.ObjectType, obj.Confidence),
+			confidence:  obj.Confidence,
+			payload:     marshalAIAnomalyPayload(payload),
+			payloadType: "object_detection",
 		})
 	}
 
 	if frame.Liveness != nil && !frame.Liveness.IsLive && frame.Liveness.Score < thresholds.Liveness {
+		payload := aiLivenessPayload{
+			LivenessScore: frame.Liveness.Score,
+			SpoofVector:   frame.Liveness.Method,
+		}
 		anomalies = append(anomalies, detectedAIAnomaly{
-			eventType:  valueobject.BackendAIFaceMismatch,
-			severity:   valueobject.SeverityCritical,
-			label:      fmt.Sprintf("Backend AI: liveness failed (score=%.2f, method=%s)", frame.Liveness.Score, frame.Liveness.Method),
-			confidence: 1.0 - frame.Liveness.Score,
+			eventType:        valueobject.BackendAIFaceMismatch,
+			severity:         valueobject.SeverityCritical,
+			label:            fmt.Sprintf("Backend AI: liveness failed (score=%.2f, method=%s)", frame.Liveness.Score, frame.Liveness.Method),
+			confidence:       1.0 - frame.Liveness.Score,
+			payload:          marshalAIAnomalyPayload(payload),
+			payloadType:      "liveness",
+			livenessScore:    frame.Liveness.Score,
+			livenessScoreSet: true,
 		})
 	}
 
 	return anomalies
+}
+
+func marshalAIAnomalyPayload(payload any) []byte {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil
+	}
+	return data
+}
+
+func faceBBoxJSON(face *inferencepb.FaceDetection) string {
+	if face == nil {
+		return ""
+	}
+	return fmt.Sprintf(`{"x":%f,"y":%f,"w":%f,"h":%f}`, face.BboxX, face.BboxY, face.BboxW, face.BboxH)
 }
 
 func summarizeAIFrames(frames []*inferencepb.FrameAnalysis, thresholds AIAnalysisThresholds) *inferencepb.AnalysisSummary {
@@ -572,26 +667,40 @@ func (h *AIAnalysisHandler) buildEvent(
 	payload AIAnalysisPayload,
 	serverTime time.Time,
 	videoTimestamp float64,
-	eventType valueobject.EventType,
-	severity valueobject.Severity,
-	label string,
-	confidence float32,
+	anomaly detectedAIAnomaly,
 ) *entity.ProctoringEvent {
-	return &entity.ProctoringEvent{
+	event := &entity.ProctoringEvent{
 		EventID:         randutil.HexToken(16),
 		SessionID:       payload.SessionID,
 		StudentID:       payload.StudentID,
 		ExamID:          payload.ExamID,
 		OrgID:           payload.OrgID,
-		EventType:       eventType,
-		Severity:        severity,
+		EventType:       anomaly.eventType,
+		Severity:        anomaly.severity,
 		Source:          valueobject.SourceBackendAI,
 		ServerTimestamp: serverTime,
 		ClientTimestamp: serverTime,
 		VideoTimestamp:  videoTimestamp,
-		Label:           label,
-		Confidence:      confidence,
+		Label:           anomaly.label,
+		Confidence:      anomaly.confidence,
+		Payload:         anomaly.payload,
+		PayloadType:     anomaly.payloadType,
+		HeadYaw:         anomaly.headYaw,
+		HeadPitch:       anomaly.headPitch,
+		HeadRoll:        anomaly.headRoll,
+		FaceBBox:        anomaly.faceBBox,
+		FaceEmbedding:   append([]float32(nil), anomaly.faceEmbedding...),
+		LivenessScore:   -1,
+		FaceSimilarity:  -1,
+		AudioRmsDb:      -100,
 	}
+	if anomaly.faceSimilaritySet {
+		event.FaceSimilarity = anomaly.faceSimilarity
+	}
+	if anomaly.livenessScoreSet {
+		event.LivenessScore = anomaly.livenessScore
+	}
+	return event
 }
 
 // ---------------------------------------------------------------------------
