@@ -27,6 +27,7 @@ ai-sidecar/
   scripts/
     download_models.py
   tests/
+    test_ci_contract.py
     test_model_inventory.py
     test_model_manifest_and_downloader.py
     test_synthetic_onnx_runtime.py
@@ -75,6 +76,8 @@ go test ./cmd/inference ./internal/infrastructure/inference ./internal/infrastru
 go test ./...
 go vet ./...
 ```
+
+GitLab CI also runs `ai-sidecar-test` in `python:3.12-slim` before the manual deploy job becomes available. That job installs `ai-sidecar/requirements.txt` plus `ai-sidecar/requirements-dev.txt`, so the synthetic ONNX Runtime test runs in CI even when a local Windows machine only has Python 3.13/3.14.
 
 Frontend:
 

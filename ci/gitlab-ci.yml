@@ -5,7 +5,7 @@
 # Pipeline: verify → deploy
 #
 #   verify (automatic on MR + main):
-#     lint, vet, test (with PostgreSQL service), security scan
+#     lint, vet, test (with PostgreSQL service), ai-sidecar-test, security scan
 #
 #   deploy (MANUAL — нажать кнопку в GitLab UI):
 #     rsync code → docker build → docker compose up → health check
@@ -91,6 +91,24 @@ test:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
 
+ai-sidecar-test:
+  stage: verify
+  image: python:3.12-slim
+  timeout: 10 minutes
+  variables:
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    PIP_NO_CACHE_DIR: "1"
+    PYTHONDONTWRITEBYTECODE: "1"
+  before_script:
+    - python -m pip install --upgrade pip
+    - python -m pip install -r ai-sidecar/requirements.txt -r ai-sidecar/requirements-dev.txt
+  script:
+    - python -B -m unittest discover ai-sidecar/tests -v
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
 security-scan:
   stage: verify
   timeout: 10 minutes
@@ -123,6 +141,7 @@ deploy-production:
       optional: true
     - job: vet
     - job: test
+    - job: ai-sidecar-test
     - job: security-scan
       optional: true
   before_script:
