@@ -227,10 +227,13 @@ onUnmounted(() => {
                 >
                 <button
                   type="button"
-                  class="absolute right-3 p-1 text-white/40 hover:text-white/80 transition-colors"
+                  class="absolute right-3 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-white/40 transition-colors hover:text-white/80"
                   @click="showPassword = !showPassword"
                 >
-                  <UIcon :name="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="size-5" />
+                  <UIcon
+                    :name="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+                    class="size-5"
+                  />
                 </button>
               </div>
             </div>
