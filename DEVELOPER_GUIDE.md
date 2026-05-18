@@ -45,6 +45,7 @@ models/arcface.onnx
 ```
 
 Do not commit large model binaries directly unless the repository is configured for Git LFS. For production, mount `/models` read-only into the sidecar container.
+The local `docker-compose.yml` mounts repository-root `./models` to `/models`, matching the downloader examples below.
 
 The repository intentionally tracks only `ai-sidecar/model_manifest.json`, not the model weights. The manifest records expected filenames, source references, minimum size checks, and environment-variable names for private artifact URLs and SHA256 values.
 

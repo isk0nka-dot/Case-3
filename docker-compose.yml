@@ -72,7 +72,7 @@ services:
     container_name: argus-ai-sidecar
     restart: always
     volumes:
-      - ./ai-sidecar/models:/models:ro
+      - ./models:/models:ro
     environment:
       - ONNX_MODELS_PATH=/models
       - MODEL_FAIL_FAST=true
