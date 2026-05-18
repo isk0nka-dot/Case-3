@@ -105,4 +105,8 @@ type AIAnalysisPayload struct {
 	// AnalysisType controls the depth of analysis.
 	// Options: "full_scan" (all detectors), "face_verify" (face only), "object_sweep" (objects only).
 	AnalysisType string `json:"analysis_type"`
+
+	// ReferenceEmbedding is the optional enrolled ArcFace vector used by the
+	// inference sidecar to compute face similarity during identity checks.
+	ReferenceEmbedding []float32 `json:"reference_embedding,omitempty"`
 }

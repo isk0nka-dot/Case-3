@@ -179,9 +179,11 @@ The root `.dockerignore` intentionally excludes `models/`, `ai-sidecar/`, `.git/
 
 The `AnalyzeFrame` RPC accepts a single image frame and is the preferred backend inference entry point.
 
+For ArcFace identity verification, callers may include `reference_embedding` on `AnalyzeFrameRequest`. This field is optional for backward compatibility. When present, the Go inference gateway copies it into `FrameAnalysisOptions.ReferenceEmbedding`; the Python bridge forwards it to `/v1/analyze-frame` as JSON `reference_embedding`. When absent, the sidecar can still return a detected face embedding, but identity similarity is not computed.
+
 The legacy `AnalyzeVideo` streaming RPC is intentionally narrowed for Step 2: it accepts only pre-extracted image frames streamed in chunks with `Content-Type` `image/jpeg`, `image/png`, `image/jpg`, or `image/webp`. Raw `video/mp4` or `video/webm` fragments return `Unimplemented` at the gateway. This prevents the production sidecar from receiving arbitrary video bytes as fake JPEG frames.
 
-`AIAnalysisHandler` handles raw `video/mp4` and `video/webm` evidence through a bounded FFmpeg extractor before calling inference. The extractor samples at `inference.frame_sample_interval_sec`, caps output with `inference.max_video_dur_sec / inference.frame_sample_interval_sec`, and sends each JPEG to `AnalyzeFrame` with its sampled timestamp. Unsupported content types are skipped before MinIO download.
+`AIAnalysisHandler` handles raw `video/mp4` and `video/webm` evidence through a bounded FFmpeg extractor before calling inference. The extractor samples at `inference.frame_sample_interval_sec`, caps output with `inference.max_video_dur_sec / inference.frame_sample_interval_sec`, and sends each JPEG to `AnalyzeFrame` with its sampled timestamp. If the queued `AIAnalysisPayload` includes `reference_embedding`, the same vector is copied onto every extracted frame request. Unsupported content types are skipped before MinIO download.
 
 Worker hosts that run backend video deep scans must have `ffmpeg` on `PATH`. If the worker runs in Docker, install `ffmpeg` in that worker image before enabling video evidence analysis.
 
@@ -214,6 +216,8 @@ Face mismatch/spoof detections use `payload_type=face_detection` and also popula
 ```
 
 The worker sets `face_similarity`, `face_bbox`, and optional `face_embedding` for ArcFace results. Liveness failures use `payload_type=liveness` and populate `liveness_score`.
+
+Do not emit `BACKEND_AI_FACE_MISMATCH` solely because a reference embedding is missing. Missing enrollment data means identity similarity was not computed; it is an operational/enrollment gap, not proof of fraud.
 
 Unused denormalized AI columns are deliberately initialized with sentinel values before insert: `face_similarity=-1`, `liveness_score=-1`, and `audio_rms_db=-100`. Do not remove these sentinels; otherwise ClickHouse analytics may interpret empty backend vision events as real zero-valued face or audio readings.
 

@@ -30,7 +30,7 @@ func (e *StubEngine) Name() string { return "stub" }
 func (e *StubEngine) Close() error { return nil }
 
 // AnalyzeFrame returns synthetic detections derived from a hash of the frame bytes.
-func (e *StubEngine) AnalyzeFrame(_ context.Context, frame []byte, _ string) (*FrameResult, error) {
+func (e *StubEngine) AnalyzeFrame(_ context.Context, frame []byte, _ string, _ ...FrameAnalysisOptions) (*FrameResult, error) {
 	start := time.Now()
 
 	// Simulate GPU inference latency.

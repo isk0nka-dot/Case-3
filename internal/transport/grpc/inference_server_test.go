@@ -29,7 +29,7 @@ func newBlockingInferenceEngine() *blockingInferenceEngine {
 	}
 }
 
-func (e *blockingInferenceEngine) AnalyzeFrame(ctx context.Context, _ []byte, _ string) (*inference.FrameResult, error) {
+func (e *blockingInferenceEngine) AnalyzeFrame(ctx context.Context, _ []byte, _ string, _ ...inference.FrameAnalysisOptions) (*inference.FrameResult, error) {
 	e.calls.Add(1)
 	e.entered <- struct{}{}
 
@@ -48,13 +48,25 @@ type countingInferenceEngine struct {
 	calls atomic.Int32
 }
 
-func (e *countingInferenceEngine) AnalyzeFrame(context.Context, []byte, string) (*inference.FrameResult, error) {
+func (e *countingInferenceEngine) AnalyzeFrame(context.Context, []byte, string, ...inference.FrameAnalysisOptions) (*inference.FrameResult, error) {
 	e.calls.Add(1)
 	return &inference.FrameResult{LatencyMs: 1}, nil
 }
 
 func (e *countingInferenceEngine) Name() string { return "counting" }
 func (e *countingInferenceEngine) Close() error { return nil }
+
+type optionsCaptureInferenceEngine struct {
+	options []inference.FrameAnalysisOptions
+}
+
+func (e *optionsCaptureInferenceEngine) AnalyzeFrame(_ context.Context, _ []byte, _ string, options ...inference.FrameAnalysisOptions) (*inference.FrameResult, error) {
+	e.options = append([]inference.FrameAnalysisOptions(nil), options...)
+	return &inference.FrameResult{LatencyMs: 1}, nil
+}
+
+func (e *optionsCaptureInferenceEngine) Name() string { return "options_capture" }
+func (e *optionsCaptureInferenceEngine) Close() error { return nil }
 
 type fakeAnalyzeVideoStream struct {
 	ctx      context.Context
@@ -208,5 +220,36 @@ func TestInferenceServerAnalyzesPreExtractedImageFrameStream(t *testing.T) {
 	}
 	if got := engine.calls.Load(); got != 1 {
 		t.Fatalf("expected one engine call for one streamed image frame, calls=%d", got)
+	}
+}
+
+func TestInferenceServerPassesReferenceEmbeddingToEngine(t *testing.T) {
+	engine := &optionsCaptureInferenceEngine{}
+	server := NewInferenceServerWithOptions(engine, zap.NewNop(), InferenceServerOptions{
+		MaxFrameBytes:       1024,
+		MaxConcurrentFrames: 1,
+	})
+
+	_, err := server.AnalyzeFrame(context.Background(), &inferencepb.AnalyzeFrameRequest{
+		SessionId:          "session-1",
+		FrameData:          []byte("jpeg"),
+		ContentType:        "image/jpeg",
+		ReferenceEmbedding: []float32{0.11, 0.22, 0.33},
+	})
+	if err != nil {
+		t.Fatalf("AnalyzeFrame returned error: %v", err)
+	}
+
+	if len(engine.options) != 1 {
+		t.Fatalf("expected one options payload, got %d", len(engine.options))
+	}
+	if got, want := engine.options[0].ReferenceEmbedding, []float32{0.11, 0.22, 0.33}; len(got) != len(want) {
+		t.Fatalf("reference embedding length=%d, want %d", len(got), len(want))
+	} else {
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("reference embedding[%d]=%v, want %v", i, got[i], want[i])
+			}
+		}
 	}
 }

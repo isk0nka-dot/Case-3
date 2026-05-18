@@ -340,13 +340,14 @@ func (h *AIAnalysisHandler) analyzeVideoEvidence(
 	totalProcessingMs := 0.0
 	for _, frame := range extractedFrames {
 		resp, err := client.AnalyzeFrame(ctx, &inferencepb.AnalyzeFrameRequest{
-			SessionId:         payload.SessionID,
-			StudentId:         payload.StudentID,
-			ExamId:            payload.ExamID,
-			OrgId:             payload.OrgID,
-			FrameData:         frame.Data,
-			ContentType:       frame.ContentType,
-			VideoTimestampSec: frame.TimestampSec,
+			SessionId:          payload.SessionID,
+			StudentId:          payload.StudentID,
+			ExamId:             payload.ExamID,
+			OrgId:              payload.OrgID,
+			FrameData:          frame.Data,
+			ContentType:        frame.ContentType,
+			VideoTimestampSec:  frame.TimestampSec,
+			ReferenceEmbedding: append([]float32(nil), payload.ReferenceEmbedding...),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("analyze extracted frame at %.2fs: %w", frame.TimestampSec, err)

@@ -25,6 +25,7 @@ The exam session path does not wait on ONNX inference. MediaPipe and audio VAD r
 - **Fail-fast:** production cannot silently fall back to synthetic inference. `engine_type=stub` requires `allow_stub=true`; `python_bridge` checks `/healthz` and refuses startup unless YOLO and ArcFace are loaded.
 - **Frame economy:** video segments must be sampled by interval or explicit event trigger. `FRAME_EXTRACTION_INTERVAL_SEC`/`inference.frame_sample_interval_sec` are the control knobs.
 - **No raw-video pseudo frames:** the Go `AnalyzeVideo` RPC currently accepts only pre-extracted `image/jpeg`, `image/png`, or `image/webp` frames. Raw `video/*` blobs return `Unimplemented` instead of pretending arbitrary bytes are JPEG frames.
+- **Reference embedding propagation:** ArcFace identity verification is enabled only when an enrolled face vector is explicitly provided. The vector is optional and flows as `AIAnalysisPayload.reference_embedding` → `AnalyzeFrameRequest.reference_embedding` → Python sidecar JSON `reference_embedding`, so older clients can omit it without changing the inference contract.
 - **Backward compatibility:** existing event contracts are not changed. Audio anomalies reuse the existing `AudioAnalysisPayload` fields and ClickHouse columns.
 - **Audio bridge isolation:** backend audio aggregation reads only structured `AudioLevelTelemetry` fields, derives ClickHouse-only `audio_anomaly` rows after sustained threshold breaches, and never writes derived anomalies back to Kafka or PostgreSQL.
 
@@ -49,6 +50,8 @@ python ai-sidecar/scripts/download_models.py --models-path models --check-only -
 ```
 
 Use `ARGUS_YOLO_ONNX_URL` and `ARGUS_ARCFACE_ONNX_URL` for private model URLs, with matching `ARGUS_YOLO_ONNX_SHA256` and `ARGUS_ARCFACE_ONNX_SHA256` values in production. The ArcFace URL may point to a zip archive; set `ARGUS_ARCFACE_ARCHIVE_MEMBER` when the archive contains multiple ONNX files.
+
+ArcFace matching requires the enrolled student embedding at inference time. The backend does not synthesize or silently invent this reference: when `reference_embedding` is absent, the sidecar can still return face embeddings, but similarity remains uncomputed. Enrollment/profile services should pass the 512-float vector into the AI analysis task or gRPC request once the trusted reference photo has been processed.
 
 ## Environment And Config Mapping
 
@@ -137,6 +140,8 @@ The backend does not continuously decode WebM/MP4 evidence fragments. Background
 `AIAnalysisHandler` enforces this at the worker boundary: `image/jpeg`, `image/png`, and `image/webp` evidence fragments may be sent directly to inference, while `video/mp4` and `video/webm` fragments are sampled through the bounded FFmpeg extractor first. Unsupported content types are skipped before storage download.
 
 The extractor uses the configured `inference.frame_sample_interval_sec` and `inference.max_video_dur_sec` values to build a bounded FFmpeg command with `-nostdin`, `fps=1/N`, and `-frames:v max`. The worker then sends each extracted JPEG through `AnalyzeFrame`, preserving the sampled timestamp in `video_timestamp_sec`.
+
+For identity checks, each extracted frame request also carries `reference_embedding` when the AI analysis task includes it. The Python sidecar receives the same vector as JSON and uses it to compute ArcFace cosine similarity; if the value is omitted, object/liveness inference still runs and face mismatch events are not fabricated.
 
 Docker runtime is split by responsibility: `Dockerfile.worker` runs the Asynq worker with `ffmpeg`, `Dockerfile.inference` runs the Go gRPC gateway, and `ai-sidecar/Dockerfile` runs ONNX Runtime. `docker-compose.yml` wires worker → inference → ai-sidecar. The root `.dockerignore` keeps Go image contexts small by excluding model weights, sidecar sources, VCS metadata, build caches, and large evidence media.
 

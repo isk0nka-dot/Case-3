@@ -72,7 +72,7 @@ func (s *InferenceServer) AnalyzeFrame(ctx context.Context, req *inferencepb.Ana
 	}
 	defer release()
 
-	result, err := s.engine.AnalyzeFrame(ctx, req.FrameData, req.ContentType)
+	result, err := s.engine.AnalyzeFrame(ctx, req.FrameData, req.ContentType, frameAnalysisOptions(req))
 	if err != nil {
 		s.logger.Error("inference: frame analysis failed",
 			zap.String("session_id", req.SessionId),
@@ -82,6 +82,15 @@ func (s *InferenceServer) AnalyzeFrame(ctx context.Context, req *inferencepb.Ana
 	}
 
 	return mapFrameResult(result), nil
+}
+
+func frameAnalysisOptions(req *inferencepb.AnalyzeFrameRequest) inference.FrameAnalysisOptions {
+	if req == nil || len(req.GetReferenceEmbedding()) == 0 {
+		return inference.FrameAnalysisOptions{}
+	}
+	return inference.FrameAnalysisOptions{
+		ReferenceEmbedding: append([]float32(nil), req.GetReferenceEmbedding()...),
+	}
 }
 
 // AnalyzeVideo accepts a streamed, pre-extracted image frame and returns analysis.

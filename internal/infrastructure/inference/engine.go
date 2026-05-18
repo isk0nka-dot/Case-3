@@ -17,13 +17,28 @@ type Engine interface {
 	// AnalyzeFrame runs face detection, object detection, and liveness
 	// verification on a single image frame. The contentType indicates the
 	// image format ("image/jpeg" or "image/png").
-	AnalyzeFrame(ctx context.Context, frame []byte, contentType string) (*FrameResult, error)
+	AnalyzeFrame(ctx context.Context, frame []byte, contentType string, options ...FrameAnalysisOptions) (*FrameResult, error)
 
 	// Name returns the engine identifier for logging and metrics.
 	Name() string
 
 	// Close releases resources (GPU memory, model handles, connections).
 	Close() error
+}
+
+// FrameAnalysisOptions carries optional per-frame context for real model
+// inference. Empty options preserve the legacy behavior.
+type FrameAnalysisOptions struct {
+	// ReferenceEmbedding is the enrolled 512-dimensional ArcFace vector used
+	// by the sidecar to compute identity similarity.
+	ReferenceEmbedding []float32
+}
+
+func firstFrameAnalysisOptions(options []FrameAnalysisOptions) FrameAnalysisOptions {
+	if len(options) == 0 {
+		return FrameAnalysisOptions{}
+	}
+	return options[0]
 }
 
 // FrameResult contains all detections from a single frame analysis.

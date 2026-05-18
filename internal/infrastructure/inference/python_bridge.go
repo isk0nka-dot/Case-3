@@ -44,10 +44,14 @@ func (e *PythonBridgeEngine) Name() string { return "python_bridge" }
 
 func (e *PythonBridgeEngine) Close() error { return nil }
 
-func (e *PythonBridgeEngine) AnalyzeFrame(ctx context.Context, frame []byte, contentType string) (*FrameResult, error) {
+func (e *PythonBridgeEngine) AnalyzeFrame(ctx context.Context, frame []byte, contentType string, options ...FrameAnalysisOptions) (*FrameResult, error) {
+	opts := firstFrameAnalysisOptions(options)
 	reqBody := analyzeFrameRequest{
 		ContentType: contentType,
 		FrameBase64: base64.StdEncoding.EncodeToString(frame),
+	}
+	if len(opts.ReferenceEmbedding) > 0 {
+		reqBody.ReferenceEmbedding = append([]float32(nil), opts.ReferenceEmbedding...)
 	}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
@@ -119,8 +123,9 @@ type bridgeModelState struct {
 }
 
 type analyzeFrameRequest struct {
-	ContentType string `json:"content_type"`
-	FrameBase64 string `json:"frame_base64"`
+	ContentType        string    `json:"content_type"`
+	FrameBase64        string    `json:"frame_base64"`
+	ReferenceEmbedding []float32 `json:"reference_embedding,omitempty"`
 }
 
 type analyzeFrameResponse struct {

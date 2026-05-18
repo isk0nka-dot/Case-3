@@ -144,3 +144,48 @@ func TestAIAnalysisExtractsVideoFramesAndSendsAnalyzeFrameRequests(t *testing.T)
 		t.Fatalf("expected two object frames, got %d", resp.Summary.GetObjectDetectionFrames())
 	}
 }
+
+func TestAIAnalysisSendsReferenceEmbeddingWithExtractedFrames(t *testing.T) {
+	extractor := &fakeFrameExtractor{
+		frames: []evidenceFrame{
+			{Data: []byte("jpeg-1"), ContentType: "image/jpeg", TimestampSec: 0},
+		},
+	}
+	client := &fakeInferenceClient{}
+	handler := &AIAnalysisHandler{
+		frameExtractor: extractor,
+		thresholds: AIAnalysisThresholds{
+			ObjectConfidence: 0.35,
+		},
+	}
+
+	_, err := handler.analyzeVideoEvidence(
+		context.Background(),
+		client,
+		AIAnalysisPayload{
+			SessionID:          "session-1",
+			OrgID:              "org-1",
+			ExamID:             "exam-1",
+			StudentID:          "student-1",
+			ReferenceEmbedding: []float32{0.11, 0.22, 0.33},
+		},
+		evidenceFragment{ObjectKey: "recordings/session-1.webm", ContentType: "video/webm"},
+		strings.NewReader("video-bytes"),
+	)
+	if err != nil {
+		t.Fatalf("analyzeVideoEvidence returned error: %v", err)
+	}
+
+	if len(client.requests) != 1 {
+		t.Fatalf("expected one AnalyzeFrame request, got %d", len(client.requests))
+	}
+	if got, want := client.requests[0].ReferenceEmbedding, []float32{0.11, 0.22, 0.33}; len(got) != len(want) {
+		t.Fatalf("reference embedding length=%d, want %d", len(got), len(want))
+	} else {
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("reference embedding[%d]=%v, want %v", i, got[i], want[i])
+			}
+		}
+	}
+}

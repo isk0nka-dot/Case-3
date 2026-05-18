@@ -45,6 +45,9 @@ message AnalyzeFrameRequest {
 
   // Position in the session recording (seconds from session start).
   double video_timestamp_sec = 7;
+
+  // Enrolled ArcFace embedding used to compute identity similarity.
+  repeated float reference_embedding = 8;
 }
 
 message AnalyzeFrameResponse {
