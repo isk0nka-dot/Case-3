@@ -45,6 +45,7 @@ type Config struct {
 	DLQ         DLQConfig         `yaml:"dlq"`
 	Redis       RedisConfig       `yaml:"redis"`
 	Inference   InferenceConfig   `yaml:"inference"`
+	AudioBridge AudioBridgeConfig `yaml:"audio_bridge"`
 	CryptoErase CryptoEraseConfig `yaml:"crypto_erasure"`
 	Backfiller  BackfillerConfig  `yaml:"backfiller"`
 	Cleanup     CleanupConfig     `yaml:"cleanup"`
@@ -242,6 +243,31 @@ func (c InferenceConfig) GRPCAddr() string {
 		host = "localhost"
 	}
 	return fmt.Sprintf("%s:%d", host, c.GRPCPort)
+}
+
+// AudioBridgeConfig controls backend-side aggregation of browser-local audio
+// telemetry into derived ClickHouse anomaly events. It never handles raw audio.
+type AudioBridgeConfig struct {
+	// Enabled controls whether AudioLevelTelemetry can derive audio_anomaly rows.
+	Enabled bool `yaml:"enabled"`
+
+	// NoiseThresholdDb is the RMS dB threshold for sustained noise. Default: -35.
+	NoiseThresholdDb float32 `yaml:"noise_threshold_db"`
+
+	// VADConfidenceThreshold is the browser VAD confidence cutoff. Default: 0.70.
+	VADConfidenceThreshold float32 `yaml:"vad_confidence_threshold"`
+
+	// ConsecutiveEvents is how many high telemetry frames are required before
+	// deriving a backend audio_anomaly. Default: 3.
+	ConsecutiveEvents int `yaml:"consecutive_events"`
+
+	// CooldownEvents suppresses duplicate derived anomalies after one fires.
+	// Default: 12, roughly 3 seconds at the 4 Hz frontend default.
+	CooldownEvents int `yaml:"cooldown_events"`
+
+	// DerivedEventConfidence is the fallback confidence for derived anomalies.
+	// Default: 0.85.
+	DerivedEventConfidence float32 `yaml:"derived_event_confidence"`
 }
 
 // ---------------------------------------------------------------------------
@@ -1016,6 +1042,23 @@ func applyDefaults(cfg *Config) {
 		cfg.Inference.Concurrency = 4
 	}
 
+	// --- Audio bridge (browser audio telemetry aggregation) ---
+	if cfg.AudioBridge.NoiseThresholdDb == 0 {
+		cfg.AudioBridge.NoiseThresholdDb = -35
+	}
+	if cfg.AudioBridge.VADConfidenceThreshold == 0 {
+		cfg.AudioBridge.VADConfidenceThreshold = 0.7
+	}
+	if cfg.AudioBridge.ConsecutiveEvents == 0 {
+		cfg.AudioBridge.ConsecutiveEvents = 3
+	}
+	if cfg.AudioBridge.CooldownEvents == 0 {
+		cfg.AudioBridge.CooldownEvents = 12
+	}
+	if cfg.AudioBridge.DerivedEventConfidence == 0 {
+		cfg.AudioBridge.DerivedEventConfidence = 0.85
+	}
+
 	// --- Webhook dispatcher ---
 	if cfg.Webhook.PollInterval == 0 {
 		cfg.Webhook.PollInterval = 1 * time.Second
@@ -1285,6 +1328,36 @@ func applyEnvOverrides(cfg *Config) {
 		}
 	}
 
+	// Audio bridge (browser audio telemetry aggregation).
+	if v := os.Getenv("EVENT_COLLECTOR_AUDIO_BRIDGE_ENABLED"); v != "" {
+		cfg.AudioBridge.Enabled = v == "true" || v == "1"
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_AUDIO_NOISE_THRESHOLD_DB"); v != "" {
+		if threshold, err := strconv.ParseFloat(v, 32); err == nil {
+			cfg.AudioBridge.NoiseThresholdDb = float32(threshold)
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_AUDIO_VAD_CONFIDENCE_THRESHOLD"); v != "" {
+		if threshold, err := strconv.ParseFloat(v, 32); err == nil {
+			cfg.AudioBridge.VADConfidenceThreshold = float32(threshold)
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_AUDIO_CONSECUTIVE_EVENTS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.AudioBridge.ConsecutiveEvents = n
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_AUDIO_COOLDOWN_EVENTS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.AudioBridge.CooldownEvents = n
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_AUDIO_DERIVED_EVENT_CONFIDENCE"); v != "" {
+		if confidence, err := strconv.ParseFloat(v, 32); err == nil {
+			cfg.AudioBridge.DerivedEventConfidence = float32(confidence)
+		}
+	}
+
 	// Backfiller (Kafka-to-ClickHouse replay, ADR-007).
 	if v := os.Getenv("EVENT_COLLECTOR_BACKFILLER_ENABLED"); v != "" {
 		cfg.Backfiller.Enabled = v == "true" || v == "1"
@@ -1443,6 +1516,25 @@ func validate(cfg *Config) error {
 	}
 	if err := validateUnitThreshold("inference.spoof_confidence_threshold", cfg.Inference.SpoofConfidenceThreshold); err != nil {
 		return err
+	}
+
+	// --- Audio Bridge ---
+	if cfg.AudioBridge.Enabled {
+		if cfg.AudioBridge.NoiseThresholdDb >= 0 {
+			return fmt.Errorf("audio_bridge.noise_threshold_db must be negative dB, got %f", cfg.AudioBridge.NoiseThresholdDb)
+		}
+		if err := validateUnitThreshold("audio_bridge.vad_confidence_threshold", cfg.AudioBridge.VADConfidenceThreshold); err != nil {
+			return err
+		}
+		if cfg.AudioBridge.ConsecutiveEvents < 1 {
+			return fmt.Errorf("audio_bridge.consecutive_events must be at least 1, got %d", cfg.AudioBridge.ConsecutiveEvents)
+		}
+		if cfg.AudioBridge.CooldownEvents < 0 {
+			return fmt.Errorf("audio_bridge.cooldown_events must be >= 0, got %d", cfg.AudioBridge.CooldownEvents)
+		}
+		if err := validateUnitThreshold("audio_bridge.derived_event_confidence", cfg.AudioBridge.DerivedEventConfidence); err != nil {
+			return err
+		}
 	}
 
 	// --- Auth ---

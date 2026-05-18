@@ -250,3 +250,16 @@ inference:
   liveness_threshold: 0.40
   object_confidence_threshold: 0.35
   spoof_confidence_threshold: 0.70
+
+# ---------------------------------------------------------------------------
+# Audio AI Bridge
+# ---------------------------------------------------------------------------
+audio_bridge:
+  # Aggregates browser-local AudioLevelTelemetry into derived ClickHouse
+  # audio_anomaly rows. Raw microphone audio is never transmitted.
+  enabled: true
+  noise_threshold_db: -35
+  vad_confidence_threshold: 0.70
+  consecutive_events: 3
+  cooldown_events: 12
+  derived_event_confidence: 0.85

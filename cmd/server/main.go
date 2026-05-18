@@ -22,24 +22,24 @@
 //
 // Lifecycle (18 steps):
 //
-//	 1. Parse CLI flags
-//	 2. Load configuration (YAML + env overrides)
-//	 3. Initialise logger
-//	 4. Initialise Kafka producer
-//	 5. Initialise ClickHouse writer
-//	 6. Initialise IngestUseCase
-//	 7. Initialise Worker Pool
-//	 8. Initialise JWT Verifier (optional, based on config)
-//	 9. Initialise Session Validator (optional, based on config)
-//	10. Initialise gRPC interceptor chain
-//	11. Create gRPC server with keepalive + interceptors
-//	12. Register EventCollectorService
-//	13. Create HTTP server (gRPC-Web proxy + health checks + CORS)
-//	14. Set up OS signal handler
-//	15. Start gRPC server
-//	16. Start HTTP server
-//	17. Block on signal or fatal error
-//	18. Graceful shutdown (gRPC → WorkerPool → HTTP → Session → UseCase)
+//  1. Parse CLI flags
+//  2. Load configuration (YAML + env overrides)
+//  3. Initialise logger
+//  4. Initialise Kafka producer
+//  5. Initialise ClickHouse writer
+//  6. Initialise IngestUseCase
+//  7. Initialise Worker Pool
+//  8. Initialise JWT Verifier (optional, based on config)
+//  9. Initialise Session Validator (optional, based on config)
+//  10. Initialise gRPC interceptor chain
+//  11. Create gRPC server with keepalive + interceptors
+//  12. Register EventCollectorService
+//  13. Create HTTP server (gRPC-Web proxy + health checks + CORS)
+//  14. Set up OS signal handler
+//  15. Start gRPC server
+//  16. Start HTTP server
+//  17. Block on signal or fatal error
+//  18. Graceful shutdown (gRPC → WorkerPool → HTTP → Session → UseCase)
 package main
 
 import (
@@ -437,9 +437,18 @@ func run() error {
 	if evidenceRecorder != nil {
 		ingestOpts = append(ingestOpts, usecase.WithRecorder(evidenceRecorder))
 	}
+	ingestOpts = append(ingestOpts, usecase.WithAudioBridge(usecase.AudioBridgeConfig{
+		Enabled:                cfg.AudioBridge.Enabled,
+		NoiseThresholdDb:       cfg.AudioBridge.NoiseThresholdDb,
+		VADConfidenceThreshold: cfg.AudioBridge.VADConfidenceThreshold,
+		ConsecutiveEvents:      cfg.AudioBridge.ConsecutiveEvents,
+		CooldownEvents:         cfg.AudioBridge.CooldownEvents,
+		DerivedEventConfidence: cfg.AudioBridge.DerivedEventConfidence,
+	}))
 	ingestUC := usecase.NewIngestUseCase(kafkaEventWriter, chWriter, logger, ingestOpts...)
 	logger.Info("ingest use-case initialised",
 		zap.Bool("evidence_capture_enabled", evidenceRecorder != nil),
+		zap.Bool("audio_bridge_enabled", cfg.AudioBridge.Enabled),
 	)
 
 	// =================================================================

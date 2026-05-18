@@ -35,13 +35,14 @@ type IngestUseCase struct {
 	kafkaWriter      port.EventWriter
 	clickhouseWriter port.EventWriter
 	recorder         EvidenceRecorder // optional — nil when MinIO is unavailable
+	audioBridge      *AudioBridge     // optional — derives ClickHouse-only audio anomalies
 	clock            *hlc.Clock       // Hybrid Logical Clock for causal ordering
 	logger           *zap.Logger
 
 	// Metrics (lock-free atomic counters).
-	totalIngested   atomic.Int64
-	totalRejected   atomic.Int64
-	totalCritical   atomic.Int64
+	totalIngested atomic.Int64
+	totalRejected atomic.Int64
+	totalCritical atomic.Int64
 }
 
 // NewIngestUseCase creates a new IngestUseCase with the given dependencies.
@@ -73,6 +74,14 @@ type IngestOption func(*IngestUseCase)
 func WithRecorder(r EvidenceRecorder) IngestOption {
 	return func(uc *IngestUseCase) {
 		uc.recorder = r
+	}
+}
+
+// WithAudioBridge attaches backend-side audio telemetry aggregation. The bridge
+// writes derived anomalies to ClickHouse only and never changes API contracts.
+func WithAudioBridge(cfg AudioBridgeConfig) IngestOption {
+	return func(uc *IngestUseCase) {
+		uc.audioBridge = NewAudioBridge(cfg)
 	}
 }
 
@@ -134,6 +143,7 @@ func (uc *IngestUseCase) Ingest(ctx context.Context, event *entity.ProctoringEve
 			zap.Error(err),
 		)
 	}
+	uc.writeDerivedAudioAnomaly(ctx, event)
 
 	// Step 5: Trigger evidence capture for critical events (tertiary, async).
 	// Evidence capture is non-blocking and never causes event rejection.
@@ -205,9 +215,10 @@ func (uc *IngestUseCase) IngestBatch(ctx context.Context, events []*entity.Proct
 	}
 
 	// Step 3: Write to ClickHouse (secondary, best-effort).
-	if err := uc.clickhouseWriter.WriteBatch(ctx, valid); err != nil {
+	clickhouseEvents := uc.appendDerivedAudioAnomalies(valid)
+	if err := uc.clickhouseWriter.WriteBatch(ctx, clickhouseEvents); err != nil {
 		uc.logger.Warn("clickhouse batch write failed (non-fatal)",
-			zap.Int("event_count", len(valid)),
+			zap.Int("event_count", len(clickhouseEvents)),
 			zap.Error(err),
 		)
 	}
@@ -245,6 +256,41 @@ func (uc *IngestUseCase) Stats() IngestStats {
 		TotalRejected: uc.totalRejected.Load(),
 		TotalCritical: uc.totalCritical.Load(),
 	}
+}
+
+func (uc *IngestUseCase) writeDerivedAudioAnomaly(ctx context.Context, event *entity.ProctoringEvent) {
+	if uc.audioBridge == nil {
+		return
+	}
+	derived := uc.audioBridge.Derive(event)
+	if derived == nil {
+		return
+	}
+	derived.SetServerTimestampHLC(uc.clock)
+	if err := uc.clickhouseWriter.Write(ctx, derived); err != nil {
+		uc.logger.Warn("clickhouse derived audio anomaly write failed (non-fatal)",
+			zap.String("event_id", derived.EventID),
+			zap.String("source_event_id", event.EventID),
+			zap.Error(err),
+		)
+	}
+}
+
+func (uc *IngestUseCase) appendDerivedAudioAnomalies(events []*entity.ProctoringEvent) []*entity.ProctoringEvent {
+	if uc.audioBridge == nil {
+		return events
+	}
+	out := make([]*entity.ProctoringEvent, 0, len(events)+1)
+	out = append(out, events...)
+	for _, event := range events {
+		derived := uc.audioBridge.Derive(event)
+		if derived == nil {
+			continue
+		}
+		derived.SetServerTimestampHLC(uc.clock)
+		out = append(out, derived)
+	}
+	return out
 }
 
 // IngestStats holds runtime metrics for monitoring.

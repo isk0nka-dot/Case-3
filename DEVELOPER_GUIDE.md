@@ -7,7 +7,8 @@ The production AI path is intentionally split:
 1. Nuxt runs lightweight MediaPipe and Web Audio checks in the browser.
 2. The Go backend queues heavier frame analysis asynchronously.
 3. The Go inference gateway calls the Python ONNX sidecar.
-4. ClickHouse stores anomaly/telemetry events for analytics.
+4. The backend audio bridge derives low-frequency ClickHouse-only audio anomalies from sustained telemetry.
+5. ClickHouse stores anomaly/telemetry events for analytics.
 
 This avoids blocking exam sessions when ONNX inference is slow or unavailable.
 
@@ -73,6 +74,7 @@ Production should use checksummed internal artifacts. Public model sources move 
 Backend:
 
 ```bash
+go test ./internal/application/usecase ./internal/infrastructure/config
 go test ./cmd/inference ./internal/infrastructure/inference ./internal/infrastructure/worker ./internal/transport/grpc
 go test ./...
 go vet ./...
@@ -144,6 +146,29 @@ inference:
   allow_stub: false
 ```
 
+Audio telemetry aggregation is controlled separately:
+
+```yaml
+audio_bridge:
+  enabled: true
+  noise_threshold_db: -35
+  vad_confidence_threshold: 0.70
+  consecutive_events: 3
+  cooldown_events: 12
+  derived_event_confidence: 0.85
+```
+
+Environment overrides:
+
+| Variable | Description |
+| --- | --- |
+| `EVENT_COLLECTOR_AUDIO_BRIDGE_ENABLED` | Enables/disables backend audio telemetry aggregation. |
+| `EVENT_COLLECTOR_AUDIO_NOISE_THRESHOLD_DB` | RMS dB threshold for sustained noise. |
+| `EVENT_COLLECTOR_AUDIO_VAD_CONFIDENCE_THRESHOLD` | Minimum VAD confidence for sustained voice. |
+| `EVENT_COLLECTOR_AUDIO_CONSECUTIVE_EVENTS` | Consecutive telemetry frames before deriving `audio_anomaly`. |
+| `EVENT_COLLECTOR_AUDIO_COOLDOWN_EVENTS` | Duplicate suppression window after a derived anomaly fires. |
+| `EVENT_COLLECTOR_AUDIO_DERIVED_EVENT_CONFIDENCE` | Fallback confidence for derived backend audio anomalies. |
+
 `Dockerfile.inference` runs `cmd/inference`, which exposes the Go gRPC inference gateway and calls the Python sidecar over HTTP. `Dockerfile.worker` runs `cmd/worker`, installs `ffmpeg`, consumes Asynq jobs, extracts bounded video frames, and calls the inference gateway. The local `docker-compose.yml` declares `ai-sidecar`, `inference`, and `worker` as separate services so model execution stays isolated from the API server.
 
 The root `.dockerignore` intentionally excludes `models/`, `ai-sidecar/`, `.git/`, Go cache files, and large media/model artifacts from Go image builds. The sidecar image is built from `ai-sidecar/` as a separate context, and runtime models are mounted from `./models:/models:ro`.
@@ -158,11 +183,18 @@ The legacy `AnalyzeVideo` streaming RPC is intentionally narrowed for Step 2: it
 
 Worker hosts that run backend video deep scans must have `ffmpeg` on `PATH`. If the worker runs in Docker, install `ffmpeg` in that worker image before enabling video evidence analysis.
 
+## Audio Bridge Contract
+
+Frontend `useAudioEngine` emits structured audio features through the existing `sendEvent` pipeline. The backend bridge observes only `AUDIO_LEVEL_TELEMETRY`; it does not ingest raw microphone samples.
+
+When sustained RMS/VAD thresholds are exceeded, the bridge writes one derived `audio_anomaly` event to ClickHouse with `source=backend_ai`. It does not write this derived event to Kafka, does not modify PostgreSQL session transactions, and does not reject the original event if ClickHouse is unavailable.
+
 ## Safety Rules
 
 - Never enable `allow_stub=true` in production.
 - Omitted inference config defaults to `python_bridge`; use `engine_type: "stub"` only in explicit local development configs with `allow_stub: true`.
 - Keep audio and vision event payloads structured; do not transmit raw microphone audio.
+- Keep backend audio anomalies ClickHouse-only unless a separate realtime contract is explicitly introduced.
 - Keep frame extraction interval-based or event-triggered. Do not continuously decode full video streams.
 - Do not reintroduce pseudo-frame splitting of raw video bytes in `AnalyzeVideo`; add a bounded extractor worker instead.
 - If inference capacity is saturated, drop frames and keep the student session alive.

@@ -11,6 +11,8 @@ flowchart LR
   Q --> GW["Go inference gateway"]
   GW -->|"HTTP /v1/analyze-frame"| PY["Python ONNX sidecar"]
   PY --> M["models/*.onnx"]
+  EC --> AB["Audio bridge aggregator"]
+  AB -->|"derived audio_anomaly"| CH
   EC --> CH["ClickHouse events"]
 ```
 
@@ -24,6 +26,7 @@ The exam session path does not wait on ONNX inference. MediaPipe and audio VAD r
 - **Frame economy:** video segments must be sampled by interval or explicit event trigger. `FRAME_EXTRACTION_INTERVAL_SEC`/`inference.frame_sample_interval_sec` are the control knobs.
 - **No raw-video pseudo frames:** the Go `AnalyzeVideo` RPC currently accepts only pre-extracted `image/jpeg`, `image/png`, or `image/webp` frames. Raw `video/*` blobs return `Unimplemented` instead of pretending arbitrary bytes are JPEG frames.
 - **Backward compatibility:** existing event contracts are not changed. Audio anomalies reuse the existing `AudioAnalysisPayload` fields and ClickHouse columns.
+- **Audio bridge isolation:** backend audio aggregation reads only structured `AudioLevelTelemetry` fields, derives ClickHouse-only `audio_anomaly` rows after sustained threshold breaches, and never writes derived anomalies back to Kafka or PostgreSQL.
 
 ## Model Inventory
 
@@ -62,6 +65,17 @@ Backend Go config:
 | `inference.face_mismatch_threshold` | `EVENT_COLLECTOR_INFERENCE_FACE_MISMATCH_THRESHOLD` | `0.62` | Identity mismatch cutoff. |
 | `inference.object_confidence_threshold` | `EVENT_COLLECTOR_INFERENCE_OBJECT_CONFIDENCE_THRESHOLD` | `0.35` | YOLO object confidence cutoff. |
 
+Backend audio bridge config:
+
+| YAML | Environment | Default | Description |
+| --- | --- | --- | --- |
+| `audio_bridge.enabled` | `EVENT_COLLECTOR_AUDIO_BRIDGE_ENABLED` | `true` in deployment config | Enables backend aggregation from audio telemetry to ClickHouse-only anomalies. |
+| `audio_bridge.noise_threshold_db` | `EVENT_COLLECTOR_AUDIO_NOISE_THRESHOLD_DB` | `-35` | Sustained RMS dB threshold for noisy-room anomalies. |
+| `audio_bridge.vad_confidence_threshold` | `EVENT_COLLECTOR_AUDIO_VAD_CONFIDENCE_THRESHOLD` | `0.70` | Minimum browser VAD confidence for sustained voice anomalies. |
+| `audio_bridge.consecutive_events` | `EVENT_COLLECTOR_AUDIO_CONSECUTIVE_EVENTS` | `3` | Number of consecutive high telemetry frames required before deriving `audio_anomaly`. |
+| `audio_bridge.cooldown_events` | `EVENT_COLLECTOR_AUDIO_COOLDOWN_EVENTS` | `12` | Suppresses duplicate derived anomalies after one fires. |
+| `audio_bridge.derived_event_confidence` | `EVENT_COLLECTOR_AUDIO_DERIVED_EVENT_CONFIDENCE` | `0.85` | Fallback confidence for derived backend audio anomalies. |
+
 Python sidecar config:
 
 | Environment | Default | Description |
@@ -98,7 +112,9 @@ Audio and AI events continue to flow through the existing `events` schema. The r
 | `confidence` | Rule confidence or model confidence |
 | `source` | Browser, webcam, backend AI |
 
-The AI layer does not write to PostgreSQL transactions in the student session path. ClickHouse writes remain asynchronous.
+Browser audio events arrive through the existing `sendEvent`/gRPC-Web path as `AudioAnalysisPayload`. The backend audio bridge observes `AUDIO_LEVEL_TELEMETRY`, and when sustained RMS/VAD thresholds are exceeded, it appends a derived `audio_anomaly` event to ClickHouse only. Kafka still receives only the original frontend event, so downstream realtime consumers and API contracts remain unchanged.
+
+The AI layer does not write to PostgreSQL transactions in the student session path. ClickHouse writes remain asynchronous and best-effort.
 
 ## Operational Notes
 
@@ -111,6 +127,8 @@ The backend does not continuously decode WebM/MP4 evidence fragments. Background
 The extractor uses the configured `inference.frame_sample_interval_sec` and `inference.max_video_dur_sec` values to build a bounded FFmpeg command with `-nostdin`, `fps=1/N`, and `-frames:v max`. The worker then sends each extracted JPEG through `AnalyzeFrame`, preserving the sampled timestamp in `video_timestamp_sec`.
 
 Docker runtime is split by responsibility: `Dockerfile.worker` runs the Asynq worker with `ffmpeg`, `Dockerfile.inference` runs the Go gRPC gateway, and `ai-sidecar/Dockerfile` runs ONNX Runtime. `docker-compose.yml` wires worker → inference → ai-sidecar. The root `.dockerignore` keeps Go image contexts small by excluding model weights, sidecar sources, VCS metadata, build caches, and large evidence media.
+
+The audio bridge lives inside the event ingestion use case and is intentionally cheap: it parses denormalized audio telemetry already present on the event, keeps a short per-session streak/cooldown counter, and writes derived anomalies through the existing ClickHouse writer. If ClickHouse is down, the original event remains accepted because Kafka is still the source of truth.
 
 Run locally:
 
