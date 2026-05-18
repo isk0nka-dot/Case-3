@@ -4,6 +4,9 @@
 .git
 .gitignore
 .gocache
+.go-build-cache
+.golangci-cache
+.bin
 .pytest_cache
 __pycache__
 *.pyc
@@ -24,6 +27,9 @@ models
 *.log
 *.tmp
 coverage.out
+coverage
+gosec.sarif
+*.sarif
 *.test
 
 node_modules

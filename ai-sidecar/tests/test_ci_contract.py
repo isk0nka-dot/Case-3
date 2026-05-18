@@ -46,10 +46,14 @@ class GitLabCiContractTests(unittest.TestCase):
         for ignored_path in (
             ".git",
             ".gocache",
+            ".go-build-cache",
+            ".golangci-cache",
+            ".bin",
             "ai-sidecar",
             "models",
             "*.onnx",
             "*.mp4",
+            "gosec.sarif",
         ):
             self.assertIn(ignored_path, dockerignore)
 
