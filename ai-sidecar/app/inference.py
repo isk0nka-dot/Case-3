@@ -56,7 +56,8 @@ class FrameAnalyzer:
 
 
 def _decode_image(raw: bytes, content_type: str):
-    if content_type not in {"image/jpeg", "image/png", "image/webp", ""}:
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    if media_type not in {"image/jpeg", "image/jpg", "image/png", "image/webp", ""}:
         raise ValueError(f"unsupported content_type: {content_type}")
 
     from PIL import Image

@@ -1,3 +1,4 @@
+import io
 import unittest
 import sys
 from pathlib import Path
@@ -6,7 +7,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.inference import _run_yolo
+from app.inference import _decode_image, _run_yolo
 
 
 class _InputMeta:
@@ -26,6 +27,15 @@ class _YoloSession:
 
 
 class YoloParserTests(unittest.TestCase):
+    def test_decode_image_accepts_content_type_parameters(self):
+        buffer = io.BytesIO()
+        Image.new("RGB", (4, 4), color="white").save(buffer, format="JPEG")
+
+        image = _decode_image(buffer.getvalue(), "image/jpeg; charset=binary")
+
+        self.assertEqual(image.mode, "RGB")
+        self.assertEqual(image.size, (4, 4))
+
     def test_detects_phone_from_yolo_output_with_objectness_column(self):
         import numpy as np
 

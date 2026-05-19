@@ -183,6 +183,8 @@ For ArcFace identity verification, callers may include `reference_embedding` on 
 
 The Python sidecar returns normalized bounding boxes as JSON objects (`{"x":0.1,"y":0.2,"w":0.3,"h":0.4}`). The Go bridge also accepts the legacy array shape (`[x,y,w,h]`) so older test fixtures and external sidecars do not break.
 
+Image content types are normalized by media type before sidecar decoding, so `image/jpeg; charset=binary` is handled the same as `image/jpeg`.
+
 The legacy `AnalyzeVideo` streaming RPC is intentionally narrowed for Step 2: it accepts only pre-extracted image frames streamed in chunks with `Content-Type` `image/jpeg`, `image/png`, `image/jpg`, or `image/webp`. Raw `video/mp4` or `video/webm` fragments return `Unimplemented` at the gateway. This prevents the production sidecar from receiving arbitrary video bytes as fake JPEG frames. Worker-owned evidence analysis should prefer `AnalyzeFrame` for both direct image fragments and frames extracted from video.
 
 `AIAnalysisHandler` handles raw `video/mp4` and `video/webm` evidence through a bounded FFmpeg extractor before calling inference. The extractor samples at `inference.frame_sample_interval_sec`, caps output with `inference.max_video_dur_sec / inference.frame_sample_interval_sec`, and sends each JPEG to `AnalyzeFrame` with its sampled timestamp. Direct image evidence is sent to `AnalyzeFrame` as a single timestamp-0 frame, but it is rejected before inference if it exceeds `inference.max_frame_bytes` (default 10 MiB). If the queued `AIAnalysisPayload` includes `reference_embedding`, the same vector is copied onto every frame request. Unsupported content types are skipped before MinIO download.
