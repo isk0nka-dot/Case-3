@@ -126,12 +126,14 @@ Backend vision deep-scan events are emitted by `AIAnalysisHandler` after the Asy
 | Backend AI result | Event type | Payload type | ClickHouse fields |
 | --- | --- | --- | --- |
 | YOLO `phone`, `book`, `earbuds`, custom hidden object | `BACKEND_AI_HIDDEN_OBJECT` | `object_detection` | `payload.object_type`, normalized bbox, `detection_confidence` |
-| YOLO `person` or `screen_reflection` | `BACKEND_AI_SCREEN_REFLECTION` | `object_detection` | `payload.object_type`, normalized bbox, `detection_confidence` |
+| YOLO `screen_reflection` | `BACKEND_AI_SCREEN_REFLECTION` | `object_detection` | `payload.object_type`, normalized bbox, `detection_confidence` |
 | ArcFace similarity below threshold | `BACKEND_AI_FACE_MISMATCH` | `face_detection` | `face_similarity`, `face_bbox`, optional `face_embedding` |
 | Spoof/deepfake face result | `BACKEND_AI_FACE_MISMATCH` or `BACKEND_AI_DEEPFAKE_DETECTED` | `face_detection` | `face_similarity` when available, `face_bbox`, optional `face_embedding` |
 | Liveness score below threshold | `BACKEND_AI_FACE_MISMATCH` | `liveness` | `liveness_score` |
 
 Liveness rows are emitted only when the model reports a configured liveness method. Placeholder methods such as `not_configured`, `unavailable`, or an empty method are ignored to avoid treating an unavailable model as fraud.
+
+Standalone YOLO `person` detections are not emitted as anomalies. A normal webcam frame can contain the enrolled student, so extra-person fraud must be derived from a face-count or identity-specific signal rather than the generic COCO `person` class alone.
 
 For backend AI events, unused AI columns are initialized with the same sentinel values used by frontend-mapped events: `face_similarity=-1`, `liveness_score=-1`, and `audio_rms_db=-100`. This prevents empty vision events from looking like low-confidence face or audio readings in ClickHouse queries.
 

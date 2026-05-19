@@ -547,8 +547,10 @@ func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnaly
 		switch obj.ObjectType {
 		case "phone", "book", "earbuds":
 			evtType = valueobject.BackendAIHiddenObject
-		case "screen_reflection", "person":
+		case "screen_reflection":
 			evtType = valueobject.BackendAIScreenReflection
+		case "person":
+			continue
 		default:
 			evtType = valueobject.BackendAIHiddenObject
 		}

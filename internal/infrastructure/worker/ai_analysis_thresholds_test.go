@@ -80,6 +80,20 @@ func TestClassifyFrameAnomaliesIgnoresUnconfiguredLiveness(t *testing.T) {
 	}
 }
 
+func TestClassifyFrameAnomaliesIgnoresPersonObjectWithoutCorroboration(t *testing.T) {
+	frame := &inferencepb.FrameAnalysis{
+		Objects: []*inferencepb.ObjectDetection{
+			{ObjectType: "person", Confidence: 0.92},
+		},
+	}
+
+	anomalies := classifyFrameAnomalies(frame, AIAnalysisThresholds{ObjectConfidence: 0.7})
+
+	if len(anomalies) != 0 {
+		t.Fatalf("expected standalone person detection to be ignored, got %d anomalies: %#v", len(anomalies), anomalies)
+	}
+}
+
 func TestClassifyFrameAnomaliesCarriesObjectDetectionPayloadForClickHouse(t *testing.T) {
 	frame := &inferencepb.FrameAnalysis{
 		TimestampSec: 12,
