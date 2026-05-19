@@ -13,21 +13,20 @@
 argus-frontend/ci/gitlab-ci.yml
         │── npm run build → .output/ → Dockerfile COPY .output
         │── rsync excludes → .output/server/node_modules ЖОҒАЛМАСЫН
-        └── DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (GitLab CI Variables)
+        └── ARGUS_DEPLOY_HOST, ARGUS_DEPLOY_USER, ARGUS_DEPLOY_SSH_KEY
 
 argus-backend/ci/gitlab-ci.yml
         │── go build → binary → Dockerfile
-        └── DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY (GitLab CI Variables)
+        └── ARGUS_DEPLOY_HOST, ARGUS_DEPLOY_USER, ARGUS_DEPLOY_SSH_KEY
 
 argus-infra/docker/docker-compose.yaml
         │── healthcheck секциялары → CI deploy "healthy" болғанда ғана аяқталады
-        │── /opt/argus/migrations/clickhouse — init.sql + 00X файлдары ТӘРТІППЕН орындалады
-        │── symlinks: /opt/argus/docker/argus-backend → /opt/argus/argus-backend
-        │                                argus-frontend → /opt/argus/argus-frontend
+        │── /opt/argus-ai/argus-infra/migrations/clickhouse — init.sql + 00X файлдары ТӘРТІППЕН орындалады
+        │── /opt/argus-ai/argus-backend және /opt/argus-ai/argus-frontend бөлек sync болады
         └── volumes: docker compose down -v → БАРЛЫҚ ДЕРЕКТЕР ЖОЙЫЛАДЫ
 
-nginx конфигурациясы
-        └── /api/ → backend:8080, / → frontend:3000, /livekit → livekit:7880
+nginx конфигурациясы (Docker nginx, argus-network ішінде)
+        └── /api/ → backend:8080, / → frontend:3000, /argus.proctoring → backend:50051
 ```
 
 ---
@@ -56,8 +55,9 @@ INSERT INTO argus_analytics.new_table SELECT * FROM argus_analytics.old_table;
 
 **Миграция файлын серверге көшіру:**
 ```bash
-scp migrations/clickhouse/000006_new_migration.up.sql deploy@89.167.75.40:/opt/argus/migrations/clickhouse/
-# Содан кейін docker compose down -v && docker compose up -d
+scp migrations/clickhouse/000006_new_migration.up.sql deploy@89.167.96.246:/opt/argus-ai/argus-infra/migrations/clickhouse/
+# Содан кейін GitLab-та manual `run-migrations` job іске қос немесе:
+# ssh deploy@89.167.96.246 "cd /opt/argus-ai/argus-infra/docker && docker compose exec ..."
 ```
 
 ---
@@ -120,17 +120,17 @@ docker compose down -v      # тек жаңа сервер баптағанда 
 
 ### 5. Nginx конфигурациясы
 
-**Файл орны:** `/etc/nginx/sites-enabled/argusai.kz`
+**Файл орны:** `/opt/argus-ai/argus-infra/nginx/nginx.conf`
 
 **Маршруттар:**
 ```
 https://argusai.kz/            → frontend:3000
 https://argusai.kz/api/        → backend:8080
-https://argusai.kz/livekit/   → livekit:7880
+https://argusai.kz/argus.proctoring → backend:50051
 ```
 
-**SSL сертификаты:** Let's Encrypt, certbot арқылы 90 күнде жаңарады.  
-**Автоматты жаңарту тексеру:** `systemctl status certbot.timer`
+**SSL сертификаты:** Let's Encrypt, `certbot` контейнері арқылы жаңарады.
+**Тексеру:** `docker compose -f docker-compose.yaml -f docker-compose.prod.yml logs nginx`
 
 ---
 
@@ -173,9 +173,10 @@ cd argus-infra
 # 2. Серверге SCP арқылы жіберу немесе push → CI
 git add . && git commit -m "infra: ..." && git push
 
-# Немесе тікелей serverге:
-scp docker/docker-compose.yaml deploy@89.167.75.40:/opt/argus/docker/
-ssh deploy@89.167.75.40 "cd /opt/argus/docker && docker compose up -d"
+# Manual job тәртібі:
+# 1) sync-infra
+# 2) қажет болса run-migrations
+# 3) nginx/infra өзгерісі болса production compose reload
 ```
 
 ---
@@ -222,19 +223,19 @@ docker logs argus-backend | grep -i "migration\|error"
 docker exec argus-postgres psql -U argus -d argus -f /migrations/001_init.sql
 ```
 
-### Pipeline: DEPLOY_SSH_KEY permission denied
+### Pipeline: ARGUS_DEPLOY_SSH_KEY permission denied
 
 ```bash
 # GitLab → Settings → CI/CD → Variables тексер:
-# DEPLOY_SSH_KEY — type: File (не Variable!)
-# DEPLOY_HOST    — 89.167.75.40
-# DEPLOY_USER    — deploy
+# ARGUS_DEPLOY_SSH_KEY — type: File
+# ARGUS_DEPLOY_HOST    — 89.167.96.246
+# ARGUS_DEPLOY_USER    — deploy
 ```
 
 ### Диск толып қалды (100%)
 
 ```bash
-ssh root@89.167.75.40
+ssh root@89.167.96.246
 
 # Тегін орын тексер
 df -h
@@ -254,20 +255,20 @@ truncate -s 0 /var/log/syslog
 
 ```bash
 # Барлық контейнерлер статусы
-ssh deploy@89.167.75.40 "cd /opt/argus/docker && docker compose ps"
+ssh deploy@89.167.96.246 "cd /opt/argus-ai/argus-infra/docker && docker compose ps"
 
 # Backend тексеру
 curl -s https://argusai.kz/api/healthz
 curl -s https://argusai.kz/api/readyz
 
 # ClickHouse тексеру
-curl -s http://89.167.75.40:8123/ping
+curl -s http://89.167.96.246:8123/ping
 
 # Nginx тексеру
-systemctl status nginx
+ssh deploy@89.167.96.246 "cd /opt/argus-ai/argus-infra/docker && docker compose logs nginx --tail=50"
 
 # SSL сертификат мерзімі
-certbot certificates
+ssh deploy@89.167.96.246 "cd /opt/argus-ai/argus-infra/docker && docker compose run --rm certbot certificates"
 ```
 
 ---
@@ -292,17 +293,19 @@ curl -X POST https://argusai.kz/api/v1/admin/system-reset \
 ### Барлығын қайта бастау (толық reset, деректер сақталады)
 
 ```bash
-ssh deploy@89.167.75.40
-cd /opt/argus/docker
+ssh deploy@89.167.96.246
+cd /opt/argus-ai/argus-infra/docker
 docker compose restart
 ```
 
 ### Толық тазалап қайта бастау (деректер жойылады)
 
 ```bash
-ssh root@89.167.75.40
-cd /opt/argus/docker
-docker compose down -v      # ⚠️ барлық деректер жойылады
+ssh deploy@89.167.96.246
+cd /opt/argus-ai/argus-infra/docker
+# GitLab-та reset-project manual job қолданған дұрыс.
+# Егер қолмен істесең, тек Argus namespace-ін түсір:
+docker compose down         # деректер сақталады
 docker compose up -d
 sleep 30
 docker compose ps           # барлығы healthy екенін тексер
@@ -327,7 +330,7 @@ docker compose ps           # барлығы healthy екенін тексер
 ### Инфрақұрылым өзгерткенде:
 - [ ] `docker-compose.yaml` volumes өзгерді ме → деректерді backup жаса
 - [ ] Жаңа migration → файл атауы `000X_name.up.sql` тәртіпте ме?
-- [ ] Nginx өзгерді ме → `nginx -t` тексер, содан кейін `nginx -s reload`
+- [ ] Nginx өзгерді ме → `docker run ... nginx -t` немесе CI validate job тексер
 
 ---
 
@@ -335,19 +338,15 @@ docker compose ps           # барлығы healthy екенін тексер
 
 ```bash
 # Production сервер
-ssh root@89.167.75.40        # root (тек апатта)
-ssh deploy@89.167.75.40      # deploy (күнделікті жұмыс)
+ssh root@89.167.96.246        # root (тек апатта)
+ssh deploy@89.167.96.246      # deploy (күнделікті жұмыс)
 
 # Жоба файлдары
-/opt/argus/docker/          # docker-compose.yaml
-/opt/argus/argus-backend/   # backend коды
-/opt/argus/argus-frontend/  # frontend коды
-/opt/argus/migrations/      # ClickHouse + PostgreSQL миграциялары
-/opt/argus/nginx/           # nginx конфигурациясы
-
-# Deploy пайдаланушы build папкасы
-/home/deploy/builds/backend/
-/home/deploy/builds/frontend/
+/opt/argus-ai/argus-infra/docker/       # docker-compose.yaml
+/opt/argus-ai/argus-backend/            # backend коды
+/opt/argus-ai/argus-frontend/           # frontend коды
+/opt/argus-ai/argus-infra/migrations/   # ClickHouse + PostgreSQL миграциялары
+/opt/argus-ai/argus-infra/nginx/        # nginx конфигурациясы
 ```
 
 ---

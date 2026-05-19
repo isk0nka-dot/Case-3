@@ -164,9 +164,9 @@ so all 3 repos inherit them:
 | `POSTGRES_PASSWORD`       | Variable | Yes       | Yes    | (strong random password)                   |
 | `MINIO_ROOT_PASSWORD`     | Variable | Yes       | Yes    | (strong random password)                   |
 | `LIVEKIT_API_SECRET`      | Variable | Yes       | Yes    | (min 32 characters)                        |
-| `BACKEND_PUBLIC_URL`      | Variable | Yes       | No     | `https://api.argus.ai`                     |
-| `FRONTEND_ORIGIN`         | Variable | Yes       | No     | `https://app.argus.ai`                     |
-| `NUXT_PUBLIC_API_BASE_URL`| Variable | Yes       | No     | `https://api.argus.ai`                     |
+| `BACKEND_PUBLIC_URL`      | Variable | Yes       | No     | `https://argusai.kz`                       |
+| `FRONTEND_ORIGIN`         | Variable | Yes       | No     | `https://argusai.kz`                       |
+| `NUXT_PUBLIC_API_BASE_URL`| Variable | Yes       | No     | `https://argusai.kz`                       |
 
 Legacy names `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, and `DEPLOY_PATH` are still accepted as fallbacks, but new setups should use the `ARGUS_*` names above.
 
@@ -242,8 +242,8 @@ BACKEND_TAG=latest
 FRONTEND_TAG=latest
 
 # Production URLs
-BACKEND_PUBLIC_URL=https://api.argus.ai
-FRONTEND_ORIGIN=https://app.argus.ai
+BACKEND_PUBLIC_URL=https://argusai.kz
+FRONTEND_ORIGIN=https://argusai.kz
 
 # Secrets (must match GitLab CI/CD variables)
 JWT_SIGNING_KEY=<output of: openssl rand -hex 32>
@@ -257,11 +257,10 @@ LOG_LEVEL=info
 ```
 
 ```bash
-# 5. Log into the container registry
-docker login registry.argus.ai -u registry-bot
+# 5. Start from the synced infra directory
 
 # 6. Start the full stack (first time — will pull all images)
-cd /opt/argus/docker
+cd /opt/argus-ai/argus-infra/docker
 docker compose -f docker-compose.yaml -f docker-compose.prod.yml up -d
 
 # 7. Verify all services are healthy
@@ -278,27 +277,20 @@ Before Nginx can serve HTTPS, you need certificates. The Certbot sidecar
 handles automatic renewal, but the first certificate must be obtained manually.
 
 ```bash
-cd /opt/argus/docker
+cd /opt/argus-ai/argus-infra/docker
 
-# 1. Start nginx on port 80 only (for ACME challenge)
-#    Temporarily comment out SSL lines in nginx.conf, or:
+# 1. Obtain the first certificate. The nginx config expects the standard
+#    Let's Encrypt path for argusai.kz and www.argusai.kz.
 docker compose -f docker-compose.yaml -f docker-compose.prod.yml \
   run --rm certbot certonly \
     --webroot -w /var/www/certbot \
-    -d app.argus.ai \
-    -d api.argus.ai \
-    --email admin@argus.ai \
+    -d argusai.kz \
+    -d www.argusai.kz \
+    --email admin@argusai.kz \
     --agree-tos \
     --no-eff-email
 
-# 2. Copy certs to the expected location (if using Let's Encrypt default path)
-#    The certbot-certs volume maps /etc/letsencrypt → /etc/nginx/certs
-#    Symlink or copy:
-docker compose exec certbot sh -c \
-  "ln -sf /etc/letsencrypt/live/app.argus.ai/fullchain.pem /etc/letsencrypt/fullchain.pem && \
-   ln -sf /etc/letsencrypt/live/app.argus.ai/privkey.pem /etc/letsencrypt/privkey.pem"
-
-# 3. Restart nginx to pick up new certificates
+# 2. Restart nginx to pick up new certificates
 docker compose -f docker-compose.yaml -f docker-compose.prod.yml \
   restart nginx
 ```
@@ -309,7 +301,7 @@ After this, Certbot automatically renews certificates every 12 hours
 ### Option B — Self-signed (development / staging)
 
 ```bash
-cd /opt/argus
+cd /opt/argus-ai/argus-infra
 
 # Generate self-signed cert (valid 1 year)
 mkdir -p certs
@@ -391,7 +383,7 @@ Developer: git tag v1.2.0 && git push origin main --tags
     │   ├─ validate:  docker compose config --quiet
     │   ├─ migrate:   run SQL migrations (manual gate)
     │   └─ deploy:    SSH into server
-    │       ├─ scp docker-compose.yaml → /opt/argus/
+    │       ├─ sync infra files → /opt/argus-ai/argus-infra/
     │       ├─ docker compose pull backend frontend
     │       ├─ docker compose up -d --no-deps --wait backend
     │       └─ docker compose up -d --no-deps --wait frontend
@@ -483,7 +475,7 @@ echo "  https://gitlab.com/argus_ai_group/argus-infra/-/pipelines"
 # SSH into the server
 ssh deploy@YOUR_SERVER_IP
 
-cd /opt/argus/docker
+cd /opt/argus-ai/argus-infra/docker
 
 # Roll back backend to a specific version
 BACKEND_TAG=v1.1.0 docker compose -f docker-compose.yaml \
@@ -502,7 +494,7 @@ BACKEND_TAG=v1.1.0 FRONTEND_TAG=v1.0.9 docker compose \
 
 ```bash
 ssh deploy@YOUR_SERVER_IP
-cd /opt/argus/docker
+cd /opt/argus-ai/argus-infra/docker
 
 # See recent image tags
 docker images --format "{{.Repository}}:{{.Tag}}" | grep argus
@@ -564,7 +556,7 @@ docker compose up -d --no-deps --wait <service>
 docker compose exec backend env
 
 # Check certificate expiry
-openssl s_client -connect app.argus.ai:443 -servername app.argus.ai 2>/dev/null | \
+openssl s_client -connect argusai.kz:443 -servername argusai.kz 2>/dev/null | \
   openssl x509 -noout -dates
 ```
 

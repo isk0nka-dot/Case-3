@@ -48,7 +48,7 @@ services:
       - argus-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 0"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/healthz || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -71,8 +71,8 @@ services:
   # First-time setup (run manually BEFORE starting the stack):
   #   docker compose run --rm certbot certonly \
   #     --webroot -w /var/www/certbot \
-  #     -d app.argus.ai -d api.argus.ai \
-  #     --email admin@argus.ai --agree-tos --no-eff-email
+  #     -d argusai.kz -d www.argusai.kz \
+  #     --email admin@argusai.kz --agree-tos --no-eff-email
   certbot:
     image: certbot/certbot:latest
     container_name: argus-certbot
