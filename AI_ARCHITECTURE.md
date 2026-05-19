@@ -117,7 +117,7 @@ Audio and AI events continue to flow through the existing `events` schema. The r
 | `confidence` | Rule confidence or model confidence |
 | `source` | Browser, webcam, backend AI |
 
-Browser audio events arrive through the existing `sendEvent`/gRPC-Web path as `AudioAnalysisPayload`. The backend audio bridge observes `AUDIO_LEVEL_TELEMETRY`, and when sustained RMS/VAD thresholds are exceeded, it appends a derived `audio_anomaly` event to ClickHouse only. Kafka still receives only the original frontend event, so downstream realtime consumers and API contracts remain unchanged.
+Browser audio events arrive through the existing `sendEvent`/gRPC-Web path as `AudioAnalysisPayload`. The backend audio bridge observes `AUDIO_LEVEL_TELEMETRY`, and when sustained RMS/VAD thresholds are exceeded, it appends a derived `audio_anomaly` event to ClickHouse only. Kafka still receives only the original frontend event, so downstream realtime consumers and API contracts remain unchanged. The bridge accepts both frontend camelCase JSON (`vadConfidence`, `classificationConfidence`) and proto-mapped snake_case JSON (`vad_confidence`, `classification_confidence`) because the transport mapper stores protobuf payloads with generated Go JSON tags.
 
 The Python sidecar response contract uses normalized bbox objects (`{"x":0.1,"y":0.2,"w":0.3,"h":0.4}`) for faces and objects. The Go bridge accepts that canonical shape and the legacy `[x,y,w,h]` array shape before mapping results to protobuf/ClickHouse fields.
 

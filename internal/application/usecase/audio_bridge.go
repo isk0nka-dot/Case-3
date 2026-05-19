@@ -37,9 +37,11 @@ type audioBridgeState struct {
 }
 
 type audioAnalysisPayloadFields struct {
-	VADConfidence            float32 `json:"vadConfidence"`
-	Classification           string  `json:"classification"`
-	ClassificationConfidence float32 `json:"classificationConfidence"`
+	VADConfidence                 float32 `json:"vadConfidence"`
+	VADConfidenceProtoJSON        float32 `json:"vad_confidence"`
+	Classification                string  `json:"classification"`
+	ClassificationConfidence      float32 `json:"classificationConfidence"`
+	ClassificationConfidenceProto float32 `json:"classification_confidence"`
 }
 
 // NewAudioBridge creates an audio telemetry aggregator. A nil bridge is used
@@ -190,5 +192,11 @@ func parseAudioAnalysisPayload(payload []byte) audioAnalysisPayloadFields {
 	}
 	var fields audioAnalysisPayloadFields
 	_ = json.Unmarshal(payload, &fields)
+	if fields.VADConfidence == 0 {
+		fields.VADConfidence = fields.VADConfidenceProtoJSON
+	}
+	if fields.ClassificationConfidence == 0 {
+		fields.ClassificationConfidence = fields.ClassificationConfidenceProto
+	}
 	return fields
 }

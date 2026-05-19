@@ -237,6 +237,13 @@ Frontend `useAudioEngine` emits structured audio features through the existing `
 
 When sustained RMS/VAD thresholds are exceeded, the bridge writes one derived `audio_anomaly` event to ClickHouse with `source=backend_ai`. It does not write this derived event to Kafka, does not modify PostgreSQL session transactions, and does not reject the original event if ClickHouse is unavailable.
 
+The bridge parser accepts both JSON shapes that can appear at the boundary:
+
+- Frontend-facing camelCase: `vadConfidence`, `classificationConfidence`
+- Protobuf/Go mapper snake_case: `vad_confidence`, `classification_confidence`
+
+Keep this compatibility when changing mapper or payload code; otherwise derived anomaly confidence can silently fall back to the configured default.
+
 ## Safety Rules
 
 - Never enable `allow_stub=true` in production.

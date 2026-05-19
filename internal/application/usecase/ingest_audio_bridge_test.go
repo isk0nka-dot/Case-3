@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -164,6 +165,42 @@ func TestIngestAcceptsAudioTelemetryWhenDerivedClickHouseWriteFails(t *testing.T
 	}
 	if got := len(kafka.snapshot()); got != 1 {
 		t.Fatalf("kafka events = %d, want 1", got)
+	}
+}
+
+func TestAudioBridgeParsesProtoJSONSnakeCasePayload(t *testing.T) {
+	bridge := NewAudioBridge(AudioBridgeConfig{
+		Enabled:                true,
+		NoiseThresholdDb:       -35,
+		VADConfidenceThreshold: 0.7,
+		ConsecutiveEvents:      1,
+		CooldownEvents:         0,
+		DerivedEventConfidence: 0.5,
+	})
+
+	event := audioTelemetryEvent("evt-proto-json-audio", -30, true, 0)
+	event.AudioClassification = ""
+	event.Payload = []byte(`{"rms_db":-30,"vad_active":true,"vad_confidence":0.92,"classification":"speech","classification_confidence":0.88,"speaker_count":1,"speaker_match":true,"speaker_similarity":1,"segment_duration_ms":250}`)
+
+	derived := bridge.Derive(event)
+	if derived == nil {
+		t.Fatal("expected derived audio anomaly from snake_case proto JSON payload")
+	}
+	if derived.Confidence != 0.92 {
+		t.Fatalf("derived confidence = %.2f, want parsed vad_confidence 0.92", derived.Confidence)
+	}
+	if derived.AudioClassification != "speech" {
+		t.Fatalf("derived classification = %q, want speech", derived.AudioClassification)
+	}
+
+	var payload struct {
+		ClassificationConfidence float32 `json:"classificationConfidence"`
+	}
+	if err := json.Unmarshal(derived.Payload, &payload); err != nil {
+		t.Fatalf("derived payload is not valid JSON: %v", err)
+	}
+	if payload.ClassificationConfidence != 0.88 {
+		t.Fatalf("classificationConfidence = %.2f, want parsed classification_confidence 0.88", payload.ClassificationConfidence)
 	}
 }
 
