@@ -20,8 +20,8 @@
 #
 # Optional CI variables:
 #   NUXT_PUBLIC_API_BASE_URL  Backend API URL (default: https://argusai.kz)
-#   ARGUS_PROJECT_ROOT        Default: /opt/argus
-#   ARGUS_FRONTEND_DEPLOY_PATH Default: $ARGUS_PROJECT_ROOT/frontend
+#   ARGUS_PROJECT_ROOT        Default: /opt/argus-ai
+#   ARGUS_FRONTEND_DEPLOY_PATH Default: $ARGUS_PROJECT_ROOT/argus-frontend
 #
 # Backward-compatible fallback: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY.
 # =============================================================================
