@@ -42,6 +42,7 @@ type AIAnalysisHandler struct {
 	logger         *zap.Logger
 	thresholds     AIAnalysisThresholds
 	frameExtractor FrameExtractor
+	maxFrameBytes  int
 }
 
 type AIAnalysisThresholds struct {
@@ -50,6 +51,8 @@ type AIAnalysisThresholds struct {
 	ObjectConfidence float32
 	SpoofConfidence  float32
 }
+
+const defaultAIAnalysisMaxFrameBytes = 10 * 1024 * 1024
 
 // NewAIAnalysisHandler creates a new asynq handler for AI deep scan jobs.
 func NewAIAnalysisHandler(
@@ -74,6 +77,7 @@ func NewAIAnalysisHandler(
 		alerter:       alerter,
 		logger:        logger.Named("asynq_ai_analysis"),
 		thresholds:    normalizeAIAnalysisThresholds(firstAIAnalysisThresholds(thresholds)),
+		maxFrameBytes: defaultAIAnalysisMaxFrameBytes,
 	}
 	h.ConfigureFrameExtraction(FrameExtractionConfig{})
 	return h
@@ -81,6 +85,13 @@ func NewAIAnalysisHandler(
 
 func (h *AIAnalysisHandler) ConfigureFrameExtraction(cfg FrameExtractionConfig) {
 	h.frameExtractor = NewFFmpegFrameExtractor(cfg)
+}
+
+func (h *AIAnalysisHandler) ConfigureMaxFrameBytes(maxBytes int) {
+	if maxBytes < 1 {
+		maxBytes = defaultAIAnalysisMaxFrameBytes
+	}
+	h.maxFrameBytes = maxBytes
 }
 
 // ProcessTask implements the asynq.Handler interface.
@@ -286,9 +297,17 @@ func (h *AIAnalysisHandler) analyzeImageEvidence(
 	frag evidenceFragment,
 	imageReader io.Reader,
 ) (*inferencepb.AnalyzeVideoResponse, error) {
-	frameData, err := io.ReadAll(imageReader)
+	maxBytes := h.effectiveMaxFrameBytes()
+	if frag.SizeBytes > int64(maxBytes) {
+		return nil, fmt.Errorf("image evidence %s exceeds maximum frame size: %d bytes > %d bytes", frag.ObjectKey, frag.SizeBytes, maxBytes)
+	}
+
+	frameData, err := io.ReadAll(io.LimitReader(imageReader, int64(maxBytes)+1))
 	if err != nil {
 		return nil, fmt.Errorf("read image evidence %s: %w", frag.ObjectKey, err)
+	}
+	if len(frameData) > maxBytes {
+		return nil, fmt.Errorf("image evidence %s exceeds maximum frame size: %d bytes > %d bytes", frag.ObjectKey, len(frameData), maxBytes)
 	}
 
 	return h.analyzeEvidenceFrames(ctx, client, payload, []evidenceFrame{
@@ -298,6 +317,13 @@ func (h *AIAnalysisHandler) analyzeImageEvidence(
 			TimestampSec: 0,
 		},
 	})
+}
+
+func (h *AIAnalysisHandler) effectiveMaxFrameBytes() int {
+	if h.maxFrameBytes < 1 {
+		return defaultAIAnalysisMaxFrameBytes
+	}
+	return h.maxFrameBytes
 }
 
 func (h *AIAnalysisHandler) analyzeVideoEvidence(

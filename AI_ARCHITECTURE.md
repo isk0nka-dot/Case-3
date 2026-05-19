@@ -65,6 +65,8 @@ Backend Go config:
 | `inference.bridge_timeout_sec` | `EVENT_COLLECTOR_INFERENCE_BRIDGE_TIMEOUT_SEC` | `5` | Health check and inference HTTP timeout. |
 | `inference.concurrency` | `EVENT_COLLECTOR_INFERENCE_CONCURRENCY` | `4` | Max simultaneous frame analyses in the Go gateway. |
 | `inference.frame_sample_interval_sec` | `EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC` | `5` | Minimum interval for heavy video frame extraction. |
+| `inference.max_video_dur_sec` | YAML only | `300` | Hard cap used to calculate the maximum frames extracted from one video fragment. |
+| `inference.max_frame_bytes` | YAML only | `10485760` | Maximum single frame payload size. The worker enforces it before direct image evidence reaches inference. |
 | `inference.face_mismatch_threshold` | `EVENT_COLLECTOR_INFERENCE_FACE_MISMATCH_THRESHOLD` | `0.62` | Identity mismatch cutoff. |
 | `inference.object_confidence_threshold` | `EVENT_COLLECTOR_INFERENCE_OBJECT_CONFIDENCE_THRESHOLD` | `0.35` | YOLO object confidence cutoff. |
 
@@ -137,7 +139,7 @@ Place model weights under `argus-backend/models/` for local testing or mount the
 
 The backend does not continuously decode WebM/MP4 evidence fragments. Background workers should send already sampled image frames to the inference gateway, or skip the fragment until the safe extractor worker is available. This keeps the exam session path independent from FFmpeg load and prevents ONNX from receiving invalid raw video bytes.
 
-`AIAnalysisHandler` enforces this at the worker boundary: `image/jpeg`, `image/png`, and `image/webp` evidence fragments are sent directly to the `AnalyzeFrame` RPC, while `video/mp4` and `video/webm` fragments are sampled through the bounded FFmpeg extractor first. Unsupported content types are skipped before storage download.
+`AIAnalysisHandler` enforces this at the worker boundary: `image/jpeg`, `image/png`, and `image/webp` evidence fragments are sent directly to the `AnalyzeFrame` RPC, while `video/mp4` and `video/webm` fragments are sampled through the bounded FFmpeg extractor first. Direct image fragments are capped by `inference.max_frame_bytes` before the frame request is built, so oversized evidence is skipped instead of being fully loaded into worker memory. Unsupported content types are skipped before storage download.
 
 The extractor uses the configured `inference.frame_sample_interval_sec` and `inference.max_video_dur_sec` values to build a bounded FFmpeg command with `-nostdin`, `fps=1/N`, and `-frames:v max`. The worker then sends each extracted JPEG through `AnalyzeFrame`, preserving the sampled timestamp in `video_timestamp_sec`. Direct image fragments use the same path with timestamp `0`.
 

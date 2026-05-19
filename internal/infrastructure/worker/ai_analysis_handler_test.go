@@ -238,3 +238,26 @@ func TestAIAnalysisSendsImageEvidenceViaAnalyzeFrame(t *testing.T) {
 		t.Fatalf("expected image object finding in summary, got %d", resp.Summary.GetObjectDetectionFrames())
 	}
 }
+
+func TestAIAnalysisRejectsOversizedImageEvidenceBeforeAnalyzeFrame(t *testing.T) {
+	client := &fakeInferenceClient{}
+	handler := &AIAnalysisHandler{}
+	handler.ConfigureMaxFrameBytes(4)
+
+	_, err := handler.analyzeImageEvidence(
+		context.Background(),
+		client,
+		AIAnalysisPayload{SessionID: "session-1", OrgID: "org-1"},
+		evidenceFragment{ObjectKey: "recordings/session-1.jpg", ContentType: "image/jpeg"},
+		strings.NewReader("12345"),
+	)
+	if err == nil {
+		t.Fatal("expected oversized image evidence error")
+	}
+	if !strings.Contains(err.Error(), "exceeds maximum frame size") {
+		t.Fatalf("expected maximum frame size error, got %v", err)
+	}
+	if len(client.requests) != 0 {
+		t.Fatalf("expected no AnalyzeFrame requests for oversized image, got %d", len(client.requests))
+	}
+}

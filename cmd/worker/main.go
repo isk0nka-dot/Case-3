@@ -221,6 +221,7 @@ func run() error {
 		IntervalSec:    cfg.Inference.FrameSampleIntervalSec,
 		MaxVideoDurSec: cfg.Inference.MaxVideoDurSec,
 	})
+	aiAnalysisHandler.ConfigureMaxFrameBytes(cfg.Inference.MaxFrameBytes)
 
 	// =================================================================
 	// STEP 10: Create and configure asynq servers.
