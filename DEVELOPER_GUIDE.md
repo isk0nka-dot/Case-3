@@ -129,15 +129,32 @@ Keep Python sidecar deployment as the default unless there is a measured reason 
 
 ## Deployment Notes
 
-CI pushes code only. Server deployment should be done separately after the pipeline is green:
+GitLab CI verifies the backend automatically and exposes production deployment as a manual job only. The server may host multiple projects, so the backend deploy is scoped to the Argus project root and never deletes broad server paths.
+
+Required GitLab CI variables:
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| `ARGUS_DEPLOY_HOST` | Variable | Production server IP or DNS name. |
+| `ARGUS_DEPLOY_USER` | Variable | SSH user, usually `deploy`. |
+| `ARGUS_DEPLOY_SSH_KEY` | File | Private deploy key. Use GitLab variable type `File`; do not use hidden masking if GitLab rejects multiline OpenSSH keys. |
+
+Optional variables:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `ARGUS_PROJECT_ROOT` | `/opt/argus` | Root directory reserved for this Argus installation. |
+| `ARGUS_BACKEND_DEPLOY_PATH` | `$ARGUS_PROJECT_ROOT/backend` | Backend checkout/build directory on the server. |
+
+Backward-compatible fallbacks are still accepted for older GitLab settings: `DEPLOY_HOST`, `DEPLOY_USER`, and `DEPLOY_SSH_KEY`.
+
+The manual `deploy-production` job runs:
 
 ```bash
-git pull
-docker build -t argus/backend:latest .
-docker build -t argus/ai-sidecar:latest ai-sidecar
-docker build -f Dockerfile.inference -t argus/inference:latest .
-docker build -f Dockerfile.worker -t argus/worker:latest .
+sh ci/scripts/deploy_backend.sh
 ```
+
+It performs SSH key preflight, syncs the repository to `$ARGUS_PROJECT_ROOT/backend`, builds `app`, `worker`, `inference`, and `ai-sidecar`, then waits for `argus-backend-app` health. Runtime DLQ data is mounted under `${ARGUS_PROJECT_ROOT:-/opt/argus}/data/dlq`, not a global `/opt/argus-ai` path.
 
 The backend config must point to the sidecar:
 

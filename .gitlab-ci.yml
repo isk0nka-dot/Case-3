@@ -4,7 +4,7 @@
 # Delegates to the comprehensive pipeline definition in ci/gitlab-ci.yml.
 # This file exists at repo root because GitLab requires .gitlab-ci.yml here.
 #
-# Pipeline stages: verify → deploy (SSH to production server)
+# Pipeline stages: verify → deploy (manual SSH gate, project-root scoped)
 # See ci/gitlab-ci.yml for full job definitions.
 # =============================================================================
 
