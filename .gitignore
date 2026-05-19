@@ -76,6 +76,7 @@ ai-sidecar/.venv*/
 # ── CI cache ──────────────────────────────────────────────────────────────
 .go-cache/
 .go-build-cache/
+.gocache/
 .golangci-cache/
 
 # ── Ad-hoc SQL / query artifacts ──────────────────────────────────────────

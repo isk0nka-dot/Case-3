@@ -64,6 +64,22 @@ func TestClassifyFrameAnomaliesAllowsThresholdTuning(t *testing.T) {
 	}
 }
 
+func TestClassifyFrameAnomaliesIgnoresUnconfiguredLiveness(t *testing.T) {
+	frame := &inferencepb.FrameAnalysis{
+		Liveness: &inferencepb.LivenessResult{
+			IsLive: false,
+			Score:  0,
+			Method: "not_configured",
+		},
+	}
+
+	anomalies := classifyFrameAnomalies(frame, AIAnalysisThresholds{Liveness: 0.4})
+
+	if len(anomalies) != 0 {
+		t.Fatalf("expected unconfigured liveness to be ignored, got %d anomalies: %#v", len(anomalies), anomalies)
+	}
+}
+
 func TestClassifyFrameAnomaliesCarriesObjectDetectionPayloadForClickHouse(t *testing.T) {
 	frame := &inferencepb.FrameAnalysis{
 		TimestampSec: 12,

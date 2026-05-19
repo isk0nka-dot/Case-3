@@ -221,6 +221,8 @@ Face mismatch/spoof detections use `payload_type=face_detection` and also popula
 
 The worker sets `face_similarity`, `face_bbox`, and optional `face_embedding` for ArcFace results. Liveness failures use `payload_type=liveness` and populate `liveness_score`.
 
+Liveness anomalies are emitted only for configured liveness methods. Placeholder methods such as `not_configured`, `unavailable`, `unknown`, or an empty method are ignored so an unavailable liveness model does not create false-positive fraud events.
+
 Do not emit `BACKEND_AI_FACE_MISMATCH` solely because a reference embedding is missing. Missing enrollment data means identity similarity was not computed; it is an operational/enrollment gap, not proof of fraud.
 
 Unused denormalized AI columns are deliberately initialized with sentinel values before insert: `face_similarity=-1`, `liveness_score=-1`, and `audio_rms_db=-100`. Do not remove these sentinels; otherwise ClickHouse analytics may interpret empty backend vision events as real zero-valued face or audio readings.

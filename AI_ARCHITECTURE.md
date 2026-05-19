@@ -131,6 +131,8 @@ Backend vision deep-scan events are emitted by `AIAnalysisHandler` after the Asy
 | Spoof/deepfake face result | `BACKEND_AI_FACE_MISMATCH` or `BACKEND_AI_DEEPFAKE_DETECTED` | `face_detection` | `face_similarity` when available, `face_bbox`, optional `face_embedding` |
 | Liveness score below threshold | `BACKEND_AI_FACE_MISMATCH` | `liveness` | `liveness_score` |
 
+Liveness rows are emitted only when the model reports a configured liveness method. Placeholder methods such as `not_configured`, `unavailable`, or an empty method are ignored to avoid treating an unavailable model as fraud.
+
 For backend AI events, unused AI columns are initialized with the same sentinel values used by frontend-mapped events: `face_similarity=-1`, `liveness_score=-1`, and `audio_rms_db=-100`. This prevents empty vision events from looking like low-confidence face or audio readings in ClickHouse queries.
 
 The AI layer does not write to PostgreSQL transactions in the student session path. ClickHouse writes remain asynchronous and best-effort.

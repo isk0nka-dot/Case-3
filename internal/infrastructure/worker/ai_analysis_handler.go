@@ -571,7 +571,7 @@ func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnaly
 		})
 	}
 
-	if frame.Liveness != nil && !frame.Liveness.IsLive && frame.Liveness.Score < thresholds.Liveness {
+	if isConfiguredLivenessFailure(frame.Liveness, thresholds.Liveness) {
 		payload := aiLivenessPayload{
 			LivenessScore: frame.Liveness.Score,
 			SpoofVector:   frame.Liveness.Method,
@@ -589,6 +589,19 @@ func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnaly
 	}
 
 	return anomalies
+}
+
+func isConfiguredLivenessFailure(liveness *inferencepb.LivenessResult, threshold float32) bool {
+	if liveness == nil || liveness.IsLive || liveness.Score >= threshold {
+		return false
+	}
+
+	switch strings.ToLower(strings.TrimSpace(liveness.Method)) {
+	case "", "not_configured", "unconfigured", "unavailable", "unknown":
+		return false
+	default:
+		return true
+	}
 }
 
 func marshalAIAnomalyPayload(payload any) []byte {
