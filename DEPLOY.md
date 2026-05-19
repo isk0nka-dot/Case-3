@@ -1,7 +1,8 @@
 # Argus AI — Production Deployment Guide
 
-Push-to-deploy workflow: tag a release in `argus-backend` or `argus-frontend`,
-and the server updates automatically via GitLab CI/CD.
+Current workflow: GitLab verifies every repository automatically, but all server-changing actions are manual. The production server can host more than one project, so Argus deployment is isolated under a single project root, `/opt/argus-ai` by default.
+
+Do not run global cleanup commands such as `docker system prune`, `rm -rf /opt`, or broad `/home/deploy` deletion from CI. The reset job in this repository is scoped to the Argus project root and `argus-*` Docker resources only.
 
 ---
 
@@ -150,9 +151,11 @@ so all 3 repos inherit them:
 
 | Variable                  | Type     | Protected | Masked | Example                                    |
 |---------------------------|----------|-----------|--------|--------------------------------------------|
-| `DEPLOY_HOST`             | Variable | Yes       | No     | `203.0.113.50` or `server.argus.ai`        |
-| `DEPLOY_USER`             | Variable | Yes       | No     | `deploy`                                   |
-| `DEPLOY_SSH_KEY`          | **File** | Yes       | Yes    | Contents of `~/.ssh/argus_deploy`          |
+| `ARGUS_DEPLOY_HOST`       | Variable | Yes       | No     | `89.167.96.246` or `server.argus.ai`       |
+| `ARGUS_DEPLOY_USER`       | Variable | Yes       | No     | `deploy`                                   |
+| `ARGUS_DEPLOY_SSH_KEY`    | **File** | Yes       | No     | Contents of `~/.ssh/argus_deploy`          |
+| `ARGUS_PROJECT_ROOT`      | Variable | Yes       | No     | `/opt/argus-ai`                            |
+| `ARGUS_INFRA_DEPLOY_PATH` | Variable | Yes       | No     | `/opt/argus-ai/argus-infra`                |
 | `REGISTRY_HOST`           | Variable | Yes       | No     | `registry.argus.ai`                        |
 | `REGISTRY_USER`           | Variable | Yes       | Yes    | `registry-bot`                             |
 | `REGISTRY_PASSWORD`       | Variable | Yes       | Yes    | (registry access token)                    |
@@ -164,6 +167,22 @@ so all 3 repos inherit them:
 | `BACKEND_PUBLIC_URL`      | Variable | Yes       | No     | `https://api.argus.ai`                     |
 | `FRONTEND_ORIGIN`         | Variable | Yes       | No     | `https://app.argus.ai`                     |
 | `NUXT_PUBLIC_API_BASE_URL`| Variable | Yes       | No     | `https://api.argus.ai`                     |
+
+Legacy names `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, and `DEPLOY_PATH` are still accepted as fallbacks, but new setups should use the `ARGUS_*` names above.
+
+For GitLab SSH private key variables, choose **Type: File**. If GitLab rejects the key as `Masked and hidden` because an OpenSSH key contains whitespace/newlines, use protected File variable without hidden masking. The job prints only the key fingerprint with `ssh-keygen -lf`, not the private key content.
+
+### Project reset variables
+
+The `reset-project` job is manual and destructive. It will not run unless this variable is supplied for that job:
+
+| Variable | Required value | Effect |
+| --- | --- | --- |
+| `ARGUS_CONFIRM_RESET` | `DELETE_ARGUS_PROJECT` | Confirms that CI may reset the Argus project namespace. |
+| `ARGUS_RESET_DATA` | `true` or `false` | When `true`, removes Docker volumes matching `argus-*`. Default is `false`. |
+| `ARGUS_RESET_CONFIG` | `true` or `false` | When `true`, removes `$ARGUS_INFRA_DEPLOY_PATH/docker/.env` and `docker/keys`. Default is `false`. |
+
+Use `ARGUS_RESET_DATA=true` only when you intentionally want to wipe PostgreSQL, ClickHouse, MinIO, Redis, Kafka, and other Argus data volumes.
 
 ### Generating secrets
 
@@ -195,15 +214,20 @@ openssl rand -base64 32
 SSH into your production server and run these commands once:
 
 ```bash
-# 1. Create the deployment directory
-sudo mkdir -p /opt/argus
-sudo chown deploy:deploy /opt/argus
-cd /opt/argus
+# 1. Create the deployment directory reserved for this Argus project
+sudo mkdir -p /opt/argus-ai
+sudo chown deploy:deploy /opt/argus-ai
+cd /opt/argus-ai
 
-# 2. Clone the infra repo (for compose files, configs, migrations)
-git clone git@gitlab.com:argus_ai_group/argus-infra.git .
+# 2. CI will sync these subdirectories:
+#    /opt/argus-ai/argus-backend
+#    /opt/argus-ai/argus-frontend
+#    /opt/argus-ai/argus-infra/docker
+#    /opt/argus-ai/argus-infra/nginx
+#    /opt/argus-ai/argus-infra/migrations
+#    /opt/argus-ai/argus-infra/scripts
 
-# 3. Create the production .env file
+# 3. Create the production .env file after infra sync
 cp docker/.env.example docker/.env
 
 # 4. Edit .env with real production values

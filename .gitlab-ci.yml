@@ -4,7 +4,7 @@
 # Delegates to the comprehensive pipeline definition in ci/gitlab-ci.yml.
 # This file exists at repo root because GitLab requires .gitlab-ci.yml here.
 #
-# Pipeline stages: validate → sync → migrate
+# Pipeline stages: validate → sync/reset → migrate (manual SSH gates)
 # See ci/gitlab-ci.yml for full job definitions.
 # =============================================================================
 
