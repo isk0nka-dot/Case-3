@@ -221,6 +221,8 @@ Face mismatch/spoof detections use `payload_type=face_detection` and also popula
 
 The worker sets `face_similarity`, `face_bbox`, and optional `face_embedding` for ArcFace results. Liveness failures use `payload_type=liveness` and populate `liveness_score`.
 
+ArcFace cosine similarity can be negative. Treat any computed similarity below `inference.face_mismatch_threshold` as a mismatch; do not require it to be greater than zero. Missing reference data is still not fraud because no computed embedding/similarity is available.
+
 Liveness anomalies are emitted only for configured liveness methods. Placeholder methods such as `not_configured`, `unavailable`, `unknown`, or an empty method are ignored so an unavailable liveness model does not create false-positive fraud events.
 
 Do not treat a standalone YOLO `person` object as fraud. The student's own webcam frame may contain a person detection; extra-person fraud must come from face count or identity-specific evidence.

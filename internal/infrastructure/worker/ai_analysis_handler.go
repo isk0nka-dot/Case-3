@@ -484,7 +484,7 @@ func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnaly
 	faceCount := int32(len(frame.Faces))
 
 	for _, face := range frame.Faces {
-		if face.Similarity > 0 && face.Similarity < thresholds.FaceMismatch {
+		if hasComputedFaceSimilarity(face) && face.Similarity < thresholds.FaceMismatch {
 			payload := aiFaceDetectionPayload{
 				Match:      false,
 				Similarity: face.Similarity,
@@ -513,8 +513,9 @@ func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnaly
 			if face.SpoofType == "deepfake" {
 				evtType = valueobject.BackendAIDeepfakeDetected
 			}
+			hasSimilarity := hasComputedFaceSimilarity(face)
 			payload := aiFaceDetectionPayload{
-				Match:      face.Similarity == 0 || face.Similarity >= thresholds.FaceMismatch,
+				Match:      !hasSimilarity || face.Similarity >= thresholds.FaceMismatch,
 				Similarity: face.Similarity,
 				FaceCount:  faceCount,
 				IsSpoof:    true,
@@ -530,7 +531,7 @@ func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnaly
 				faceBBox:          faceBBoxJSON(face),
 				faceEmbedding:     append([]float32(nil), face.Embedding...),
 				faceSimilarity:    face.Similarity,
-				faceSimilaritySet: face.Similarity > 0,
+				faceSimilaritySet: hasSimilarity,
 				headYaw:           face.HeadYaw,
 				headPitch:         face.HeadPitch,
 				headRoll:          face.HeadRoll,
@@ -593,6 +594,10 @@ func classifyFrameAnomalies(frame *inferencepb.FrameAnalysis, thresholds AIAnaly
 	return anomalies
 }
 
+func hasComputedFaceSimilarity(face *inferencepb.FaceDetection) bool {
+	return face != nil && len(face.Embedding) > 0
+}
+
 func isConfiguredLivenessFailure(liveness *inferencepb.LivenessResult, threshold float32) bool {
 	if liveness == nil || liveness.IsLive || liveness.Score >= threshold {
 		return false
@@ -637,7 +642,7 @@ func summarizeAIFrames(frames []*inferencepb.FrameAnalysis, thresholds AIAnalysi
 			summary.ObjectDetectionFrames++
 		}
 		for _, face := range frame.Faces {
-			if face.Similarity > 0 && face.Similarity < thresholds.FaceMismatch {
+			if hasComputedFaceSimilarity(face) && face.Similarity < thresholds.FaceMismatch {
 				summary.FaceMismatchFrames++
 			}
 			if face.IsSpoof && face.Confidence >= thresholds.SpoofConfidence {

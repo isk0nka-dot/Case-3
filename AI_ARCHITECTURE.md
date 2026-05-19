@@ -131,6 +131,8 @@ Backend vision deep-scan events are emitted by `AIAnalysisHandler` after the Asy
 | Spoof/deepfake face result | `BACKEND_AI_FACE_MISMATCH` or `BACKEND_AI_DEEPFAKE_DETECTED` | `face_detection` | `face_similarity` when available, `face_bbox`, optional `face_embedding` |
 | Liveness score below threshold | `BACKEND_AI_FACE_MISMATCH` | `liveness` | `liveness_score` |
 
+ArcFace similarity can be negative. Any computed similarity below `inference.face_mismatch_threshold` is treated as a mismatch; missing reference data is represented by no computed embedding and is not treated as fraud.
+
 Liveness rows are emitted only when the model reports a configured liveness method. Placeholder methods such as `not_configured`, `unavailable`, or an empty method are ignored to avoid treating an unavailable model as fraud.
 
 Standalone YOLO `person` detections are not emitted as anomalies. A normal webcam frame can contain the enrolled student, so extra-person fraud must be derived from a face-count or identity-specific signal rather than the generic COCO `person` class alone.

@@ -12,7 +12,7 @@ import (
 func TestClassifyFrameAnomaliesUsesConfigurableThresholds(t *testing.T) {
 	frame := &inferencepb.FrameAnalysis{
 		Faces: []*inferencepb.FaceDetection{
-			{Similarity: 0.59, Confidence: 0.8},
+			{Similarity: 0.59, Confidence: 0.8, Embedding: []float32{0.1, 0.2, 0.3}},
 			{IsSpoof: true, SpoofType: "deepfake", Confidence: 0.65},
 		},
 		Objects: []*inferencepb.ObjectDetection{
@@ -91,6 +91,30 @@ func TestClassifyFrameAnomaliesIgnoresPersonObjectWithoutCorroboration(t *testin
 
 	if len(anomalies) != 0 {
 		t.Fatalf("expected standalone person detection to be ignored, got %d anomalies: %#v", len(anomalies), anomalies)
+	}
+}
+
+func TestClassifyFrameAnomaliesFlagsNegativeFaceSimilarity(t *testing.T) {
+	frame := &inferencepb.FrameAnalysis{
+		Faces: []*inferencepb.FaceDetection{
+			{
+				Similarity: -0.12,
+				Confidence: 0.97,
+				Embedding:  []float32{0.1, 0.2, 0.3},
+			},
+		},
+	}
+
+	anomalies := classifyFrameAnomalies(frame, AIAnalysisThresholds{FaceMismatch: 0.62})
+
+	if len(anomalies) != 1 {
+		t.Fatalf("expected negative similarity to emit mismatch, got %d anomalies: %#v", len(anomalies), anomalies)
+	}
+	if anomalies[0].eventType != valueobject.BackendAIFaceMismatch {
+		t.Fatalf("expected face mismatch event, got %s", anomalies[0].eventType)
+	}
+	if !anomalies[0].faceSimilaritySet || anomalies[0].faceSimilarity != -0.12 {
+		t.Fatalf("expected negative face similarity to be preserved, got set=%v value=%f", anomalies[0].faceSimilaritySet, anomalies[0].faceSimilarity)
 	}
 }
 
