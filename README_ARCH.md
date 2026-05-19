@@ -3,6 +3,28 @@
 **Audience:** Senior engineers joining the Argus AI team.
 **Purpose:** Understand the system's design contracts in 5 minutes. Break none of them.
 
+## CI/CD Contract
+
+The frontend pipeline runs `npm ci`, unit tests, lint, typecheck, and a production Nuxt build before deployment is available. Deployment is manual only.
+
+Required GitLab CI variables:
+
+| Variable | Type | Description |
+| --- | --- | --- |
+| `ARGUS_DEPLOY_HOST` | Variable | Production server IP or DNS name. |
+| `ARGUS_DEPLOY_USER` | Variable | SSH user, usually `deploy`. |
+| `ARGUS_DEPLOY_SSH_KEY` | File | Private deploy key. Use GitLab variable type `File`; multiline OpenSSH keys may not be accepted as hidden masked variables. |
+
+Optional variables:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `ARGUS_PROJECT_ROOT` | `/opt/argus` | Root directory reserved for this Argus installation on a shared server. |
+| `ARGUS_FRONTEND_DEPLOY_PATH` | `$ARGUS_PROJECT_ROOT/frontend` | Frontend checkout/build directory on the server. |
+| `NUXT_PUBLIC_API_BASE_URL` | `https://argusai.kz` | Public backend URL baked into the Nuxt build. |
+
+The manual `deploy-production` job runs `sh ci/scripts/deploy_frontend.sh`. It checks SSH access first, syncs only the frontend repo into `$ARGUS_PROJECT_ROOT/frontend`, builds `argus/frontend:latest`, and starts `argus-frontend-app`. It does not prune Docker globally or touch other projects on the server.
+
 ---
 
 ## 1. System Blueprint
