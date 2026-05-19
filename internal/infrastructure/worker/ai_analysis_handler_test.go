@@ -189,3 +189,52 @@ func TestAIAnalysisSendsReferenceEmbeddingWithExtractedFrames(t *testing.T) {
 		}
 	}
 }
+
+func TestAIAnalysisSendsImageEvidenceViaAnalyzeFrame(t *testing.T) {
+	client := &fakeInferenceClient{}
+	handler := &AIAnalysisHandler{
+		thresholds: AIAnalysisThresholds{
+			ObjectConfidence: 0.35,
+		},
+	}
+
+	resp, err := handler.analyzeImageEvidence(
+		context.Background(),
+		client,
+		AIAnalysisPayload{
+			SessionID:          "session-1",
+			OrgID:              "org-1",
+			ExamID:             "exam-1",
+			StudentID:          "student-1",
+			ReferenceEmbedding: []float32{0.11, 0.22},
+		},
+		evidenceFragment{ObjectKey: "recordings/session-1.jpg", ContentType: "image/jpeg"},
+		strings.NewReader("jpeg-bytes"),
+	)
+	if err != nil {
+		t.Fatalf("analyzeImageEvidence returned error: %v", err)
+	}
+
+	if len(client.requests) != 1 {
+		t.Fatalf("expected one AnalyzeFrame request, got %d", len(client.requests))
+	}
+	req := client.requests[0]
+	if string(req.FrameData) != "jpeg-bytes" {
+		t.Fatalf("unexpected frame data %q", string(req.FrameData))
+	}
+	if req.ContentType != "image/jpeg" {
+		t.Fatalf("expected image/jpeg content type, got %q", req.ContentType)
+	}
+	if req.SessionId != "session-1" || req.StudentId != "student-1" || req.ExamId != "exam-1" || req.OrgId != "org-1" {
+		t.Fatalf("request metadata was not preserved: %#v", req)
+	}
+	if got, want := req.ReferenceEmbedding, []float32{0.11, 0.22}; len(got) != len(want) {
+		t.Fatalf("reference embedding length=%d, want %d", len(got), len(want))
+	}
+	if len(resp.Frames) != 1 {
+		t.Fatalf("expected one frame response, got %d", len(resp.Frames))
+	}
+	if resp.Summary.GetObjectDetectionFrames() != 1 {
+		t.Fatalf("expected image object finding in summary, got %d", resp.Summary.GetObjectDetectionFrames())
+	}
+}

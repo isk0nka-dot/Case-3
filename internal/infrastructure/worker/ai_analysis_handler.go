@@ -276,47 +276,28 @@ func (h *AIAnalysisHandler) analyzeFragment(
 		return h.analyzeVideoEvidence(ctx, client, payload, frag, obj)
 	}
 
-	// Stream to inference gateway via AnalyzeVideo client-streaming RPC.
-	stream, err := client.AnalyzeVideo(ctx)
+	return h.analyzeImageEvidence(ctx, client, payload, frag, obj)
+}
+
+func (h *AIAnalysisHandler) analyzeImageEvidence(
+	ctx context.Context,
+	client inferencepb.InferenceServiceClient,
+	payload AIAnalysisPayload,
+	frag evidenceFragment,
+	imageReader io.Reader,
+) (*inferencepb.AnalyzeVideoResponse, error) {
+	frameData, err := io.ReadAll(imageReader)
 	if err != nil {
-		return nil, fmt.Errorf("open AnalyzeVideo stream: %w", err)
+		return nil, fmt.Errorf("read image evidence %s: %w", frag.ObjectKey, err)
 	}
 
-	const chunkSize = 64 * 1024 // 64 KB chunks
-	buf := make([]byte, chunkSize)
-	isFirst := true
-
-	for {
-		n, readErr := obj.Read(buf)
-		if n > 0 {
-			chunk := &inferencepb.AnalyzeVideoChunk{
-				Data:        buf[:n],
-				ContentType: frag.ContentType,
-			}
-			if isFirst {
-				chunk.SessionId = payload.SessionID
-				chunk.OrgId = payload.OrgID
-				isFirst = false
-			}
-			if err := stream.Send(chunk); err != nil {
-				return nil, fmt.Errorf("send chunk: %w", err)
-			}
-		}
-		if readErr != nil {
-			// Send final chunk marker.
-			if err := stream.Send(&inferencepb.AnalyzeVideoChunk{IsLast: true}); err != nil {
-				return nil, fmt.Errorf("send last chunk: %w", err)
-			}
-			break
-		}
-	}
-
-	resp, err := stream.CloseAndRecv()
-	if err != nil {
-		return nil, fmt.Errorf("close stream: %w", err)
-	}
-
-	return resp, nil
+	return h.analyzeEvidenceFrames(ctx, client, payload, []evidenceFrame{
+		{
+			Data:         frameData,
+			ContentType:  frag.ContentType,
+			TimestampSec: 0,
+		},
+	})
 }
 
 func (h *AIAnalysisHandler) analyzeVideoEvidence(
@@ -336,6 +317,15 @@ func (h *AIAnalysisHandler) analyzeVideoEvidence(
 		return nil, fmt.Errorf("extract frames from %s: %w", frag.ObjectKey, err)
 	}
 
+	return h.analyzeEvidenceFrames(ctx, client, payload, extractedFrames)
+}
+
+func (h *AIAnalysisHandler) analyzeEvidenceFrames(
+	ctx context.Context,
+	client inferencepb.InferenceServiceClient,
+	payload AIAnalysisPayload,
+	extractedFrames []evidenceFrame,
+) (*inferencepb.AnalyzeVideoResponse, error) {
 	frames := make([]*inferencepb.FrameAnalysis, 0, len(extractedFrames))
 	totalProcessingMs := 0.0
 	for _, frame := range extractedFrames {
