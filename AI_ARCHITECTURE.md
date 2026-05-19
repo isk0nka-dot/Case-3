@@ -119,6 +119,8 @@ Audio and AI events continue to flow through the existing `events` schema. The r
 
 Browser audio events arrive through the existing `sendEvent`/gRPC-Web path as `AudioAnalysisPayload`. The backend audio bridge observes `AUDIO_LEVEL_TELEMETRY`, and when sustained RMS/VAD thresholds are exceeded, it appends a derived `audio_anomaly` event to ClickHouse only. Kafka still receives only the original frontend event, so downstream realtime consumers and API contracts remain unchanged.
 
+The Python sidecar response contract uses normalized bbox objects (`{"x":0.1,"y":0.2,"w":0.3,"h":0.4}`) for faces and objects. The Go bridge accepts that canonical shape and the legacy `[x,y,w,h]` array shape before mapping results to protobuf/ClickHouse fields.
+
 Backend vision deep-scan events are emitted by `AIAnalysisHandler` after the Asynq worker samples evidence frames and receives inference results:
 
 | Backend AI result | Event type | Payload type | ClickHouse fields |

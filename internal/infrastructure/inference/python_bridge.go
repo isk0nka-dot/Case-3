@@ -137,7 +137,7 @@ type analyzeFrameResponse struct {
 
 type bridgeFace struct {
 	Confidence float32    `json:"confidence"`
-	BBox       [4]float32 `json:"bbox"`
+	BBox       bridgeBBox `json:"bbox"`
 	Embedding  []float32  `json:"embedding"`
 	Similarity float32    `json:"similarity"`
 	IsSpoof    bool       `json:"is_spoof"`
@@ -150,13 +150,39 @@ type bridgeFace struct {
 type bridgeObject struct {
 	ObjectType string     `json:"object_type"`
 	Confidence float32    `json:"confidence"`
-	BBox       [4]float32 `json:"bbox"`
+	BBox       bridgeBBox `json:"bbox"`
 }
 
 type bridgeLiveness struct {
 	Score  float32 `json:"score"`
 	IsLive bool    `json:"is_live"`
 	Method string  `json:"method"`
+}
+
+type bridgeBBox [4]float32
+
+func (b *bridgeBBox) UnmarshalJSON(data []byte) error {
+	var arr [4]float32
+	if err := json.Unmarshal(data, &arr); err == nil {
+		*b = bridgeBBox(arr)
+		return nil
+	}
+
+	var obj struct {
+		X float32 `json:"x"`
+		Y float32 `json:"y"`
+		W float32 `json:"w"`
+		H float32 `json:"h"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+	*b = bridgeBBox{obj.X, obj.Y, obj.W, obj.H}
+	return nil
+}
+
+func (b bridgeBBox) boundingBox() BoundingBox {
+	return BoundingBox{X: b[0], Y: b[1], W: b[2], H: b[3]}
 }
 
 func (r analyzeFrameResponse) toFrameResult() *FrameResult {
@@ -169,7 +195,7 @@ func (r analyzeFrameResponse) toFrameResult() *FrameResult {
 	for _, face := range r.Faces {
 		result.Faces = append(result.Faces, FaceResult{
 			Confidence: face.Confidence,
-			BBox:       BoundingBox{X: face.BBox[0], Y: face.BBox[1], W: face.BBox[2], H: face.BBox[3]},
+			BBox:       face.BBox.boundingBox(),
 			Embedding:  face.Embedding,
 			Similarity: face.Similarity,
 			IsSpoof:    face.IsSpoof,
@@ -183,7 +209,7 @@ func (r analyzeFrameResponse) toFrameResult() *FrameResult {
 		result.Objects = append(result.Objects, ObjectResult{
 			ObjectType: obj.ObjectType,
 			Confidence: obj.Confidence,
-			BBox:       BoundingBox{X: obj.BBox[0], Y: obj.BBox[1], W: obj.BBox[2], H: obj.BBox[3]},
+			BBox:       obj.BBox.boundingBox(),
 		})
 	}
 	return result

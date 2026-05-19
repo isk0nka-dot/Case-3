@@ -26,7 +26,7 @@ func TestPythonBridgeAnalyzeFrameMapsSidecarDetections(t *testing.T) {
 				"faces": []map[string]any{
 					{
 						"confidence": 0.98,
-						"bbox":       []float32{0.1, 0.2, 0.3, 0.4},
+						"bbox":       map[string]any{"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4},
 						"embedding":  []float32{0.11, 0.22},
 						"similarity": 0.57,
 						"is_spoof":   false,
@@ -37,7 +37,7 @@ func TestPythonBridgeAnalyzeFrameMapsSidecarDetections(t *testing.T) {
 					{
 						"object_type": "phone",
 						"confidence":  0.91,
-						"bbox":        []float32{0.5, 0.6, 0.1, 0.2},
+						"bbox":        map[string]any{"x": 0.5, "y": 0.6, "w": 0.1, "h": 0.2},
 					},
 				},
 				"liveness": map[string]any{
