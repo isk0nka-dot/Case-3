@@ -1302,6 +1302,16 @@ func applyEnvOverrides(cfg *Config) {
 			cfg.Inference.FrameSampleIntervalSec = seconds
 		}
 	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_MAX_VIDEO_DUR_SEC"); v != "" {
+		if seconds, err := strconv.Atoi(v); err == nil {
+			cfg.Inference.MaxVideoDurSec = seconds
+		}
+	}
+	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_MAX_FRAME_BYTES"); v != "" {
+		if bytes, err := strconv.Atoi(v); err == nil {
+			cfg.Inference.MaxFrameBytes = bytes
+		}
+	}
 	if v := os.Getenv("EVENT_COLLECTOR_INFERENCE_FACE_MISMATCH_THRESHOLD"); v != "" {
 		if threshold, err := strconv.ParseFloat(v, 32); err == nil {
 			cfg.Inference.FaceMismatchThreshold = float32(threshold)

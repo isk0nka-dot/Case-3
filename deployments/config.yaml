@@ -239,6 +239,9 @@ inference:
 
   # Resource guardrails. If all inference slots are busy, frames are dropped
   # with ResourceExhausted instead of blocking exam session traffic.
+  # Override budgets with EVENT_COLLECTOR_INFERENCE_MAX_FRAME_BYTES,
+  # EVENT_COLLECTOR_INFERENCE_MAX_VIDEO_DUR_SEC, and
+  # EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC.
   max_frame_bytes: 10485760
   max_video_dur_sec: 300
   frame_sample_rate: 2

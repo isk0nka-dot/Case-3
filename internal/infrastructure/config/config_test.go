@@ -82,3 +82,19 @@ func TestAudioBridgeEnvOverrides(t *testing.T) {
 		t.Fatalf("cooldown events = %d, want 9", cfg.AudioBridge.CooldownEvents)
 	}
 }
+
+func TestInferenceFrameBudgetEnvOverrides(t *testing.T) {
+	t.Setenv("EVENT_COLLECTOR_INFERENCE_MAX_FRAME_BYTES", "2097152")
+	t.Setenv("EVENT_COLLECTOR_INFERENCE_MAX_VIDEO_DUR_SEC", "45")
+
+	cfg := &Config{}
+	applyDefaults(cfg)
+	applyEnvOverrides(cfg)
+
+	if cfg.Inference.MaxFrameBytes != 2097152 {
+		t.Fatalf("max frame bytes = %d, want 2097152", cfg.Inference.MaxFrameBytes)
+	}
+	if cfg.Inference.MaxVideoDurSec != 45 {
+		t.Fatalf("max video duration = %d, want 45", cfg.Inference.MaxVideoDurSec)
+	}
+}

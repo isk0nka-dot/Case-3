@@ -65,8 +65,8 @@ Backend Go config:
 | `inference.bridge_timeout_sec` | `EVENT_COLLECTOR_INFERENCE_BRIDGE_TIMEOUT_SEC` | `5` | Health check and inference HTTP timeout. |
 | `inference.concurrency` | `EVENT_COLLECTOR_INFERENCE_CONCURRENCY` | `4` | Max simultaneous frame analyses in the Go gateway. |
 | `inference.frame_sample_interval_sec` | `EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC` | `5` | Minimum interval for heavy video frame extraction. |
-| `inference.max_video_dur_sec` | YAML only | `300` | Hard cap used to calculate the maximum frames extracted from one video fragment. |
-| `inference.max_frame_bytes` | YAML only | `10485760` | Maximum single frame payload size. The worker enforces it before direct image evidence reaches inference. |
+| `inference.max_video_dur_sec` | `EVENT_COLLECTOR_INFERENCE_MAX_VIDEO_DUR_SEC` | `300` | Hard cap used to calculate the maximum frames extracted from one video fragment. |
+| `inference.max_frame_bytes` | `EVENT_COLLECTOR_INFERENCE_MAX_FRAME_BYTES` | `10485760` | Maximum single frame payload size. The worker enforces it before direct image evidence reaches inference. |
 | `inference.face_mismatch_threshold` | `EVENT_COLLECTOR_INFERENCE_FACE_MISMATCH_THRESHOLD` | `0.62` | Identity mismatch cutoff. |
 | `inference.object_confidence_threshold` | `EVENT_COLLECTOR_INFERENCE_OBJECT_CONFIDENCE_THRESHOLD` | `0.35` | YOLO object confidence cutoff. |
 
