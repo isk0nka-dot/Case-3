@@ -143,8 +143,8 @@ Optional variables:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `ARGUS_PROJECT_ROOT` | `/opt/argus` | Root directory reserved for this Argus installation. |
-| `ARGUS_BACKEND_DEPLOY_PATH` | `$ARGUS_PROJECT_ROOT/backend` | Backend checkout/build directory on the server. |
+| `ARGUS_PROJECT_ROOT` | `/opt/argus-ai` | Root directory reserved for this Argus installation. |
+| `ARGUS_BACKEND_DEPLOY_PATH` | `$ARGUS_PROJECT_ROOT/argus-backend` | Backend checkout/build directory on the server. |
 
 Backward-compatible fallbacks are still accepted for older GitLab settings: `DEPLOY_HOST`, `DEPLOY_USER`, and `DEPLOY_SSH_KEY`.
 
@@ -154,7 +154,7 @@ The manual `deploy-production` job runs:
 sh ci/scripts/deploy_backend.sh
 ```
 
-It performs SSH key preflight, syncs the repository to `$ARGUS_PROJECT_ROOT/backend`, builds `app`, `worker`, `inference`, and `ai-sidecar`, then waits for `argus-backend-app` health. Runtime DLQ data is mounted under `${ARGUS_PROJECT_ROOT:-/opt/argus}/data/dlq`, not a global `/opt/argus-ai` path.
+It performs SSH key preflight, syncs the repository to `$ARGUS_PROJECT_ROOT/argus-backend`, builds `app`, `worker`, `inference`, and `ai-sidecar`, then waits for `argus-backend-app` health. Runtime DLQ data is mounted under `${ARGUS_PROJECT_ROOT:-/opt/argus-ai}/dlq-data`, not a broad server path.
 
 The backend config must point to the sidecar:
 

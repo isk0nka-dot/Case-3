@@ -21,8 +21,8 @@
 #   ARGUS_DEPLOY_SSH_KEY SSH private key (type: File, protected)
 #
 # Optional:
-#   ARGUS_PROJECT_ROOT          Default: /opt/argus
-#   ARGUS_BACKEND_DEPLOY_PATH   Default: $ARGUS_PROJECT_ROOT/backend
+#   ARGUS_PROJECT_ROOT          Default: /opt/argus-ai
+#   ARGUS_BACKEND_DEPLOY_PATH   Default: $ARGUS_PROJECT_ROOT/argus-backend
 #
 # Backward-compatible fallback: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY.
 # =============================================================================

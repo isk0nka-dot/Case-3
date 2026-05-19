@@ -118,7 +118,7 @@ services:
       - inference
     volumes:
       - ./deployments/config.yaml:/app/deployments/config.yaml
-      - ${ARGUS_PROJECT_ROOT:-/opt/argus}/data/dlq:/data/argus-dlq
+      - ${ARGUS_PROJECT_ROOT:-/opt/argus-ai}/dlq-data:/data/argus-dlq
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
       - "110"
@@ -157,7 +157,7 @@ services:
       - ai-sidecar
     volumes:
       - ./deployments/config.yaml:/app/deployments/config.yaml
-      - ${ARGUS_PROJECT_ROOT:-/opt/argus}/data/dlq:/data/argus-dlq
+      - ${ARGUS_PROJECT_ROOT:-/opt/argus-ai}/dlq-data:/data/argus-dlq
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8080:8080"
