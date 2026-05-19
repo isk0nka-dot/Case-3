@@ -245,7 +245,30 @@ emit(event) → IndexedDB.put(event) → gRPC.ingestBatch(events)
 
 Priority drain order: critical → high → normal → low (telemetry). Snapshots drain separately (5 per batch to limit bandwidth). Storage quota monitored every 30s; low-priority items evicted at 80% usage.
 
-### 4.5 RBAC Model
+### 4.5 Browser AI Audio Bridge
+
+`useSecurityShield()` owns the browser-side AI orchestration for a live exam session. When
+`realtimeAudio.enabled` is true, it starts `useAudioEngine()` alongside the MediaPipe
+vision engine. Raw microphone samples never leave the browser; only structured
+`AudioAnalysisPayload` fields are emitted:
+
+- `rmsDb`, `vadActive`, `vadConfidence`
+- `spectralCentroidHz`, `zcr`
+- `classification`, `classificationConfidence`
+- `speakerCount`, `speakerMatch`, `speakerSimilarity`
+- `segmentDurationMs`
+
+`AUDIO_LEVEL_TELEMETRY` is a high-frequency telemetry event and must always use the
+`EventCollectorClient` telemetry buffer, not the violation buffer. The client must rely on
+`isTelemetryEvent()` from `app/lib/proto/types.ts` instead of hardcoded numeric ranges so
+new AI telemetry event IDs (`104-106`) keep the same batching and offline-queue behavior
+as gaze, mouse, keyboard, and focus telemetry.
+
+Backend aggregation remains separate: sustained audio telemetry can produce a derived
+`AUDIO_ANOMALY` in ClickHouse, but the frontend continues to send the original structured
+telemetry asynchronously through the existing gRPC queue.
+
+### 4.6 RBAC Model
 
 ```
 super_admin (org_id='*') ⊃ org_admin ⊃ proctor ⊃ viewer

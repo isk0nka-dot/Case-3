@@ -40,6 +40,7 @@ import type {
   StreamAck
 } from '../proto/types'
 
+import { isTelemetryEvent } from '../proto/types'
 import {
   encodeIngestEventRequest,
   encodeIngestBatchRequest,
@@ -238,8 +239,7 @@ export class EventCollectorClient {
     }
 
     // Classify into telemetry vs violation buffer.
-    const eventTypeNum = event.eventType as number
-    if (this.batchConfig.separateTelemetry && eventTypeNum >= 100 && eventTypeNum <= 103) {
+    if (this.batchConfig.separateTelemetry && isTelemetryEvent(event.eventType)) {
       this.telemetryBuffer.push(event)
     } else {
       this.violationBuffer.push(event)
