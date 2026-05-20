@@ -19,8 +19,8 @@ services:
       CLICKHOUSE_PASSWORD: ${ARGUS_CLICKHOUSE_PASSWORD:-}
       CLICKHOUSE_DB: ${ARGUS_CLICKHOUSE_DATABASE:-argus_analytics}
     ports:
-      - "${ARGUS_CLICKHOUSE_HTTP_PORT:-8123}:8123"
-      - "${ARGUS_CLICKHOUSE_NATIVE_PORT:-9000}:9000"
+      - "127.0.0.1:${ARGUS_CLICKHOUSE_HTTP_PORT:-8123}:8123"
+      - "127.0.0.1:${ARGUS_CLICKHOUSE_NATIVE_PORT:-9000}:9000"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - clickhouse_logs:/var/log/clickhouse-server
@@ -128,7 +128,7 @@ services:
     volumes:
       - ./deployments/config.yaml:/app/deployments/config.yaml:ro
     ports:
-      - "${ARGUS_INFERENCE_GRPC_PORT:-50061}:50061"
+      - "127.0.0.1:${ARGUS_INFERENCE_GRPC_PORT:-50061}:50061"
     environment:
       EVENT_COLLECTOR_INFERENCE_GRPC_HOST: 0.0.0.0
       EVENT_COLLECTOR_INFERENCE_GRPC_PORT: 50061

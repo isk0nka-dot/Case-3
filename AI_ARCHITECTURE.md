@@ -166,6 +166,10 @@ This layout keeps ONNX and FFmpeg work out of the student request path. If `work
 
 On small servers, do not use the multi-node infra stack unless capacity has been measured. Three Kafka brokers plus three ClickHouse nodes are intended for larger hosts. Use the single-node compose first, then move to the infra stack when CPU/RAM and operational ownership are ready.
 
+The single-server compose keeps ClickHouse and the Go inference gRPC port bound to `127.0.0.1`. They are internal operational ports, not public APIs. Frontend and backend HTTP should be placed behind the reverse proxy/TLS entry point before external users are onboarded.
+
+Fresh PostgreSQL volumes must be initialized with `argus-infra/migrations/postgres/*.up.sql`. Missing migrations can leave the health endpoint green while background workers fail later, for example the export worker requires `export_jobs` and the durable queue relay requires `outbox_jobs`.
+
 The audio bridge lives inside the event ingestion use case and is intentionally cheap: it parses denormalized audio telemetry already present on the event, keeps a short per-session streak/cooldown counter, and writes derived anomalies through the existing ClickHouse writer. If ClickHouse is down, the original event remains accepted because Kafka is still the source of truth.
 
 Run locally:

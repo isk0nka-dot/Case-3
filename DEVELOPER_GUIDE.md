@@ -154,7 +154,7 @@ The manual `deploy-production` job runs:
 sh ci/scripts/deploy_backend.sh
 ```
 
-It performs SSH key preflight, syncs the repository to `$ARGUS_PROJECT_ROOT/argus-backend`, builds `app`, `worker`, `inference`, and `ai-sidecar`, then waits for `argus-backend-app` health. Runtime DLQ data is mounted under `${ARGUS_PROJECT_ROOT:-/opt/argus-ai}/dlq-data`, not a broad server path.
+It performs SSH key preflight, syncs the repository to `$ARGUS_PROJECT_ROOT/argus-backend`, builds `app`, `worker`, `inference`, and `ai-sidecar`, then waits for `argus-backend-app` health. Runtime DLQ data is stored in the `argus_dlq` named Docker volume, not a broad server path.
 
 ### Single-server production compose
 
@@ -183,6 +183,18 @@ Before starting it, create `argus-backend/.env` from `.env.example` and set real
 The compose file persists PostgreSQL, ClickHouse, Kafka, ZooKeeper, MinIO, and Badger DLQ data with named Docker volumes. Do not remove these volumes during normal redeploys. For a deliberate wipe/reinstall, capture an inventory first and delete only known Argus containers, networks, and volumes.
 
 DLQ storage intentionally uses the `argus_dlq` named volume instead of a host bind mount. The backend containers run as non-root `appuser`, and host bind mounts commonly fail with `permission denied` on `/data/argus-dlq/LOCK`. A named volume preserves the image-owned directory permissions and keeps retry data persistent.
+
+ClickHouse and the Go inference gateway publish their debug ports on `127.0.0.1` only. They are reachable from the server itself or over an SSH tunnel, but they are not exposed directly to the public network. Only the frontend/backend HTTP entry points should be public before a reverse proxy is installed.
+
+After a clean PostgreSQL volume is created, apply the SQL migrations from the infra repository before relying on background workers:
+
+```bash
+for f in /opt/argus-ai/argus-infra/migrations/postgres/[0-9][0-9][0-9][0-9][0-9][0-9]_*.up.sql; do
+  docker exec -i argus-db psql -v ON_ERROR_STOP=1 -U argus -d argus_db < "$f"
+done
+```
+
+The export worker requires `export_jobs`; the transactional queue relay requires `outbox_jobs`; LiveKit recording callbacks require `livekit_recordings`. Missing migrations do not always fail health checks immediately, so verify worker logs after a fresh install.
 
 `minio-init` creates the evidence and export buckets before `app` and `worker` start. This is required because the MinIO adapter intentionally fails startup when the evidence bucket is missing.
 
