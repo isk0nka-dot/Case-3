@@ -174,12 +174,15 @@ Before starting it, create `argus-backend/.env` from `.env.example` and set real
 | `ARGUS_MINIO_ROOT_USER` | yes | MinIO root user used by backend evidence storage. |
 | `ARGUS_MINIO_ROOT_PASSWORD` | yes | MinIO root password. The compose file refuses to render without it. |
 | `ARGUS_MINIO_BUCKET` | yes | Evidence bucket, normally `argus-evidence`. |
+| `ARGUS_MINIO_EXPORT_BUCKET` | yes | Export archive bucket, normally `argus-exports`. |
 | `EVENT_COLLECTOR_JWT_SIGNING_KEY` | yes | HS256 signing key, minimum 32 characters. The compose file refuses to render without it. |
 | `EVENT_COLLECTOR_CORS_ORIGINS` | yes | Comma-separated frontend origins, normally `https://argusai.kz,https://www.argusai.kz`. |
 | `DOCKER_GROUP_ID` | yes | Numeric group id owning `/var/run/docker.sock` on the server. Get it with `stat -c %g /var/run/docker.sock`. |
 | `MODEL_FAIL_FAST` | yes | Keep `true` in production so missing/corrupt ONNX models stop the sidecar at startup. |
 
 The compose file persists PostgreSQL, ClickHouse, Kafka, ZooKeeper, and MinIO data with named Docker volumes. Do not remove these volumes during normal redeploys. For a deliberate wipe/reinstall, capture an inventory first and delete only known Argus containers, networks, and volumes.
+
+`minio-init` creates the evidence and export buckets before `app` and `worker` start. This is required because the MinIO adapter intentionally fails startup when the evidence bucket is missing.
 
 Required model files must exist before `MODEL_FAIL_FAST=true` can start the sidecar:
 
