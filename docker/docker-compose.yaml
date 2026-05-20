@@ -35,7 +35,7 @@ services:
   # analytics, monitoring, evidence storage, and organization management.
   backend:
     build:
-      context: ../backend
+      context: ../../argus-backend
       dockerfile: Dockerfile
       args:
         VERSION: ${BACKEND_TAG:-dev}
@@ -112,7 +112,7 @@ services:
   # Nuxt 4 (Vue 3) admin dashboard SPA.
   frontend:
     build:
-      context: ../frontend
+      context: ../../argus-frontend
       dockerfile: Dockerfile
       args:
         NUXT_PUBLIC_API_BASE_URL: ${BACKEND_PUBLIC_URL:-http://localhost:8080}
