@@ -4,21 +4,26 @@ services:
     container_name: argus-db
     restart: always
     environment:
-      POSTGRES_DB: argus_db
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: ${ARGUS_POSTGRES_DB:-argus_db}
+      POSTGRES_USER: ${ARGUS_POSTGRES_USER:-argus}
+      POSTGRES_PASSWORD: ${ARGUS_POSTGRES_PASSWORD:?ARGUS_POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:24.8
     container_name: argus-clickhouse
     restart: always
     environment:
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=password123
-      - CLICKHOUSE_DB=argus_db
+      CLICKHOUSE_USER: ${ARGUS_CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${ARGUS_CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_DB: ${ARGUS_CLICKHOUSE_DATABASE:-argus_analytics}
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "${ARGUS_CLICKHOUSE_HTTP_PORT:-8123}:8123"
+      - "${ARGUS_CLICKHOUSE_NATIVE_PORT:-9000}:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -26,6 +31,9 @@ services:
     restart: always
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -40,6 +48,8 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+    volumes:
+      - kafka_data:/var/lib/kafka/data
 
   redis:
     image: redis:7-alpine
@@ -48,17 +58,17 @@ services:
     command: redis-server --save "" --appendonly no
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
     container_name: argus-minio
     restart: always
     command: server /data --console-address ":9001"
     environment:
-      - MINIO_ROOT_USER=argus-minio-admin
-      - MINIO_ROOT_PASSWORD=argus-minio-secret-change-in-production
+      MINIO_ROOT_USER: ${ARGUS_MINIO_ROOT_USER:-argus-minio-admin}
+      MINIO_ROOT_PASSWORD: ${ARGUS_MINIO_ROOT_PASSWORD:?ARGUS_MINIO_ROOT_PASSWORD is required}
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -72,10 +82,13 @@ services:
     volumes:
       - ./models:/models:ro
     environment:
-      - ONNX_MODELS_PATH=/models
-      - MODEL_FAIL_FAST=true
-      - YOLO_MODEL_FILE=yolov8n.onnx
-      - ARCFACE_MODEL_FILE=arcface.onnx
+      ONNX_MODELS_PATH: /models
+      MODEL_FAIL_FAST: ${MODEL_FAIL_FAST:-true}
+      YOLO_MODEL_FILE: ${YOLO_MODEL_FILE:-yolov8n.onnx}
+      ARCFACE_MODEL_FILE: ${ARCFACE_MODEL_FILE:-arcface.onnx}
+      YOLO_CONFIDENCE_THRESHOLD: ${YOLO_CONFIDENCE_THRESHOLD:-0.35}
+      FACE_MISMATCH_THRESHOLD: ${FACE_MISMATCH_THRESHOLD:-0.62}
+      AUDIO_VAD_THRESHOLD: ${AUDIO_VAD_THRESHOLD:-0.65}
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8091/healthz')"]
       interval: 30s
@@ -92,16 +105,17 @@ services:
     depends_on:
       - ai-sidecar
     volumes:
-      - ./deployments/config.yaml:/app/deployments/config.yaml
+      - ./deployments/config.yaml:/app/deployments/config.yaml:ro
     ports:
-      - "50061:50061"
+      - "${ARGUS_INFERENCE_GRPC_PORT:-50061}:50061"
     environment:
-      - EVENT_COLLECTOR_INFERENCE_GRPC_HOST=0.0.0.0
-      - EVENT_COLLECTOR_INFERENCE_GRPC_PORT=50061
-      - EVENT_COLLECTOR_INFERENCE_ENGINE_TYPE=python_bridge
-      - EVENT_COLLECTOR_INFERENCE_ALLOW_STUB=false
-      - EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL=http://ai-sidecar:8091
-      - EVENT_COLLECTOR_LOG_LEVEL=info
+      EVENT_COLLECTOR_INFERENCE_GRPC_HOST: 0.0.0.0
+      EVENT_COLLECTOR_INFERENCE_GRPC_PORT: 50061
+      EVENT_COLLECTOR_INFERENCE_ENGINE_TYPE: python_bridge
+      EVENT_COLLECTOR_INFERENCE_ALLOW_STUB: "false"
+      EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL: http://ai-sidecar:8091
+      EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC: ${FRAME_EXTRACTION_INTERVAL_SEC:-4}
+      EVENT_COLLECTOR_LOG_LEVEL: ${EVENT_COLLECTOR_LOG_LEVEL:-info}
 
   worker:
     build:
@@ -117,32 +131,32 @@ services:
       - minio
       - inference
     volumes:
-      - ./deployments/config.yaml:/app/deployments/config.yaml
+      - ./deployments/config.yaml:/app/deployments/config.yaml:ro
       - ${ARGUS_PROJECT_ROOT:-/opt/argus-ai}/dlq-data:/data/argus-dlq
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
-      - "110"
+      - "${DOCKER_GROUP_ID:-110}"
     environment:
-      - EVENT_COLLECTOR_KAFKA_BROKERS=kafka:9092
-      - EVENT_COLLECTOR_PG_HOST=db
-      - EVENT_COLLECTOR_PG_DATABASE=argus_db
-      - EVENT_COLLECTOR_PG_USERNAME=admin
-      - EVENT_COLLECTOR_PG_PASSWORD=password123
-      - EVENT_COLLECTOR_CH_ADDRS=clickhouse:9000
-      - EVENT_COLLECTOR_CH_DATABASE=argus_analytics
-      - EVENT_COLLECTOR_CH_USERNAME=default
-      - EVENT_COLLECTOR_CH_PASSWORD=password123
-      - EVENT_COLLECTOR_REDIS_ADDR=redis:6379
-      - EVENT_COLLECTOR_INFERENCE_GRPC_HOST=inference
-      - EVENT_COLLECTOR_INFERENCE_GRPC_PORT=50061
-      - EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC=4
-      - EVENT_COLLECTOR_MINIO_ENDPOINT=minio:9000
-      - EVENT_COLLECTOR_MINIO_ACCESS_KEY=argus-minio-admin
-      - EVENT_COLLECTOR_MINIO_SECRET_KEY=argus-minio-secret-change-in-production
-      - EVENT_COLLECTOR_MINIO_BUCKET=argus-evidence
-      - EVENT_COLLECTOR_DLQ_ENABLED=true
-      - EVENT_COLLECTOR_DLQ_DATA_DIR=/data/argus-dlq
-      - EVENT_COLLECTOR_LOG_LEVEL=info
+      EVENT_COLLECTOR_KAFKA_BROKERS: kafka:9092
+      EVENT_COLLECTOR_PG_HOST: db
+      EVENT_COLLECTOR_PG_DATABASE: ${ARGUS_POSTGRES_DB:-argus_db}
+      EVENT_COLLECTOR_PG_USERNAME: ${ARGUS_POSTGRES_USER:-argus}
+      EVENT_COLLECTOR_PG_PASSWORD: ${ARGUS_POSTGRES_PASSWORD:?ARGUS_POSTGRES_PASSWORD is required}
+      EVENT_COLLECTOR_CH_ADDRS: clickhouse:9000
+      EVENT_COLLECTOR_CH_DATABASE: ${ARGUS_CLICKHOUSE_DATABASE:-argus_analytics}
+      EVENT_COLLECTOR_CH_USERNAME: ${ARGUS_CLICKHOUSE_USER:-default}
+      EVENT_COLLECTOR_CH_PASSWORD: ${ARGUS_CLICKHOUSE_PASSWORD:-}
+      EVENT_COLLECTOR_REDIS_ADDR: redis:6379
+      EVENT_COLLECTOR_INFERENCE_GRPC_HOST: inference
+      EVENT_COLLECTOR_INFERENCE_GRPC_PORT: 50061
+      EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC: ${FRAME_EXTRACTION_INTERVAL_SEC:-4}
+      EVENT_COLLECTOR_MINIO_ENDPOINT: minio:9000
+      EVENT_COLLECTOR_MINIO_ACCESS_KEY: ${ARGUS_MINIO_ROOT_USER:-argus-minio-admin}
+      EVENT_COLLECTOR_MINIO_SECRET_KEY: ${ARGUS_MINIO_ROOT_PASSWORD:?ARGUS_MINIO_ROOT_PASSWORD is required}
+      EVENT_COLLECTOR_MINIO_BUCKET: ${ARGUS_MINIO_BUCKET:-argus-evidence}
+      EVENT_COLLECTOR_DLQ_ENABLED: "true"
+      EVENT_COLLECTOR_DLQ_DATA_DIR: /data/argus-dlq
+      EVENT_COLLECTOR_LOG_LEVEL: ${EVENT_COLLECTOR_LOG_LEVEL:-info}
 
   app:
     build: .
@@ -156,36 +170,47 @@ services:
       - minio
       - ai-sidecar
     volumes:
-      - ./deployments/config.yaml:/app/deployments/config.yaml
+      - ./deployments/config.yaml:/app/deployments/config.yaml:ro
       - ${ARGUS_PROJECT_ROOT:-/opt/argus-ai}/dlq-data:/data/argus-dlq
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "8080:8080"
+      - "${ARGUS_BACKEND_HTTP_PORT:-8080}:8080"
     group_add:
-      - "110"
+      - "${DOCKER_GROUP_ID:-110}"
     environment:
-      - EVENT_COLLECTOR_KAFKA_BROKERS=kafka:9092
-      - EVENT_COLLECTOR_PG_HOST=db
-      - EVENT_COLLECTOR_PG_DATABASE=argus_db
-      - EVENT_COLLECTOR_PG_USERNAME=admin
-      - EVENT_COLLECTOR_PG_PASSWORD=password123
-      - EVENT_COLLECTOR_HTTP_PORT=8080
-      - EVENT_COLLECTOR_CH_ADDRS=clickhouse:9000
-      - EVENT_COLLECTOR_CH_DATABASE=argus_analytics
-      - EVENT_COLLECTOR_CH_USERNAME=default
-      - EVENT_COLLECTOR_CH_PASSWORD=password123
-      - EVENT_COLLECTOR_REDIS_ADDR=redis:6379
-      - EVENT_COLLECTOR_JWT_SIGNING_KEY=ad28f750c84ad1df7c0382acae0bdf620fcdceb4358d0de7639b0c3638ee8710
-      - EVENT_COLLECTOR_CORS_ORIGINS=https://argusai.kz,https://www.argusai.kz,http://89.167.96.246:3000
-      - EVENT_COLLECTOR_LOG_LEVEL=info
-      - EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL=http://ai-sidecar:8091
-      - EVENT_COLLECTOR_MINIO_ENDPOINT=minio:9000
-      - EVENT_COLLECTOR_MINIO_ACCESS_KEY=argus-minio-admin
-      - EVENT_COLLECTOR_MINIO_SECRET_KEY=argus-minio-secret-change-in-production
-      - EVENT_COLLECTOR_MINIO_BUCKET=argus-evidence
-      - EVENT_COLLECTOR_DLQ_ENABLED=true
-      - EVENT_COLLECTOR_DLQ_DATA_DIR=/data/argus-dlq
+      EVENT_COLLECTOR_KAFKA_BROKERS: kafka:9092
+      EVENT_COLLECTOR_PG_HOST: db
+      EVENT_COLLECTOR_PG_DATABASE: ${ARGUS_POSTGRES_DB:-argus_db}
+      EVENT_COLLECTOR_PG_USERNAME: ${ARGUS_POSTGRES_USER:-argus}
+      EVENT_COLLECTOR_PG_PASSWORD: ${ARGUS_POSTGRES_PASSWORD:?ARGUS_POSTGRES_PASSWORD is required}
+      EVENT_COLLECTOR_HTTP_PORT: 8080
+      EVENT_COLLECTOR_CH_ADDRS: clickhouse:9000
+      EVENT_COLLECTOR_CH_DATABASE: ${ARGUS_CLICKHOUSE_DATABASE:-argus_analytics}
+      EVENT_COLLECTOR_CH_USERNAME: ${ARGUS_CLICKHOUSE_USER:-default}
+      EVENT_COLLECTOR_CH_PASSWORD: ${ARGUS_CLICKHOUSE_PASSWORD:-}
+      EVENT_COLLECTOR_REDIS_ADDR: redis:6379
+      EVENT_COLLECTOR_JWT_SIGNING_KEY: ${EVENT_COLLECTOR_JWT_SIGNING_KEY:?EVENT_COLLECTOR_JWT_SIGNING_KEY is required}
+      EVENT_COLLECTOR_CORS_ORIGINS: ${EVENT_COLLECTOR_CORS_ORIGINS:-https://argusai.kz,https://www.argusai.kz}
+      EVENT_COLLECTOR_LOG_LEVEL: ${EVENT_COLLECTOR_LOG_LEVEL:-info}
+      EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL: http://ai-sidecar:8091
+      EVENT_COLLECTOR_MINIO_ENDPOINT: minio:9000
+      EVENT_COLLECTOR_MINIO_ACCESS_KEY: ${ARGUS_MINIO_ROOT_USER:-argus-minio-admin}
+      EVENT_COLLECTOR_MINIO_SECRET_KEY: ${ARGUS_MINIO_ROOT_PASSWORD:?ARGUS_MINIO_ROOT_PASSWORD is required}
+      EVENT_COLLECTOR_MINIO_BUCKET: ${ARGUS_MINIO_BUCKET:-argus-evidence}
+      EVENT_COLLECTOR_DLQ_ENABLED: "true"
+      EVENT_COLLECTOR_DLQ_DATA_DIR: /data/argus-dlq
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
 
 volumes:
   postgres_data:
+  clickhouse_data:
+  clickhouse_logs:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:
   minio_data:

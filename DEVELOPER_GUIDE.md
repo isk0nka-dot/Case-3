@@ -156,6 +156,40 @@ sh ci/scripts/deploy_backend.sh
 
 It performs SSH key preflight, syncs the repository to `$ARGUS_PROJECT_ROOT/argus-backend`, builds `app`, `worker`, `inference`, and `ai-sidecar`, then waits for `argus-backend-app` health. Runtime DLQ data is mounted under `${ARGUS_PROJECT_ROOT:-/opt/argus-ai}/dlq-data`, not a broad server path.
 
+### Single-server production compose
+
+For a small production server, use the repository `docker-compose.yml` instead of the multi-node infra stack. The infra stack is intended for larger hosts; this backend compose keeps Kafka and ClickHouse single-node so an 8 GB server is not overloaded by three Kafka brokers and three ClickHouse replicas.
+
+Before starting it, create `argus-backend/.env` from `.env.example` and set real secrets:
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `ARGUS_PROJECT_ROOT` | yes | Persistent host root, normally `/opt/argus-ai`. |
+| `ARGUS_POSTGRES_DB` | yes | PostgreSQL database, normally `argus_db`. |
+| `ARGUS_POSTGRES_USER` | yes | PostgreSQL application user. |
+| `ARGUS_POSTGRES_PASSWORD` | yes | PostgreSQL password. The compose file refuses to render without it. |
+| `ARGUS_CLICKHOUSE_DATABASE` | yes | ClickHouse analytics database, normally `argus_analytics`. Must match `EVENT_COLLECTOR_CH_DATABASE`. |
+| `ARGUS_CLICKHOUSE_USER` | yes | ClickHouse user. |
+| `ARGUS_CLICKHOUSE_PASSWORD` | optional | ClickHouse password. Empty is allowed only when the server is not exposed publicly. |
+| `ARGUS_MINIO_ROOT_USER` | yes | MinIO root user used by backend evidence storage. |
+| `ARGUS_MINIO_ROOT_PASSWORD` | yes | MinIO root password. The compose file refuses to render without it. |
+| `ARGUS_MINIO_BUCKET` | yes | Evidence bucket, normally `argus-evidence`. |
+| `EVENT_COLLECTOR_JWT_SIGNING_KEY` | yes | HS256 signing key, minimum 32 characters. The compose file refuses to render without it. |
+| `EVENT_COLLECTOR_CORS_ORIGINS` | yes | Comma-separated frontend origins, normally `https://argusai.kz,https://www.argusai.kz`. |
+| `DOCKER_GROUP_ID` | yes | Numeric group id owning `/var/run/docker.sock` on the server. Get it with `stat -c %g /var/run/docker.sock`. |
+| `MODEL_FAIL_FAST` | yes | Keep `true` in production so missing/corrupt ONNX models stop the sidecar at startup. |
+
+The compose file persists PostgreSQL, ClickHouse, Kafka, ZooKeeper, and MinIO data with named Docker volumes. Do not remove these volumes during normal redeploys. For a deliberate wipe/reinstall, capture an inventory first and delete only known Argus containers, networks, and volumes.
+
+Required model files must exist before `MODEL_FAIL_FAST=true` can start the sidecar:
+
+```text
+argus-backend/models/yolov8n.onnx
+argus-backend/models/arcface.onnx
+```
+
+The model directory is mounted read-only into `ai-sidecar` as `/models`.
+
 The backend config must point to the sidecar:
 
 ```yaml

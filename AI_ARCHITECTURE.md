@@ -155,6 +155,17 @@ For identity checks, each extracted frame request also carries `reference_embedd
 
 Docker runtime is split by responsibility: `Dockerfile.worker` runs the Asynq worker with `ffmpeg`, `Dockerfile.inference` runs the Go gRPC gateway, and `ai-sidecar/Dockerfile` runs ONNX Runtime. `docker-compose.yml` wires worker → inference → ai-sidecar. The root `.dockerignore` keeps Go image contexts small by excluding model weights, sidecar sources, VCS metadata, build caches, and large evidence media.
 
+Production single-server deployments should keep the same isolation boundaries. The repository `docker-compose.yml` runs:
+
+- `app`: HTTP/gRPC event collector and admin API.
+- `worker`: asynchronous evidence analysis and bounded FFmpeg frame extraction.
+- `inference`: Go gRPC inference gateway.
+- `ai-sidecar`: Python ONNX Runtime process with models mounted from `./models:/models:ro`.
+
+This layout keeps ONNX and FFmpeg work out of the student request path. If `worker`, `inference`, or `ai-sidecar` is unhealthy, the API server can keep accepting normal session traffic as long as its own required stores are available. For production, leave `MODEL_FAIL_FAST=true`; missing or corrupt model weights should fail the AI sidecar visibly instead of falling back to pseudo-AI.
+
+On small servers, do not use the multi-node infra stack unless capacity has been measured. Three Kafka brokers plus three ClickHouse nodes are intended for larger hosts. Use the single-node compose first, then move to the infra stack when CPU/RAM and operational ownership are ready.
+
 The audio bridge lives inside the event ingestion use case and is intentionally cheap: it parses denormalized audio telemetry already present on the event, keeps a short per-session streak/cooldown counter, and writes derived anomalies through the existing ClickHouse writer. If ClickHouse is down, the original event remains accepted because Kafka is still the source of truth.
 
 Run locally:
