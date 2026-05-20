@@ -153,7 +153,7 @@ services:
       - inference
     volumes:
       - ./deployments/config.yaml:/app/deployments/config.yaml:ro
-      - ${ARGUS_PROJECT_ROOT:-/opt/argus-ai}/dlq-data:/data/argus-dlq
+      - argus_dlq:/data/argus-dlq
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
       - "${DOCKER_GROUP_ID:-110}"
@@ -192,7 +192,7 @@ services:
       - ai-sidecar
     volumes:
       - ./deployments/config.yaml:/app/deployments/config.yaml:ro
-      - ${ARGUS_PROJECT_ROOT:-/opt/argus-ai}/dlq-data:/data/argus-dlq
+      - argus_dlq:/data/argus-dlq
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "${ARGUS_BACKEND_HTTP_PORT:-8080}:8080"
@@ -235,3 +235,4 @@ volumes:
   zookeeper_log:
   kafka_data:
   minio_data:
+  argus_dlq:
