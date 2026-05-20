@@ -85,6 +85,8 @@ services:
       - EVENT_COLLECTOR_MINIO_BUCKET=${MINIO_BUCKET:-argus-evidence}
       # ── Redis ─────────────────────────────────────────────────────────────
       - EVENT_COLLECTOR_REDIS_ADDR=redis:6379
+      # ── AI inference bridge ───────────────────────────────────────────────
+      - EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL=http://ai-sidecar:8091
     depends_on:
       kafka-1:
         condition: service_healthy
@@ -107,6 +109,119 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  # ── AI Sidecar ───────────────────────────────────────────────────────────────
+  # Python ONNX Runtime service. Loads real YOLO/ArcFace model weights from
+  # ../../argus-backend/models and fails fast when required models are missing.
+  ai-sidecar:
+    build:
+      context: ../../argus-backend/ai-sidecar
+      dockerfile: Dockerfile
+    image: argus/ai-sidecar:${BACKEND_TAG:-latest}
+    container_name: argus-ai-sidecar
+    volumes:
+      - ../../argus-backend/models:/models:ro
+    environment:
+      - ONNX_MODELS_PATH=/models
+      - MODEL_FAIL_FAST=${MODEL_FAIL_FAST:-true}
+      - YOLO_MODEL_FILE=${YOLO_MODEL_FILE:-yolov8n.onnx}
+      - ARCFACE_MODEL_FILE=${ARCFACE_MODEL_FILE:-arcface.onnx}
+    networks:
+      - argus-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8091/healthz')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Inference Gateway ────────────────────────────────────────────────────────
+  # Lightweight Go gRPC gateway around the Python sidecar. Heavy model execution
+  # remains isolated from latency-sensitive student HTTP/gRPC traffic.
+  inference:
+    build:
+      context: ../../argus-backend
+      dockerfile: Dockerfile.inference
+      args:
+        VERSION: ${BACKEND_TAG:-dev}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: argus/inference:${BACKEND_TAG:-latest}
+    container_name: argus-inference
+    volumes:
+      - ./config.yaml:/app/deployments/config.yaml:ro
+    environment:
+      - EVENT_COLLECTOR_INFERENCE_GRPC_HOST=0.0.0.0
+      - EVENT_COLLECTOR_INFERENCE_GRPC_PORT=50061
+      - EVENT_COLLECTOR_INFERENCE_ENGINE_TYPE=python_bridge
+      - EVENT_COLLECTOR_INFERENCE_ALLOW_STUB=false
+      - EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL=http://ai-sidecar:8091
+      - EVENT_COLLECTOR_LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      ai-sidecar:
+        condition: service_healthy
+    networks:
+      - argus-network
+    restart: unless-stopped
+
+  # ── AI Worker ────────────────────────────────────────────────────────────────
+  # Async processing for evidence fragments and derived ClickHouse anomaly rows.
+  worker:
+    build:
+      context: ../../argus-backend
+      dockerfile: Dockerfile.worker
+      args:
+        VERSION: ${BACKEND_TAG:-dev}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: argus/worker:${BACKEND_TAG:-latest}
+    container_name: argus-worker
+    user: "0:0"
+    volumes:
+      - ./config.yaml:/app/deployments/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - badger-data:/app/data/dlq
+    environment:
+      - EVENT_COLLECTOR_KAFKA_BROKERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
+      - EVENT_COLLECTOR_CH_ADDRS=clickhouse-1:9000,clickhouse-2:9000,clickhouse-3:9000
+      - EVENT_COLLECTOR_CH_DATABASE=${CH_DATABASE:-argus_analytics}
+      - EVENT_COLLECTOR_CH_USERNAME=${CH_USERNAME:-default}
+      - EVENT_COLLECTOR_CH_PASSWORD=${CH_PASSWORD:-}
+      - EVENT_COLLECTOR_PG_HOST=postgres
+      - EVENT_COLLECTOR_PG_PORT=5432
+      - EVENT_COLLECTOR_PG_DATABASE=${POSTGRES_DB:-argus}
+      - EVENT_COLLECTOR_PG_USERNAME=${POSTGRES_USER:-argus}
+      - EVENT_COLLECTOR_PG_PASSWORD=${POSTGRES_PASSWORD:-argus_secret}
+      - EVENT_COLLECTOR_REDIS_ADDR=redis:6379
+      - EVENT_COLLECTOR_INFERENCE_GRPC_HOST=inference
+      - EVENT_COLLECTOR_INFERENCE_GRPC_PORT=50061
+      - EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC=4
+      - EVENT_COLLECTOR_MINIO_ENDPOINT=minio:9000
+      - EVENT_COLLECTOR_MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-argus-minio-admin}
+      - EVENT_COLLECTOR_MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      - EVENT_COLLECTOR_MINIO_BUCKET=${MINIO_BUCKET:-argus-evidence}
+      - EVENT_COLLECTOR_DLQ_ENABLED=true
+      - EVENT_COLLECTOR_DLQ_DATA_DIR=/app/data/dlq
+      - EVENT_COLLECTOR_LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
+      clickhouse-1:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      inference:
+        condition: service_started
+    networks:
+      - argus-network
+    restart: unless-stopped
 
   # ── argus-frontend ────────────────────────────────────────────────────────────
   # Nuxt 4 (Vue 3) admin dashboard SPA.

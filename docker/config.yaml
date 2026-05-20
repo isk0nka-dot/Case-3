@@ -127,9 +127,9 @@ minio:
 # Logger
 # ---------------------------------------------------------------------------
 logger:
-  level: "debug"
-  encoding: "console"
-  development: true
+  level: "info"
+  encoding: "json"
+  development: false
 
 # ---------------------------------------------------------------------------
 # Rate Limiting
@@ -209,10 +209,9 @@ session:
 # ---------------------------------------------------------------------------
 cors:
   # Allowed origins for gRPC-Web requests from the Nuxt 3 frontend.
-  # Use ["*"] for local development ONLY.
-  # Production: ["https://app.argus.ai", "https://staging.argus.ai"]
   allowed_origins:
-    - "*"
+    - "https://argusai.kz"
+    - "https://www.argusai.kz"
 
   # Preflight response cache duration (24 hours). Prevents browsers from
   # sending an OPTIONS request before every gRPC-Web call.
@@ -221,3 +220,46 @@ cors:
   # Must be true to allow the Authorization header (JWT) in cross-origin
   # requests. When true, the server echoes the exact Origin (not "*").
   allow_credentials: true
+
+# ---------------------------------------------------------------------------
+# Backend AI Inference Gateway
+# ---------------------------------------------------------------------------
+inference:
+  # Production should use python_bridge. The stub engine is only for local
+  # development and is blocked unless allow_stub=true.
+  grpc_host: "localhost"
+  grpc_port: 50061
+  engine_type: "python_bridge"
+  allow_stub: false
+
+  # HTTP endpoint of ai-sidecar/Dockerfile. Override in Docker/Kubernetes with
+  # EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL.
+  python_bridge_url: "http://localhost:8091"
+  bridge_timeout_sec: 5
+
+  # Resource guardrails. If all inference slots are busy, frames are dropped
+  # with ResourceExhausted instead of blocking exam session traffic.
+  max_frame_bytes: 10485760
+  max_video_dur_sec: 300
+  frame_sample_rate: 2
+  frame_sample_interval_sec: 4
+  concurrency: 2
+
+  # Runtime-tunable anomaly thresholds.
+  face_mismatch_threshold: 0.62
+  liveness_threshold: 0.40
+  object_confidence_threshold: 0.35
+  spoof_confidence_threshold: 0.70
+
+# ---------------------------------------------------------------------------
+# Audio AI Bridge
+# ---------------------------------------------------------------------------
+audio_bridge:
+  # Aggregates browser-local AudioLevelTelemetry into derived ClickHouse
+  # audio_anomaly rows. Raw microphone audio is never transmitted.
+  enabled: true
+  noise_threshold_db: -35
+  vad_confidence_threshold: 0.70
+  consecutive_events: 3
+  cooldown_events: 12
+  derived_event_confidence: 0.85
