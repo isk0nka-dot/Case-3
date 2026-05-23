@@ -123,7 +123,7 @@ generate_production_env_file() {
 
 materialize_ssh_key() {
   raw_key="${ARGUS_DEPLOY_SSH_KEY:-${DEPLOY_SSH_KEY:-${SSH_PRIVATE_KEY:-}}}"
-  [ -n "$raw_key" ] || fail "SSH key is required. Set SSH_PRIVATE_KEY, ARGUS_DEPLOY_SSH_KEY, or DEPLOY_SSH_KEY"
+  [ -n "$raw_key" ] || fail "SSH key is required. Set DEPLOY_SSH_KEY, ARGUS_DEPLOY_SSH_KEY, or SSH_PRIVATE_KEY"
 
   if [ -r "$raw_key" ]; then
     printf '%s\n' "$raw_key"

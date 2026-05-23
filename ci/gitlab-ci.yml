@@ -33,7 +33,8 @@
 #   ARGUS_DEPLOY_SSH_KEY    SSH private key (type: File, protected)
 #
 # Also supported for the new Argus+Webizon deploy job:
-#   SSH_PRIVATE_KEY          SSH private key (prefer File type)
+#   DEPLOY_SSH_KEY          SSH private key (prefer File type)
+#   SSH_PRIVATE_KEY         Backward-compatible SSH private key alias
 #   DEPLOY_HOST              Production server IP or DNS name
 #   DEPLOY_USER              SSH user
 #
