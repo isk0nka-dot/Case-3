@@ -76,6 +76,8 @@ echo "Syncing docker compose and configs..."
 rsync -azO --exclude='.env' --exclude='keys/' \
   docker/docker-compose.yaml \
   docker/docker-compose.prod.yml \
+  docker/docker-compose.argus-webizon.prod.yml \
+  docker/.env.argus-webizon.example \
   docker/redis.conf \
   "$ARGUS_DEPLOY_USER@$ARGUS_DEPLOY_HOST:$ARGUS_INFRA_DEPLOY_PATH/docker/"
 

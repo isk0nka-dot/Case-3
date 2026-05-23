@@ -5,7 +5,7 @@
 # This pipeline manages infrastructure-level changes, NOT application deploys.
 # Application deploys (backend/frontend) are handled by their own repos.
 #
-# Pipeline: validate → sync → migrate
+# Pipeline: validate → sync → migrate → deploy
 #
 #   validate (automatic on MR + main):
 #     docker compose config syntax check
@@ -15,6 +15,10 @@
 #
 #   migrate (manual on main, after sync):
 #     Run PostgreSQL + ClickHouse migrations via docker exec
+#
+#   deploy-argus-webizon (manual on main):
+#     Sync the hardened Argus+Webizon compose stack, verify secrets/models/certs,
+#     pull registry images, and start containers with docker compose --wait.
 #
 # Use this pipeline when you change:
 #   - docker-compose.yaml / docker-compose.prod.yml
@@ -27,6 +31,11 @@
 #   ARGUS_DEPLOY_HOST       Production server IP or DNS name
 #   ARGUS_DEPLOY_USER       SSH user (e.g. deploy)
 #   ARGUS_DEPLOY_SSH_KEY    SSH private key (type: File, protected)
+#
+# Also supported for the new Argus+Webizon deploy job:
+#   SSH_PRIVATE_KEY          SSH private key (prefer File type)
+#   DEPLOY_HOST              Production server IP or DNS name
+#   DEPLOY_USER              SSH user
 #
 # Optional:
 #   ARGUS_PROJECT_ROOT      Default: /opt/argus-ai
@@ -57,6 +66,7 @@ stages:
   - validate
   - sync
   - migrate
+  - deploy
 
 variables:
   ARGUS_PROJECT_ROOT: /opt/argus-ai
@@ -81,6 +91,7 @@ validate-compose:
     - cd docker
     - docker compose -f docker-compose.yaml config --quiet
     - docker compose -f docker-compose.yaml -f docker-compose.prod.yml config --quiet
+    - docker compose --env-file .env.argus-webizon.example -f docker-compose.argus-webizon.prod.yml config --quiet
     - echo "✓ Compose config is valid"
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -124,6 +135,26 @@ run-migrations:
     - apk add --no-cache openssh-client
   script:
     - sh ci/scripts/run_migrations.sh
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+
+# ── Stage: deploy ────────────────────────────────────────────────────────────
+# First clean Argus+Webizon deployment. This job intentionally fails fast if
+# server-side .env secrets, ONNX model weights, TLS bootstrap, registry login,
+# or service health checks are not ready.
+
+deploy-argus-webizon:
+  stage: deploy
+  image: alpine:3.20
+  timeout: 30 minutes
+  before_script:
+    - apk add --no-cache openssh-client rsync
+  script:
+    - sh ci/scripts/deploy_argus_webizon.sh
+  environment:
+    name: production
+    url: https://argusai.kz
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       when: manual
