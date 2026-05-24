@@ -159,6 +159,7 @@ security-scan:
 
 deploy-production:
   stage: deploy
+  cache: []
   image: alpine:3.20
   timeout: 15 minutes
   needs:
