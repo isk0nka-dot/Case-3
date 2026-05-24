@@ -25,6 +25,7 @@
 -- Step 1: Rename existing table
 -- ---------------------------------------------------------------------------
 
+DROP TABLE IF EXISTS argus_analytics.proctoring_events_legacy SYNC;
 RENAME TABLE argus_analytics.proctoring_events TO argus_analytics.proctoring_events_legacy;
 
 
