@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS argus_analytics.session_ai_summary
 )
 ENGINE = AggregatingMergeTree()
 ORDER BY (org_id, exam_id, session_id)
-TTL last_event_time + INTERVAL 90 DAY
+TTL toDateTime(last_event_time) + INTERVAL 90 DAY
 SETTINGS index_granularity = 8192;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS argus_analytics.session_ai_summary_mv
