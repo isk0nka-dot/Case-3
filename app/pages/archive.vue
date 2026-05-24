@@ -107,6 +107,8 @@ const selectedArchiveExam = computed({
 const expandedArchive = ref<ArchiveSession | null>(null)
 const seekPosition = ref(0)
 const isPlaying = ref(false)
+const videoUrl = ref<string | null>(null)
+const videoRef = ref<HTMLVideoElement | null>(null)
 
 async function openArchiveSession(session: ArchiveSession) {
   expandedArchive.value = session
@@ -119,12 +121,20 @@ async function openArchiveSession(session: ArchiveSession) {
   audioVolume.value = 75
   audioSyncActive.value = false
   highlightedCamera.value = null
+  videoUrl.value = null
 
   // Fetch events from API if not already loaded
   if (!session.events || session.events.length === 0) {
     loadingEvents.value = true
     await store.fetchSessionEvents(session.id)
     loadingEvents.value = false
+  }
+
+  // Set video URL immediately — the <video> element's @error handler clears it if not found.
+  const apiBase = useRuntimeConfig().public.apiBaseUrl || ''
+  const token = authStore.jwtToken || ''
+  if (token) {
+    videoUrl.value = `${apiBase}/api/v1/archive/sessions/${session.id}/video?token=${encodeURIComponent(token)}`
   }
 }
 
@@ -168,7 +178,15 @@ function seekToEvent(videoTimestamp: number, eventSource?: string) {
 }
 
 function togglePlayback() {
-  isPlaying.value = !isPlaying.value
+  if (videoRef.value) {
+    if (isPlaying.value) {
+      videoRef.value.pause()
+    } else {
+      videoRef.value.play()
+    }
+  } else {
+    isPlaying.value = !isPlaying.value
+  }
 }
 
 // --- Camera swap ---
@@ -951,7 +969,21 @@ onUnmounted(() => {
                           : 'none'
                       }"
                     >
-                      <div class="absolute inset-0 flex items-center justify-center">
+                      <!-- Recorded video if available -->
+                      <video
+                        v-if="videoUrl && !camerasSwapped"
+                        ref="videoRef"
+                        :src="videoUrl"
+                        class="absolute inset-0 w-full h-full object-cover"
+                        :muted="isMuted"
+                        preload="metadata"
+                        @timeupdate="seekPosition = videoRef?.duration ? (videoRef.currentTime / videoRef.duration) * 100 : 0"
+                        @play="isPlaying = true"
+                        @pause="isPlaying = false"
+                        @error="videoUrl = null"
+                      />
+                      <!-- Placeholder when no recording -->
+                      <div v-else class="absolute inset-0 flex items-center justify-center">
                         <div class="flex flex-col items-center gap-3 opacity-25">
                           <UIcon
                             name="i-lucide-film"
