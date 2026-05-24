@@ -138,7 +138,7 @@ fi
 if [ -e "$1" ]; then
   for f do
     echo "  -> $(basename "$f")"
-    docker exec -i "$ch_container" clickhouse-client --multiquery < "$f"
+    docker exec -i "$ch_container" clickhouse-client --database argus_analytics --multiquery < "$f"
   done
 else
   echo "  No ClickHouse migration files found"
