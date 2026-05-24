@@ -26,7 +26,10 @@ class GitLabCiContractTests(unittest.TestCase):
         self.assertIn("dockerfile: Dockerfile.inference", compose)
         self.assertIn("  worker:", compose)
         self.assertIn("dockerfile: Dockerfile.worker", compose)
-        self.assertIn("EVENT_COLLECTOR_INFERENCE_GRPC_HOST=inference", compose)
+        self.assertRegex(
+            compose,
+            r"EVENT_COLLECTOR_INFERENCE_GRPC_HOST\s*:\s*inference|EVENT_COLLECTOR_INFERENCE_GRPC_HOST=inference",
+        )
 
     def test_worker_and_inference_dockerfiles_match_entrypoints(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]
