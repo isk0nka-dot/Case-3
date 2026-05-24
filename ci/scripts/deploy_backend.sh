@@ -97,11 +97,17 @@ ssh "$ARGUS_DEPLOY_USER@$ARGUS_DEPLOY_HOST" "mkdir -p '$ARGUS_BACKEND_DEPLOY_PAT
 
 echo "Syncing backend code..."
 rsync -azO --delete \
-  --exclude='.git' \
-  --exclude='.go' \
-  --exclude='.go-cache' \
+  --exclude='.git/' \
+  --exclude='.go/' \
+  --exclude='.cache/' \
+  --exclude='.go-cache/' \
+  --exclude='.go-build-cache/' \
+  --exclude='.gocache/' \
+  --exclude='.golangci-cache/' \
   --exclude='.env' \
-  --exclude='models/*.onnx' \
+  --exclude='coverage.out' \
+  --exclude='gosec.sarif' \
+  --exclude='models/***' \
   "${CI_PROJECT_DIR:-.}/" \
   "$ARGUS_DEPLOY_USER@$ARGUS_DEPLOY_HOST:$ARGUS_BACKEND_DEPLOY_PATH/"
 
