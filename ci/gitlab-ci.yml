@@ -16,15 +16,16 @@
 #   - Push tag:       verify → deploy (manual gate)
 #
 # Required CI variables (set at GitLab Group level):
-#   ARGUS_DEPLOY_HOST    Production server IP or DNS name
-#   ARGUS_DEPLOY_USER    SSH user (e.g. deploy)
-#   ARGUS_DEPLOY_SSH_KEY SSH private key (type: File, protected)
+#   DEPLOY_HOST       Production server IP or DNS name
+#   DEPLOY_USER       SSH user (e.g. deploy)
+#   DEPLOY_SSH_KEY    SSH private key (prefer type: File, protected)
 #
 # Optional:
 #   ARGUS_PROJECT_ROOT          Default: /opt/argus-ai
 #   ARGUS_BACKEND_DEPLOY_PATH   Default: $ARGUS_PROJECT_ROOT/argus-backend
 #
-# Backward-compatible fallback: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY.
+# Backward-compatible fallback: ARGUS_DEPLOY_HOST, ARGUS_DEPLOY_USER,
+# ARGUS_DEPLOY_SSH_KEY, SSH_PRIVATE_KEY.
 # =============================================================================
 
 image: golang:1.26

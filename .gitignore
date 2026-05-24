@@ -74,6 +74,7 @@ ai-sidecar/.venv*/
 .#*
 
 # ── CI cache ──────────────────────────────────────────────────────────────
+.cache/
 .go-cache/
 .go-build-cache/
 .gocache/

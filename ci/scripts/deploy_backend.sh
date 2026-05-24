@@ -31,16 +31,31 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "missing required command: $1"
 }
 
+materialize_ssh_key() {
+  raw_key="${DEPLOY_SSH_KEY:-${ARGUS_DEPLOY_SSH_KEY:-${SSH_PRIVATE_KEY:-}}}"
+  [ -n "$raw_key" ] || fail "SSH key is required. Set DEPLOY_SSH_KEY, ARGUS_DEPLOY_SSH_KEY, or SSH_PRIVATE_KEY"
+
+  if [ -r "$raw_key" ]; then
+    printf '%s\n' "$raw_key"
+    return 0
+  fi
+
+  key_file="$(mktemp)"
+  case "$raw_key" in
+    *"\\n"*) printf '%b' "$raw_key" ;;
+    *) printf '%s\n' "$raw_key" ;;
+  esac | sed 's/\r$//' > "$key_file"
+  chmod 600 "$key_file"
+  printf '%s\n' "$key_file"
+}
+
 ARGUS_DEPLOY_HOST="${ARGUS_DEPLOY_HOST:-${DEPLOY_HOST:-}}"
 ARGUS_DEPLOY_USER="${ARGUS_DEPLOY_USER:-${DEPLOY_USER:-}}"
-ARGUS_DEPLOY_SSH_KEY="${ARGUS_DEPLOY_SSH_KEY:-${DEPLOY_SSH_KEY:-}}"
 ARGUS_PROJECT_ROOT="${ARGUS_PROJECT_ROOT:-/opt/argus-ai}"
 ARGUS_BACKEND_DEPLOY_PATH="${ARGUS_BACKEND_DEPLOY_PATH:-$ARGUS_PROJECT_ROOT/argus-backend}"
 
 [ -n "$ARGUS_DEPLOY_HOST" ] || fail "ARGUS_DEPLOY_HOST is required"
 [ -n "$ARGUS_DEPLOY_USER" ] || fail "ARGUS_DEPLOY_USER is required"
-[ -n "$ARGUS_DEPLOY_SSH_KEY" ] || fail "ARGUS_DEPLOY_SSH_KEY is required"
-[ -r "$ARGUS_DEPLOY_SSH_KEY" ] || fail "ARGUS_DEPLOY_SSH_KEY file is not readable"
 
 safe_abs_path "ARGUS_PROJECT_ROOT" "$ARGUS_PROJECT_ROOT"
 safe_abs_path "ARGUS_BACKEND_DEPLOY_PATH" "$ARGUS_BACKEND_DEPLOY_PATH"
@@ -52,12 +67,18 @@ require_cmd ssh-keygen
 require_cmd ssh-keyscan
 require_cmd rsync
 
-eval "$(ssh-agent -s)"
-trap 'ssh-agent -k >/dev/null 2>&1 || true' EXIT
+SSH_KEY_FILE="$(materialize_ssh_key)"
+REMOVE_SSH_KEY_FILE="false"
+if [ -r "$SSH_KEY_FILE" ] && [ "${SSH_KEY_FILE#/tmp/}" != "$SSH_KEY_FILE" ]; then
+  REMOVE_SSH_KEY_FILE="true"
+fi
 
-chmod 600 "$ARGUS_DEPLOY_SSH_KEY"
-ssh-keygen -lf "$ARGUS_DEPLOY_SSH_KEY"
-ssh-add "$ARGUS_DEPLOY_SSH_KEY"
+eval "$(ssh-agent -s)"
+trap 'ssh-agent -k >/dev/null 2>&1 || true; if [ "${REMOVE_SSH_KEY_FILE:-false}" = "true" ]; then rm -f "${SSH_KEY_FILE:-}" 2>/dev/null || true; fi' EXIT
+
+chmod 600 "$SSH_KEY_FILE"
+ssh-keygen -lf "$SSH_KEY_FILE"
+ssh-add "$SSH_KEY_FILE"
 mkdir -p "$HOME/.ssh"
 chmod 700 "$HOME/.ssh"
 ssh-keyscan -H "$ARGUS_DEPLOY_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null
