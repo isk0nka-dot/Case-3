@@ -122,7 +122,22 @@ SETTINGS
 -- ---------------------------------------------------------------------------
 
 INSERT INTO argus_analytics.proctoring_events
-SELECT * FROM argus_analytics.proctoring_events_legacy;
+    (event_id, session_id, student_id, exam_id, org_id,
+     event_type, severity, source,
+     server_timestamp, client_timestamp, video_timestamp_sec,
+     label, confidence, payload, payload_type,
+     user_agent, sdk_version, resolution, timezone_offset_min, ip_address, region,
+     head_yaw, head_pitch, head_roll, face_bbox, liveness_score, face_embedding, face_similarity,
+     audio_rms_db, vad_active, audio_classification, speaker_count, speaker_match)
+SELECT
+    event_id, session_id, student_id, exam_id, org_id,
+    event_type, severity, source,
+    server_timestamp, client_timestamp, video_timestamp_sec,
+    label, confidence, payload, payload_type,
+    user_agent, sdk_version, resolution, timezone_offset_min, ip_address, region,
+    head_yaw, head_pitch, head_roll, face_bbox, liveness_score, face_embedding, face_similarity,
+    audio_rms_db, vad_active, audio_classification, speaker_count, speaker_match
+FROM argus_analytics.proctoring_events_legacy;
 
 
 -- ---------------------------------------------------------------------------
