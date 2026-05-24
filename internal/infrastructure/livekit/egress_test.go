@@ -52,7 +52,7 @@ func TestBuildTrackCompositeRequestUsesStableRecordingPathAndEncoding(t *testing
 	if s3 == nil {
 		t.Fatal("s3 output is nil")
 	}
-	if s3.Endpoint != cfg.S3Endpoint || s3.AccessKey != cfg.S3AccessKey || s3.Secret != cfg.S3SecretKey || s3.Bucket != cfg.S3Bucket {
+	if s3.Endpoint != s3Endpoint(cfg.S3Endpoint) || s3.AccessKey != cfg.S3AccessKey || s3.Secret != cfg.S3SecretKey || s3.Bucket != cfg.S3Bucket {
 		t.Fatalf("s3 config not copied into request: %+v", s3)
 	}
 }
