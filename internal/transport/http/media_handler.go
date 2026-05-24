@@ -38,6 +38,7 @@ type MediaHandler struct {
 	livekitAPIKey    string
 	livekitAPISecret string
 	livekitWSURL     string
+	livekitPublicURL string // public URL returned to browser (may differ from internal WS URL)
 }
 
 // NewMediaHandler creates a new media API handler with LiveKit configuration.
@@ -58,6 +59,13 @@ func NewMediaHandler(
 	if wsURL == "" {
 		wsURL = "ws://localhost:7880"
 	}
+	// LIVEKIT_PUBLIC_WS_URL is the URL browsers use to connect to LiveKit.
+	// Defaults to LIVEKIT_WS_URL. Override when running in Docker where the
+	// internal hostname (e.g. "livekit") is not resolvable by the browser.
+	publicURL := os.Getenv("LIVEKIT_PUBLIC_WS_URL")
+	if publicURL == "" {
+		publicURL = wsURL
+	}
 
 	return &MediaHandler{
 		pgRepo:           pgRepo,
@@ -67,6 +75,7 @@ func NewMediaHandler(
 		livekitAPIKey:    apiKey,
 		livekitAPISecret: apiSecret,
 		livekitWSURL:     wsURL,
+		livekitPublicURL: publicURL,
 	}
 }
 
@@ -273,7 +282,7 @@ func (h *MediaHandler) handleGenerateToken(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(MediaTokenResponse{
 		Token: token,
-		WsURL: h.livekitWSURL,
+		WsURL: h.livekitPublicURL,
 		Room:  roomName,
 	})
 }
@@ -285,7 +294,7 @@ func (h *MediaHandler) handleListRooms(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"livekitUrl":  h.livekitWSURL,
+		"livekitUrl":  h.livekitPublicURL,
 		"apiKey":      h.livekitAPIKey,
 		"status":      "available",
 		"description": "Use POST /api/v1/media/token to generate participant tokens",

@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -61,21 +62,51 @@ func getAPIKeyFromContext(ctx context.Context) *APIKeyContext {
 // External Handler
 // ==========================================================================
 
+// ExternalEgressController auto-starts video recording when a student joins.
+type ExternalEgressController interface {
+	StartParticipantRecording(ctx context.Context, roomName, identity, sessionID, userID string) (string, error)
+}
+
 // ExternalHandler serves the REST API for external/SaaS partner integrations.
 type ExternalHandler struct {
-	repo          *postgres.Repository
-	logger        *zap.Logger
-	jwtSigningKey []byte
-	ingest        *usecase.IngestUseCase
+	repo             *postgres.Repository
+	logger           *zap.Logger
+	jwtSigningKey    []byte
+	ingest           *usecase.IngestUseCase
+	livekitAPIKey    string
+	livekitAPISecret string
+	livekitPublicURL string
+	egress           ExternalEgressController // nil until SetEgress is called
 }
+
+// SetEgress wires in the LiveKit Egress service for auto-recording.
+func (h *ExternalHandler) SetEgress(e ExternalEgressController) { h.egress = e }
 
 // NewExternalHandler creates a new external API handler.
 func NewExternalHandler(repo *postgres.Repository, logger *zap.Logger, jwtSigningKey []byte, ingest *usecase.IngestUseCase) *ExternalHandler {
+	lkAPIKey := os.Getenv("LIVEKIT_API_KEY")
+	if lkAPIKey == "" {
+		lkAPIKey = "argus-dev-api-key"
+	}
+	lkAPISecret := os.Getenv("LIVEKIT_API_SECRET")
+	if lkAPISecret == "" {
+		lkAPISecret = "argus-dev-api-secret-must-be-at-least-32-characters-long"
+	}
+	lkPublicURL := os.Getenv("LIVEKIT_PUBLIC_WS_URL")
+	if lkPublicURL == "" {
+		lkPublicURL = os.Getenv("LIVEKIT_WS_URL")
+		if lkPublicURL == "" {
+			lkPublicURL = "ws://localhost:7880"
+		}
+	}
 	return &ExternalHandler{
-		repo:          repo,
-		logger:        logger.Named("external_api"),
-		jwtSigningKey: jwtSigningKey,
-		ingest:        ingest,
+		repo:             repo,
+		logger:           logger.Named("external_api"),
+		jwtSigningKey:    jwtSigningKey,
+		ingest:           ingest,
+		livekitAPIKey:    lkAPIKey,
+		livekitAPISecret: lkAPISecret,
+		livekitPublicURL: lkPublicURL,
 	}
 }
 
@@ -94,6 +125,11 @@ func (h *ExternalHandler) RegisterRoutes(mux *http.ServeMux) {
 
 	// Event ingestion (proctoring session JWT auth) — for SDK / test clients.
 	mux.HandleFunc("POST /api/v1/external/events", h.requireSessionToken(h.handleIngestEvents))
+
+	// LiveKit student token (proctoring session JWT auth) — SDK calls this to publish camera.
+	mux.HandleFunc("POST /api/v1/external/sessions/{sessionId}/student-token", h.requireSessionToken(h.handleStudentMediaToken))
+	// Recording-ready signal — SDK calls this after student successfully joins LiveKit room.
+	mux.HandleFunc("POST /api/v1/external/sessions/{sessionId}/recording-ready", h.requireSessionToken(h.handleRecordingReady))
 }
 
 // ==========================================================================
@@ -470,8 +506,8 @@ func (h *ExternalHandler) handleCreateWebhook(w http.ResponseWriter, r *http.Req
 		h.jsonError(w, "url is required", http.StatusBadRequest)
 		return
 	}
-	if !strings.HasPrefix(req.URL, "https://") {
-		h.jsonError(w, "Webhook URL must use HTTPS", http.StatusBadRequest)
+	if !strings.HasPrefix(req.URL, "https://") && !strings.HasPrefix(req.URL, "http://") {
+		h.jsonError(w, "Webhook URL must use HTTP or HTTPS", http.StatusBadRequest)
 		return
 	}
 
@@ -752,4 +788,173 @@ func (h *ExternalHandler) handleIngestEvents(w http.ResponseWriter, r *http.Requ
 		"rejected_count": result.RejectedCount,
 		"batch_id":       body.BatchID,
 	})
+}
+
+// ==========================================================================
+// Student LiveKit Media Token
+// ==========================================================================
+
+// handleStudentMediaToken generates a LiveKit student token so the SDK can
+// publish the student's camera to the proctoring room. Authenticated with the
+// argusSessionToken (student JWT), NOT admin credentials.
+//
+//	POST /api/v1/external/sessions/{sessionId}/student-token
+func (h *ExternalHandler) handleStudentMediaToken(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		h.jsonError(w, "missing session claims", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID := r.PathValue("sessionId")
+	if sessionID == "" {
+		sessionID = claims.SessionID
+	}
+
+	// Verify the session exists in DB.
+	session, err := h.repo.GetExternalSessionByID(r.Context(), sessionID)
+	if err != nil || session == nil {
+		h.jsonError(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	// Room name matches the convention used by the proctor token generator.
+	roomName := "argus-session-" + sessionID
+	identity := fmt.Sprintf("student-%s", claims.StudentID)
+
+	token, err := h.generateStudentLiveKitToken(identity, session.StudentName, roomName)
+	if err != nil {
+		h.logger.Error("failed to generate student livekit token", zap.Error(err))
+		h.jsonError(w, "failed to generate livekit token", http.StatusInternalServerError)
+		return
+	}
+
+	// Auto-start recording after student joins (non-blocking, retries until room exists).
+	if h.egress != nil {
+		capturedRoom := roomName
+		capturedIdentity := identity
+		capturedStudentID := claims.StudentID
+		capturedSessionID := sessionID
+		go func() {
+			// Student needs a few seconds to connect to LiveKit after receiving the token.
+			// Retry every 5s for up to 60s until the room exists.
+			for attempt := 1; attempt <= 12; attempt++ {
+				time.Sleep(5 * time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				egressID, err := h.egress.StartParticipantRecording(ctx, capturedRoom, capturedIdentity, capturedSessionID, capturedStudentID)
+				cancel()
+				if err == nil {
+					h.logger.Info("auto-recording started",
+						zap.String("egress_id", egressID),
+						zap.String("room", capturedRoom),
+						zap.Int("attempt", attempt),
+					)
+					return
+				}
+				h.logger.Debug("recording not started yet, retrying",
+					zap.String("room", capturedRoom),
+					zap.Int("attempt", attempt),
+					zap.Error(err),
+				)
+			}
+			h.logger.Warn("auto-recording gave up: student did not join room in time",
+				zap.String("room", capturedRoom),
+			)
+		}()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"livekitToken": token,
+		"livekitUrl":   h.livekitPublicURL,
+		"room":         roomName,
+	})
+}
+
+// handleRecordingReady is called by the SDK after the student has successfully
+// joined the LiveKit room. This is the reliable trigger point for starting
+// ParticipantEgress (the room is guaranteed to exist at this point).
+//
+//	POST /api/v1/external/sessions/{sessionId}/recording-ready
+func (h *ExternalHandler) handleRecordingReady(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		h.jsonError(w, "missing session claims", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID := r.PathValue("sessionId")
+	if sessionID == "" {
+		sessionID = claims.SessionID
+	}
+
+	if h.egress == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "no_egress"})
+		return
+	}
+
+	roomName := "argus-session-" + sessionID
+	identity := fmt.Sprintf("student-%s", claims.StudentID)
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		egressID, err := h.egress.StartParticipantRecording(ctx, roomName, identity, sessionID, claims.StudentID)
+		if err != nil {
+			h.logger.Warn("recording-ready: failed to start egress",
+				zap.String("room", roomName),
+				zap.Error(err),
+			)
+		} else {
+			h.logger.Info("recording-ready: egress started",
+				zap.String("egress_id", egressID),
+				zap.String("room", roomName),
+			)
+		}
+	}()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "recording_requested"})
+}
+
+// generateStudentLiveKitToken creates a LiveKit JWT for a publishing student.
+func (h *ExternalHandler) generateStudentLiveKitToken(identity, name, room string) (string, error) {
+	now := time.Now()
+	boolTrue := true
+	boolFalse := false
+
+	claims := livekitTokenClaims{
+		Exp:  now.Add(24 * time.Hour).Unix(),
+		Iss:  h.livekitAPIKey,
+		Nbf:  now.Unix(),
+		Sub:  identity,
+		Name: name,
+		Video: livekitVideoGrant{
+			RoomJoin:       true,
+			Room:           room,
+			CanPublish:     &boolTrue,
+			CanSubscribe:   &boolFalse,
+			CanPublishData: &boolTrue,
+		},
+	}
+
+	header := `{"alg":"HS256","typ":"JWT"}`
+	headerB64 := lkBase64Encode([]byte(header))
+
+	payloadJSON, err := json.Marshal(claims)
+	if err != nil {
+		return "", fmt.Errorf("marshal claims: %w", err)
+	}
+	payloadB64 := lkBase64Encode(payloadJSON)
+
+	signingInput := headerB64 + "." + payloadB64
+	mac := hmac.New(sha256.New, []byte(h.livekitAPISecret))
+	mac.Write([]byte(signingInput))
+	signatureB64 := lkBase64Encode(mac.Sum(nil))
+
+	return headerB64 + "." + payloadB64 + "." + signatureB64, nil
 }

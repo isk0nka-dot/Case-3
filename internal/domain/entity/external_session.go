@@ -133,8 +133,8 @@ func (w *WebhookEndpoint) Validate() error {
 	if strings.TrimSpace(w.URL) == "" {
 		return errors.New("url is required")
 	}
-	if !strings.HasPrefix(w.URL, "https://") {
-		return errors.New("webhook url must use HTTPS")
+	if !strings.HasPrefix(w.URL, "https://") && !strings.HasPrefix(w.URL, "http://") {
+		return errors.New("webhook url must use HTTP or HTTPS")
 	}
 	if len(w.Events) == 0 {
 		return errors.New("at least one event type is required")

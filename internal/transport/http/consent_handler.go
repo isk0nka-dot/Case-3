@@ -156,7 +156,13 @@ func (h *ConsentHandler) handleGetConsent(w http.ResponseWriter, r *http.Request
 		&resp.ConsentVersion, &resp.Accepted, &resp.CreatedAt,
 	)
 	if err == sql.ErrNoRows {
-		h.consentJSONError(w, "No consent record found for this session", http.StatusNotFound)
+		// Return empty consent object so frontend doesn't crash on missing records.
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"sessionId": sessionID,
+			"accepted":  false,
+			"exists":    false,
+		})
 		return
 	}
 	if err != nil {

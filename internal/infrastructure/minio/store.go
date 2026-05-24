@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -247,6 +248,68 @@ func (s *Store) objectKey(fragment *entity.EvidenceFragment) string {
 		ext,
 	)
 }
+
+// StreamKey fetches an object by raw S3 key and streams it to the response writer.
+// Handles HTTP Range requests properly via MinIO's SetRange — this avoids using
+// http.ServeContent which requires io.ReadSeeker (unsupported by MinIO objects).
+func (s *Store) StreamKey(ctx context.Context, key string, w http.ResponseWriter, r *http.Request) error {
+	// First: get object size via a stat-only request.
+	opts := minio.GetObjectOptions{}
+	statObj, err := s.client.GetObject(ctx, s.bucket, key, opts)
+	if err != nil {
+		return fmt.Errorf("minio: get object %s: %w", key, err)
+	}
+	info, err := statObj.Stat()
+	statObj.Close()
+	if err != nil {
+		return fmt.Errorf("minio: stat object %s: %w", key, err)
+	}
+
+	totalSize := info.Size
+	start, end := int64(0), totalSize-1
+	isRange := false
+
+	// Parse Range header (e.g. "bytes=0-1023").
+	rangeHeader := r.Header.Get("Range")
+	if rangeHeader != "" {
+		var rs, re int64
+		n, _ := fmt.Sscanf(rangeHeader, "bytes=%d-%d", &rs, &re)
+		if n >= 1 {
+			start = rs
+			if n == 2 && re < totalSize {
+				end = re
+			}
+			isRange = true
+		}
+	}
+
+	// Fetch only the required byte range from MinIO.
+	rangeOpts := minio.GetObjectOptions{}
+	_ = rangeOpts.SetRange(start, end)
+	obj, err := s.client.GetObject(ctx, s.bucket, key, rangeOpts)
+	if err != nil {
+		return fmt.Errorf("minio: get object %s range [%d-%d]: %w", key, start, end, err)
+	}
+	defer obj.Close()
+
+	contentLength := end - start + 1
+
+	w.Header().Set("Content-Type", "video/mp4")
+	w.Header().Set("Content-Disposition", "inline")
+	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", contentLength))
+
+	if isRange {
+		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, totalSize))
+		w.WriteHeader(http.StatusPartialContent)
+	}
+
+	io.Copy(w, obj) //nolint:errcheck
+	return nil
+}
+
+// Bucket returns the configured bucket name.
+func (s *Store) Bucket() string { return s.bucket }
 
 // MinIOClient returns the underlying MinIO client for direct access.
 // Used by the export worker to download evidence fragments from the

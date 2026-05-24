@@ -1493,7 +1493,11 @@ func (r *Repository) CompleteExternalSession(ctx context.Context, sessionID, ver
 			integrity_score = $4, violation_count = $5,
 			completed_at = NOW(), updated_at = NOW()
 		WHERE session_id = $1`
-	_, err := r.db.ExecContext(ctx, query, sessionID, verdict, details, score, violations)
+	var detailsVal interface{}
+	if len(details) > 0 {
+		detailsVal = details
+	}
+	_, err := r.db.ExecContext(ctx, query, sessionID, verdict, detailsVal, score, violations)
 	return err
 }
 

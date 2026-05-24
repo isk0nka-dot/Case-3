@@ -1137,8 +1137,8 @@ func (h *AdminHandler) handleCreateWebhook(w http.ResponseWriter, r *http.Reques
 		h.jsonError(w, "URL is required", http.StatusBadRequest)
 		return
 	}
-	if !strings.HasPrefix(req.URL, "https://") {
-		h.jsonError(w, "Webhook URL must use HTTPS", http.StatusBadRequest)
+	if !strings.HasPrefix(req.URL, "https://") && !strings.HasPrefix(req.URL, "http://") {
+		h.jsonError(w, "Webhook URL must use HTTP or HTTPS", http.StatusBadRequest)
 		return
 	}
 

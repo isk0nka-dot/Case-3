@@ -826,6 +826,7 @@ func run() error {
 		}, logger)
 		recordingHandler := adminHTTP.NewRecordingHandler(egressService, pgRepo, logger, adminJWTKey, pgRepo)
 		recordingHandler.RegisterRoutes(httpMux)
+		externalHandler.SetEgress(egressService)
 
 		livekitWebhookHandler := livekitInfra.NewWebhookHandler(livekitAPIKey, livekitAPISecret, pgRepo, logger)
 		httpMux.Handle("POST /api/v1/livekit/webhook", livekitWebhookHandler)
@@ -837,7 +838,7 @@ func run() error {
 
 		// Archive API endpoints (REST) — Historical session review and export.
 		// Powers the "Архив сессий" dashboard with ClickHouse queries.
-		archiveHandler := adminHTTP.NewArchiveHandler(chWriter, pgRepo, logger, adminJWTKey)
+		archiveHandler := adminHTTP.NewArchiveHandler(chWriter, pgRepo, logger, adminJWTKey, evidenceStore)
 		archiveHandler.RegisterRoutes(httpMux)
 
 		logger.Info("archive api registered",

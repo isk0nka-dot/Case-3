@@ -26,6 +26,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/argus-ai/event-collector/internal/domain/entity"
 	"github.com/argus-ai/event-collector/internal/infrastructure/clickhouse"
+	minioInfra "github.com/argus-ai/event-collector/internal/infrastructure/minio"
 	"github.com/argus-ai/event-collector/internal/infrastructure/postgres"
 	"go.uber.org/zap"
 )
@@ -35,6 +36,7 @@ type ArchiveHandler struct {
 	chConn driver.Conn
 	chMeta *clickhouse.Writer
 	pgRepo *postgres.Repository
+	minio  *minioInfra.Store
 	logger *zap.Logger
 
 	jwtSigningKey []byte
@@ -47,11 +49,13 @@ func NewArchiveHandler(
 	pgRepo *postgres.Repository,
 	logger *zap.Logger,
 	jwtSigningKey []byte,
+	minio *minioInfra.Store,
 ) *ArchiveHandler {
 	return &ArchiveHandler{
 		chConn:        chWriter.Conn(),
 		chMeta:        chWriter,
 		pgRepo:        pgRepo,
+		minio:         minio,
 		logger:        logger.Named("archive_api"),
 		jwtSigningKey: jwtSigningKey,
 		repo:          pgRepo,
@@ -64,6 +68,7 @@ func (h *ArchiveHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/archive/sessions/{sessionId}/events", h.requireAuth(h.handleSessionEvents))
 	mux.HandleFunc("GET /api/v1/archive/exams", h.requireAuth(h.handleExamSummaries))
 	mux.HandleFunc("GET /api/v1/archive/sessions/{sessionId}/export", h.requireAuth(h.handleExportSession))
+	mux.HandleFunc("GET /api/v1/archive/sessions/{sessionId}/video", h.requireAuth(h.handleStreamVideo))
 
 	// Review workflow endpoints — mandatory human review for all sessions.
 	mux.HandleFunc("POST /api/v1/archive/sessions/{sessionId}/review", h.requireAuth(h.handleSubmitReview))
@@ -944,6 +949,10 @@ func (h *ArchiveHandler) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
 			token = authHeader[7:]
 		}
+		// Allow token via query param for media streaming (video element can't set headers).
+		if token == "" {
+			token = r.URL.Query().Get("token")
+		}
 
 		if token == "" {
 			h.jsonError(w, "Unauthorized", http.StatusUnauthorized)
@@ -1031,4 +1040,65 @@ func (h *ArchiveHandler) jsonError(w http.ResponseWriter, msg string, status int
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+// handleStreamVideo streams a recorded MP4 from MinIO for the given session.
+//
+//	GET /api/v1/archive/sessions/{sessionId}/video
+func (h *ArchiveHandler) handleStreamVideo(w http.ResponseWriter, r *http.Request) {
+	if h.minio == nil {
+		h.jsonError(w, "recording storage not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	sessionID := r.PathValue("sessionId")
+	if sessionID == "" {
+		h.jsonError(w, "sessionId is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+
+	// First try: use stored file_url from livekit_recordings (populated via webhook).
+	var objectKey string
+	var fileURL string
+	_ = h.pgRepo.DB().QueryRowContext(ctx, `
+		SELECT file_url FROM livekit_recordings
+		WHERE session_id = $1 AND file_url != ''
+		ORDER BY created_at DESC LIMIT 1`, sessionID,
+	).Scan(&fileURL)
+	if fileURL != "" {
+		objectKey = fileURL
+	}
+
+	// Second try: construct key from external_sessions student_id (webhook not needed).
+	if objectKey == "" {
+		var studentID string
+		_ = h.pgRepo.DB().QueryRowContext(ctx,
+			`SELECT student_id FROM external_sessions WHERE session_id = $1 LIMIT 1`,
+			sessionID,
+		).Scan(&studentID)
+		if studentID != "" {
+			objectKey = fmt.Sprintf(
+				"content/recordings/argus-session-%s/%s-%s.mp4",
+				sessionID, sessionID, studentID,
+			)
+		}
+	}
+
+	if objectKey == "" {
+		h.jsonError(w, "recording not found", http.StatusNotFound)
+		return
+	}
+
+	if err := h.minio.StreamKey(ctx, objectKey, w, r); err != nil {
+		h.logger.Warn("failed to stream recording",
+			zap.String("session_id", sessionID),
+			zap.String("key", objectKey),
+			zap.Error(err),
+		)
+		if w.Header().Get("Content-Type") == "" {
+			h.jsonError(w, "recording not found or not yet ready", http.StatusNotFound)
+		}
+	}
 }
