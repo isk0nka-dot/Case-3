@@ -140,7 +140,9 @@ security-scan:
     entrypoint: [""]
   script:
     - cd "${CI_PROJECT_DIR}"
-    - gosec -fmt sarif -out gosec.sarif ./... || true
+    - |
+      packages="$(go list ./...)"
+      gosec -fmt sarif -out gosec.sarif $packages || true
     - test -s gosec.sarif || printf '%s\n' '{"version":"2.1.0","runs":[]}' > gosec.sarif
   artifacts:
     when: always
