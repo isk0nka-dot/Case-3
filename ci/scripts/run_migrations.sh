@@ -101,7 +101,7 @@ if container_exists argus-postgres; then
   pg_db="${POSTGRES_DB:-argus}"
 elif container_exists argus-db; then
   pg_container=argus-db
-  pg_user="${POSTGRES_USER:-admin}"
+  pg_user="${POSTGRES_USER:-argus}"
   pg_db="${POSTGRES_DB:-argus_db}"
 else
   echo "ERROR: no supported PostgreSQL container found" >&2
