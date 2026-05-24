@@ -1486,6 +1486,35 @@ func (r *Repository) UpdateExternalSessionStatus(ctx context.Context, sessionID,
 	return err
 }
 
+func (r *Repository) ListExternalSessionsByResult(ctx context.Context, examID, studentID string) ([]*entity.ExternalSession, error) {
+	query := `
+		SELECT id, session_id, org_id, exam_id, student_id, student_name, exam_name,
+		       status, verdict, integrity_score, violation_count,
+		       started_at, completed_at, created_at, updated_at
+		FROM external_sessions
+		WHERE exam_id = $1 AND student_id = $2 AND deleted_at IS NULL
+		ORDER BY created_at DESC`
+	rows, err := r.db.QueryContext(ctx, query, examID, studentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var sessions []*entity.ExternalSession
+	for rows.Next() {
+		s := &entity.ExternalSession{}
+		if err := rows.Scan(
+			&s.ID, &s.SessionID, &s.OrgID, &s.ExamID, &s.StudentID,
+			&s.StudentName, &s.ExamName, &s.Status, &s.Verdict,
+			&s.IntegrityScore, &s.ViolationCount,
+			&s.StartedAt, &s.CompletedAt, &s.CreatedAt, &s.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, s)
+	}
+	return sessions, rows.Err()
+}
+
 func (r *Repository) CompleteExternalSession(ctx context.Context, sessionID, verdict string, details []byte, score float64, violations int) error {
 	query := `
 		UPDATE external_sessions

@@ -123,6 +123,9 @@ func (h *ExternalHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/external/webhooks", h.requireAPIKey("webhooks:write", h.handleCreateWebhook))
 	mux.HandleFunc("DELETE /api/v1/external/webhooks/{webhookId}", h.requireAPIKey("webhooks:write", h.handleDeleteWebhook))
 
+	// Sessions by result — query completed sessions for a given exam+student pair.
+	mux.HandleFunc("GET /api/v1/external/sessions/by-result", h.requireAPIKey("sessions:read", h.handleListSessionsByResult))
+
 	// Event ingestion (proctoring session JWT auth) — for SDK / test clients.
 	mux.HandleFunc("POST /api/v1/external/events", h.requireSessionToken(h.handleIngestEvents))
 
@@ -957,4 +960,35 @@ func (h *ExternalHandler) generateStudentLiveKitToken(identity, name, room strin
 	signatureB64 := lkBase64Encode(mac.Sum(nil))
 
 	return headerB64 + "." + payloadB64 + "." + signatureB64, nil
+}
+
+// ==========================================================================
+// Sessions By Result
+// ==========================================================================
+
+// handleListSessionsByResult returns proctoring sessions for a given exam+student pair.
+// Used by LMS partners to fetch the verdict after a test is submitted.
+//
+//	GET /api/v1/external/sessions/by-result?testId=X&profileId=Y
+func (h *ExternalHandler) handleListSessionsByResult(w http.ResponseWriter, r *http.Request) {
+	examID := r.URL.Query().Get("testId")
+	studentID := r.URL.Query().Get("profileId")
+	if examID == "" || studentID == "" {
+		h.jsonError(w, "testId and profileId query params are required", http.StatusBadRequest)
+		return
+	}
+
+	sessions, err := h.repo.ListExternalSessionsByResult(r.Context(), examID, studentID)
+	if err != nil {
+		h.logger.Error("list sessions by result failed", zap.Error(err))
+		h.jsonError(w, "failed to fetch sessions", http.StatusInternalServerError)
+		return
+	}
+	if sessions == nil {
+		sessions = []*entity.ExternalSession{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(sessions)
 }
