@@ -107,7 +107,7 @@ func NewRepository(cfg Config, logger *zap.Logger) (*Repository, error) {
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("postgres: ping failed: %w", err)
 	}
 
@@ -398,7 +398,7 @@ func (r *Repository) ListOrgs(ctx context.Context, filter port.OrgFilter) ([]*en
 	if err != nil {
 		return nil, fmt.Errorf("postgres: list orgs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	orgs := make([]*entity.Organization, 0)
 	for rows.Next() {
@@ -520,7 +520,7 @@ func (r *Repository) ListUsersByOrg(ctx context.Context, orgID string) ([]*entit
 	if err != nil {
 		return nil, fmt.Errorf("postgres: list users by org: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	users := make([]*entity.User, 0)
 	for rows.Next() {

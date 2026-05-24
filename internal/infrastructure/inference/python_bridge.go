@@ -68,7 +68,7 @@ func (e *PythonBridgeEngine) AnalyzeFrame(ctx context.Context, frame []byte, con
 	if err != nil {
 		return nil, fmt.Errorf("python bridge frame request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("python bridge frame request returned status %d", resp.StatusCode)
@@ -90,7 +90,7 @@ func (e *PythonBridgeEngine) checkHealth(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("python bridge health check failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("python bridge health check returned status %d", resp.StatusCode)

@@ -421,17 +421,17 @@ func FormatAlertBilingual(a Alert) string {
 
 	// KZ block
 	var kzB strings.Builder
-	kzB.WriteString(fmt.Sprintf("<b>🇰🇿 %s — ARGUS AI</b>\n", htmlEscape(kzHeader)))
+	fmt.Fprintf(&kzB, "<b>🇰🇿 %s — ARGUS AI</b>\n", htmlEscape(kzHeader))
 	kzB.WriteString(separator + "\n")
-	kzB.WriteString(fmt.Sprintf("<b>Компонент:</b>   <code>%s</code>\n", htmlEscape(a.Component)))
-	kzB.WriteString(fmt.Sprintf("<b>Оқиға ID:</b>    <code>%s</code>\n", incidentID))
+	fmt.Fprintf(&kzB, "<b>Компонент:</b>   <code>%s</code>\n", htmlEscape(a.Component))
+	fmt.Fprintf(&kzB, "<b>Оқиға ID:</b>    <code>%s</code>\n", incidentID)
 	if a.SessionID != "" {
-		kzB.WriteString(fmt.Sprintf("<b>Сессия:</b>      <code>%s</code>\n", htmlEscape(a.SessionID)))
+		fmt.Fprintf(&kzB, "<b>Сессия:</b>      <code>%s</code>\n", htmlEscape(a.SessionID))
 	}
-	kzB.WriteString(fmt.Sprintf("<b>Маңыздылық:</b>  <code>%s</code>\n", htmlEscape(a.Severity)))
-	kzB.WriteString(fmt.Sprintf("<b>Уақыт:</b>       <code>%s</code>\n", a.Timestamp.Format("2006-01-02 15:04:05 MST")))
+	fmt.Fprintf(&kzB, "<b>Маңыздылық:</b>  <code>%s</code>\n", htmlEscape(a.Severity))
+	fmt.Fprintf(&kzB, "<b>Уақыт:</b>       <code>%s</code>\n", a.Timestamp.Format("2006-01-02 15:04:05 MST"))
 	kzB.WriteString(separator + "\n")
-	kzB.WriteString(fmt.Sprintf("<b>Қате мәліметтері:</b>\n<pre>%s</pre>\n", errorText))
+	fmt.Fprintf(&kzB, "<b>Қате мәліметтері:</b>\n<pre>%s</pre>\n", errorText)
 	kzB.WriteString(separator + "\n")
 
 	switch strings.ToUpper(a.Severity) {
@@ -445,17 +445,17 @@ func FormatAlertBilingual(a Alert) string {
 
 	// EN block
 	var enB strings.Builder
-	enB.WriteString(fmt.Sprintf("<b>🇬🇧 %s — ARGUS AI</b>\n", htmlEscape(enHeader)))
+	fmt.Fprintf(&enB, "<b>🇬🇧 %s — ARGUS AI</b>\n", htmlEscape(enHeader))
 	enB.WriteString(separator + "\n")
-	enB.WriteString(fmt.Sprintf("<b>Component:</b>   <code>%s</code>\n", htmlEscape(a.Component)))
-	enB.WriteString(fmt.Sprintf("<b>Incident ID:</b> <code>%s</code>\n", incidentID))
+	fmt.Fprintf(&enB, "<b>Component:</b>   <code>%s</code>\n", htmlEscape(a.Component))
+	fmt.Fprintf(&enB, "<b>Incident ID:</b> <code>%s</code>\n", incidentID)
 	if a.SessionID != "" {
-		enB.WriteString(fmt.Sprintf("<b>Session:</b>     <code>%s</code>\n", htmlEscape(a.SessionID)))
+		fmt.Fprintf(&enB, "<b>Session:</b>     <code>%s</code>\n", htmlEscape(a.SessionID))
 	}
-	enB.WriteString(fmt.Sprintf("<b>Severity:</b>    <code>%s</code>\n", htmlEscape(a.Severity)))
-	enB.WriteString(fmt.Sprintf("<b>Time:</b>        <code>%s</code>\n", a.Timestamp.Format("2006-01-02 15:04:05 MST")))
+	fmt.Fprintf(&enB, "<b>Severity:</b>    <code>%s</code>\n", htmlEscape(a.Severity))
+	fmt.Fprintf(&enB, "<b>Time:</b>        <code>%s</code>\n", a.Timestamp.Format("2006-01-02 15:04:05 MST"))
 	enB.WriteString(separator + "\n")
-	enB.WriteString(fmt.Sprintf("<b>Error Details:</b>\n<pre>%s</pre>\n", errorText))
+	fmt.Fprintf(&enB, "<b>Error Details:</b>\n<pre>%s</pre>\n", errorText)
 	enB.WriteString(separator + "\n")
 
 	switch strings.ToUpper(a.Severity) {

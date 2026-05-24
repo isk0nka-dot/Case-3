@@ -179,7 +179,7 @@ func (tp *TelegramProvider) SendDirect(text string) error {
 		tp.logger.Warn("telegram SendDirect: send failed", zap.Error(err))
 		return fmt.Errorf("telegram SendDirect: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		tp.logger.Warn("telegram SendDirect: non-200 response",

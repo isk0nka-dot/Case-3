@@ -104,27 +104,27 @@ func GenerateGazeHeatmapSVG(points []GazePoint, cfg *HeatmapConfig) string {
 
 	// Build SVG
 	var svg strings.Builder
-	svg.WriteString(fmt.Sprintf(
+	fmt.Fprintf(&svg,
 		`<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d">`,
 		cfg.Width, cfg.Height, cfg.Width, cfg.Height,
-	))
+	)
 	svg.WriteString("\n")
 
 	// Background
-	svg.WriteString(fmt.Sprintf(
+	fmt.Fprintf(&svg,
 		`<rect width="%d" height="%d" fill="#1a1a2e"/>`,
 		cfg.Width, cfg.Height,
-	))
+	)
 	svg.WriteString("\n")
 
 	// Radial gradient definition
 	svg.WriteString(`<defs>`)
-	svg.WriteString(fmt.Sprintf(
-		`<radialGradient id="hg"><stop offset="0%%" stop-color="#ff0000" stop-opacity="1"/>`+
-			`<stop offset="30%%" stop-color="#ffaa00" stop-opacity="0.8"/>`+
-			`<stop offset="60%%" stop-color="#ffff00" stop-opacity="0.4"/>`+
+	svg.WriteString(
+		`<radialGradient id="hg"><stop offset="0%%" stop-color="#ff0000" stop-opacity="1"/>` +
+			`<stop offset="30%%" stop-color="#ffaa00" stop-opacity="0.8"/>` +
+			`<stop offset="60%%" stop-color="#ffff00" stop-opacity="0.4"/>` +
 			`<stop offset="100%%" stop-color="#00ff00" stop-opacity="0"/></radialGradient>`,
-	))
+	)
 	svg.WriteString(`</defs>`)
 	svg.WriteString("\n")
 
@@ -142,34 +142,34 @@ func GenerateGazeHeatmapSVG(points []GazePoint, cfg *HeatmapConfig) string {
 			cy := gy*cfg.CellSize + cfg.CellSize/2
 			r := int(float64(cfg.Radius) * (0.5 + norm*0.5))
 
-			svg.WriteString(fmt.Sprintf(
+			fmt.Fprintf(&svg,
 				`<circle cx="%d" cy="%d" r="%d" fill="url(#hg)" opacity="%.2f"/>`,
 				cx, cy, r, opacity,
-			))
+			)
 			svg.WriteString("\n")
 		}
 	}
 
 	// Grid labels: "Центр", "Лево", "Право"
 	labelStyle := `font-family="Arial,sans-serif" font-size="11" fill="#ffffff" opacity="0.4"`
-	svg.WriteString(fmt.Sprintf(
+	fmt.Fprintf(&svg,
 		`<text x="%d" y="%d" text-anchor="middle" %s>Центр</text>`,
 		cfg.Width/2, cfg.Height-8, labelStyle,
-	))
-	svg.WriteString(fmt.Sprintf(
+	)
+	fmt.Fprintf(&svg,
 		`<text x="8" y="%d" %s>Лево</text>`,
 		cfg.Height/2, labelStyle,
-	))
-	svg.WriteString(fmt.Sprintf(
+	)
+	fmt.Fprintf(&svg,
 		`<text x="%d" y="%d" text-anchor="end" %s>Право</text>`,
 		cfg.Width-8, cfg.Height/2, labelStyle,
-	))
+	)
 
 	// Border
-	svg.WriteString(fmt.Sprintf(
+	fmt.Fprintf(&svg,
 		`<rect width="%d" height="%d" fill="none" stroke="#333" stroke-width="1"/>`,
 		cfg.Width, cfg.Height,
-	))
+	)
 
 	svg.WriteString("\n</svg>")
 	return svg.String()

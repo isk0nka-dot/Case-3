@@ -227,7 +227,7 @@ func (v *Verifier) querySessionFragments(ctx context.Context, sessionID string) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []evidenceRow
 	for rows.Next() {
