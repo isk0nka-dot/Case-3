@@ -202,7 +202,7 @@ ORDER BY (org_id, exam_id, session_id, server_timestamp)
 -- ClickHouse provides 90 days of historical query capability.
 -- For compliance requirements >90 days, configure S3/GCS cold storage
 -- with ALTER TABLE MODIFY TTL ... TO DISK 'cold_storage'.
-TTL server_timestamp + INTERVAL 90 DAY
+TTL toDateTime(server_timestamp) + INTERVAL 90 DAY
 
 SETTINGS
     -- Sparse index granularity. 8192 rows between consecutive index marks.
@@ -263,7 +263,7 @@ CREATE TABLE IF NOT EXISTS session_event_counts
 ENGINE = SummingMergeTree(count)
 PARTITION BY toYYYYMM(last_seen)
 ORDER BY (org_id, exam_id, session_id, event_type, severity)
-TTL last_seen + INTERVAL 90 DAY;
+TTL toDateTime(last_seen) + INTERVAL 90 DAY;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS session_event_counts_mv
 TO session_event_counts
@@ -380,7 +380,7 @@ CREATE TABLE IF NOT EXISTS critical_events_recent
 ENGINE = MergeTree
 PARTITION BY toYYYYMMDD(server_timestamp)
 ORDER BY (org_id, exam_id, server_timestamp)
-TTL server_timestamp + INTERVAL 7 DAY
+TTL toDateTime(server_timestamp) + INTERVAL 7 DAY
 SETTINGS index_granularity = 4096;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS critical_events_recent_mv
@@ -438,7 +438,7 @@ CREATE TABLE IF NOT EXISTS student_session_summary
 ENGINE = SummingMergeTree((total_events, critical_count, warning_count, info_count))
 PARTITION BY toYYYYMM(last_event_time)
 ORDER BY (org_id, exam_id, student_id, session_id)
-TTL last_event_time + INTERVAL 90 DAY;
+TTL toDateTime(last_event_time) + INTERVAL 90 DAY;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS student_session_summary_mv
 TO student_session_summary
@@ -593,7 +593,7 @@ CREATE TABLE IF NOT EXISTS evidence_fragments
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(uploaded_at)
 ORDER BY (org_id, session_id, uploaded_at)
-TTL uploaded_at + INTERVAL 730 DAY
+TTL toDateTime(uploaded_at) + INTERVAL 730 DAY
 SETTINGS index_granularity = 8192;
 
 
