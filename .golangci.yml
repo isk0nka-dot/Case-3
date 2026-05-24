@@ -4,6 +4,7 @@
 version: "2"
 
 run:
+  concurrency: 1
   timeout: 5m
   issues-exit-code: 1
 
