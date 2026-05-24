@@ -128,18 +128,19 @@ run-migrations:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 # ── Stage: deploy ────────────────────────────────────────────────────────────
-# Syncs Argus+Webizon compose stack, verifies secrets/models/certs,
-# pulls registry images, and starts containers with docker compose --wait.
+# Restarts only Argus app containers (app, worker, inference, ai-sidecar).
+# Does NOT rebuild images — rebuilding is handled by argus-backend pipeline.
+# Does NOT touch Webizon.
 
-deploy-argus-webizon:
+deploy-argus:
   stage: deploy
   image: alpine:3.20
-  timeout: 30 minutes
+  timeout: 10 minutes
   needs: [run-migrations]
   before_script:
-    - apk add --no-cache openssh-client rsync
+    - apk add --no-cache openssh-client
   script:
-    - sh ci/scripts/deploy_argus_webizon.sh
+    - sh ci/scripts/deploy_argus.sh
   environment:
     name: production
     url: https://argusai.kz
