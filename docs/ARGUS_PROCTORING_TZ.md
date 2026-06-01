@@ -1,8 +1,21 @@
 # Техническое задание: ARGUS AI Proctoring
 
 **Дата:** 2026-06-01  
-**Статус:** архитектурная спецификация перед финальной реализацией и production hardening  
+**Статус:** объединенная продуктово-архитектурная спецификация перед финальной реализацией и production hardening
 **Область:** ARGUS AI proctoring platform, без деплоя на сервер в рамках этого документа
+
+## 0. Architectural Decision and Conflict Resolution
+
+Этот документ является авторитетной объединенной спецификацией для текущей итерации ARGUS AI.
+
+Ранее в продуктовых требованиях были одновременно описаны browser-only MVP, Desktop Agent, Chrome Extension и Mobile Side-Camera. Это создает конфликт при реализации: browser-only режим можно довести до production быстрее, а desktop/mobile контуры требуют отдельного security, installer, device support и support-процесса.
+
+Решение:
+
+- текущая production-итерация фокусируется на Web-mode: Student Exam Shell, PreExamCheck, MediaPipe/Web Audio, async backend AI, review workflow, external API и selective recording;
+- Desktop Agent, Chrome Extension и Mobile Side-Camera фиксируются как Strict Mode roadmap, но не блокируют browser MVP;
+- все места в UI и документации, где заявляется OS-level lockdown, remote access blocking или process scanning, должны явно помечаться как доступные только в Strict Mode с desktop/extension компонентом;
+- backend и storage должны проектироваться так, чтобы Strict Mode события можно было добавить позже без изменения текущих event/result контрактов.
 
 ## 1. Цель
 
@@ -41,6 +54,7 @@ Reference links:
 
 Backend:
 
+- Go module targets Go `1.26`; the backend uses Clean Architecture style with REST/gRPC ingestion, PostgreSQL transactions, ClickHouse analytics, MinIO evidence storage, Redis/Asynq background jobs, Kafka/outbox event distribution, and a separate Go inference gateway.
 - `AI_ARCHITECTURE.md` описывает текущий AI pipeline: Nuxt MediaPipe/Web Audio, Go inference gateway, Python ONNX sidecar, ClickHouse event mapping.
 - `DEVELOPER_GUIDE.md` фиксирует модельные файлы, env/config mapping, тесты, Docker sidecar, fail-fast правила.
 - `cmd/inference/main.go` содержит inference gateway с `stub` только при `allow_stub=true` и production path через `python_bridge`.
@@ -73,6 +87,14 @@ Infrastructure/CI:
 - Нужна production policy по retention: сколько хранить raw evidence, recordings, ClickHouse events, review decisions.
 - Нужен dashboard checklist для операторов: как понять, что inference degraded, queue saturated, ClickHouse unavailable или model missing.
 
+### 3.3 Критические пробелы ближайшей реализации
+
+1. **Student Exam Shell.** Нужна выделенная экзаменационная оболочка студента: consent, hard preflight, fullscreen policy, network tier, exam iframe/container, warning banners, graceful degraded state.
+2. **SDK contract synchronization.** External API, frontend SDK examples and backend contracts must use one canonical session/event/result schema.
+3. **Mock/UI cleanup.** Frontend operator pages must clearly separate production-backed screens from marketing/demo/mock screens.
+4. **LMS connector baseline.** External integration must first stabilize generic API + webhook contract, then EDUSER/Moodle/LTI adapters can be added without changing core session semantics.
+5. **Operational safety.** Inference queue overload, missing models, ClickHouse outage and recording errors must degrade the monitoring signal, not the student exam session.
+
 ## 4. Product Scope
 
 ### 4.1 In Scope для ARGUS v1
@@ -93,7 +115,16 @@ Infrastructure/CI:
 - Continuous frame extraction from full exam videos.
 - Automatic exam invalidation without review policy.
 - Raw microphone stream storage by default.
+- Desktop Agent, Chrome Extension and Mobile Side-Camera in the current browser MVP. They are planned for Strict Mode after the web baseline is stable.
 - Kubernetes migration before Docker Compose production baseline is stable.
+
+### 4.3 Control Modes
+
+| Mode | Scope | Guarantees | Current priority |
+| --- | --- | --- | --- |
+| Web Mode | Browser-only student shell with MediaPipe/Web Audio, visibility/fullscreen, camera/microphone checks, async backend AI | Fastest production path; cannot enforce OS-level process blocking | Primary |
+| Connector Mode | LMS/OES integration through External API, SDK and webhooks | Lets partners launch sessions and receive verdicts without embedding internal UI | Primary |
+| Strict Mode | Desktop Agent, Chrome Extension, Mobile Side-Camera | Enables OS/process checks, stronger lockdown and second-camera workspace evidence | Later phase |
 
 ## 5. Roles
 
@@ -308,6 +339,20 @@ Recording path pattern:
 content/recordings/{roomName}/{sessionId}-{studentId}.mp4
 ```
 
+### Data Retention Policy
+
+Default retention must be explicit and configurable per contract:
+
+| Data | Default retention | Notes |
+| --- | --- | --- |
+| Raw structured events | 90 days | ClickHouse TTL can enforce cleanup |
+| Video/audio evidence fragments | 180 days | Can be extended to 365 days by contract |
+| Review decisions and verdict metadata | 3 years | Transactional/audit records |
+| Admin/proctor audit logs | 1-3 years | Depends on organization policy |
+| Model artifacts | Until replaced | Keep version/hash manifest for reproducibility |
+
+Destructive privacy requests must be implemented as a controlled retention workflow. Where evidence cannot be physically deleted immediately because of legal/audit hold, access must be revoked and the hold reason must be auditable.
+
 ## 12. External Integration
 
 ARGUS external API must support:
@@ -427,6 +472,20 @@ The release is not production-ready until this full flow passes:
 8. Submit review decision.
 9. Verify external result/webhook.
 
+### Beta Release Acceptance Criteria
+
+The browser MVP can be called beta-ready only when all criteria below pass on staging:
+
+1. External API creates a session using organization API credentials.
+2. Student opens launch URL, accepts consent and completes PreExamCheck.
+3. Student starts the exam inside the Student Exam Shell without direct dependency on ONNX inference.
+4. MediaPipe/Web Audio events are visible in ClickHouse and in the review timeline.
+5. At least one backend AI analysis job runs through worker -> inference gateway -> Python sidecar -> ClickHouse event.
+6. Proctor sees incidents, evidence metadata and confidence values in Review Panel.
+7. Proctor submits final verdict.
+8. External platform receives or fetches signed final result.
+9. A staging load scenario of 100 concurrent browser sessions does not break session heartbeats or transactional APIs.
+
 ## 17. Production Readiness Checklist
 
 Required before server rollout:
@@ -447,52 +506,78 @@ Required before server rollout:
 
 ## 18. Implementation Roadmap
 
-### Phase 0: Repository and CI baseline
+### Phase 0: Inventory and Contract Freeze
 
-Goal: keep GitLab as single source of truth.
+Goal: freeze the product and API baseline before adding more detectors.
 
 Deliverables:
 
 - clean repo status for backend/frontend/infra;
 - CI pipeline green without server deploy dependency;
 - documented env and model requirements;
-- known issue for infra line-ending normalization closed with a separate docs/ci commit if needed.
-
-### Phase 1: Product contract freeze
-
-Goal: lock the proctoring event taxonomy and review policy before adding more detectors.
-
-Deliverables:
-
+- frontend audit separating production-backed operator pages from demo/mock screens;
 - canonical event severity matrix;
 - final review verdict enum;
-- external webhook result schema;
-- acceptance tests for API compatibility.
+- external session/result/webhook schema;
+- model delivery policy for `models/yolov8n.onnx` and `models/arcface.onnx` with SHA256 checks;
+- `MODEL_FAIL_FAST=true` in production and `allow_stub=true` only in local dev configs.
 
-### Phase 2: Real model smoke path
+### Phase 1: Browser MVP and Proctor Console
 
-Goal: verify real YOLO/ArcFace models in sandbox.
+Goal: ship the web-only proctoring baseline that can run real exams without desktop dependencies.
 
 Deliverables:
 
-- private artifact delivery or mounted `models/`;
-- model hash checks;
-- sidecar startup smoke test;
+- Student Exam Shell with consent, PreExamCheck, fullscreen policy, network tier and exam container/iframe;
+- face enrollment capture suitable for ArcFace reference generation;
+- structured browser events through the existing `sendEvent` / gRPC-Web pipeline;
+- Proctor Live Grid supporting risk-based sorting, active incident indicators and session detail drill-down;
+- Review Panel connected to real backend/archive data rather than only mock timelines;
+- selective LiveKit Egress recording around critical event windows;
+- warning/terminate commands modeled as explicit proctor actions with audit entries.
+
+### Phase 2: Deep AI and Identity Verification
+
+Goal: verify real YOLO/ArcFace models in sandbox and connect backend AI results to review.
+
+Deliverables:
+
+- private artifact delivery or mounted `/models` directory;
+- model hash checks and sidecar startup smoke test;
 - one backend frame analysis test with real weights;
-- thresholds calibrated for low false-positive mode.
+- ArcFace identity comparison against trusted reference embedding;
+- dynamic face recheck events during exam;
+- YOLO object detection for `cell phone` and policy-controlled objects;
+- backend audio bridge producing ClickHouse-only `audio_anomaly` from structured RMS/VAD telemetry;
+- thresholds calibrated for low false-positive mode and configurable per org/exam.
 
-### Phase 3: End-to-end proctoring flow
+### Phase 3: LMS/OES Connectors
 
-Goal: prove full session lifecycle.
+Goal: let external platforms create sessions and receive signed final results.
 
 Deliverables:
 
-- E2E script or Playwright flow for external session -> precheck -> events -> review -> result;
-- ClickHouse event assertions;
-- MinIO evidence assertions;
-- review decision assertions.
+- EDUSER native connector as the first partner integration;
+- Moodle plugin or documented Moodle launch flow;
+- LTI 1.3 connector design and first implementation slice;
+- bidirectional lifecycle: LMS creates session -> ARGUS returns `sessionId` and launch/SDK URL -> ARGUS returns final verdict;
+- webhook retry/DLQ behavior documented and tested;
+- compatibility tests proving new AI events do not break external result schema.
 
-### Phase 4: Production deploy hardening
+### Phase 4: Strict Mode
+
+Goal: add stronger control surfaces after browser MVP stability is proven.
+
+Deliverables:
+
+- `argus-desktop-agent` design for Windows 10/11 and Ubuntu Linux;
+- process/remote-access/VM checks routed as structured events, not privileged backend calls;
+- hardware fingerprint policy with privacy review;
+- Chrome Extension scope decision for browser lockdown improvements;
+- Mobile Side-Camera QR pairing and LiveKit stream flow;
+- clear fallback when Strict Mode client is not installed or not trusted.
+
+### Phase 5: Production Deploy Hardening
 
 Goal: safe rollout after server baseline is ready.
 
@@ -501,8 +586,9 @@ Deliverables:
 - Docker compose with resource limits and isolated networks;
 - reverse proxy and TLS;
 - model mount;
-- backup scripts;
-- health dashboards;
+- Redis persistence for Asynq;
+- backup scripts for PostgreSQL and ClickHouse;
+- health dashboards for queue depth, sidecar health, ClickHouse writes, recording callbacks and DLQ;
 - rollback command set.
 
 ## 19. Current Decision
