@@ -264,7 +264,13 @@
       })
       .catch(function (err) {
         logError('mount failed:', err && err.message ? err.message : err);
-        if (typeof self.config.onError === 'function') self.config.onError(err);
+        // Show user-friendly overlay for known errors
+        if (err && err.code === 'SESSION_EXPIRED') {
+          self._showError(err.userMessage || 'Сессия истекла. Обновите страницу.');
+        }
+        if (typeof self.config.onError === 'function') {
+          self.config.onError({ message: err && err.message, code: err && err.code, userMessage: err && err.userMessage });
+        }
       });
   };
 
@@ -314,6 +320,12 @@
     log('Requesting student token...');
     return apiFetch(cfg.apiUrl + '/api/v1/external/sessions/' + cfg.sessionId + '/student-token', cfg.token)
       .then(function (r) {
+        if (r.status === 401) {
+          var err = new Error('SESSION_EXPIRED');
+          err.code = 'SESSION_EXPIRED';
+          err.userMessage = 'Сессия истекла. Обновите страницу или обратитесь к преподавателю.';
+          throw err;
+        }
         if (!r.ok) return r.text().then(function (b) { throw new Error('student-token HTTP ' + r.status + ': ' + b); });
         return r.json();
       });
@@ -484,6 +496,20 @@
 
   ArgusProctoring.prototype._stopHeartbeat = function () {
     if (this._heartbeatTimer) { clearInterval(this._heartbeatTimer); this._heartbeatTimer = null; }
+  };
+
+  ArgusProctoring.prototype._showError = function (msg) {
+    if (document.getElementById('argus-error-overlay')) return;
+    var el = document.createElement('div');
+    el.id = 'argus-error-overlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(10,15,25,0.97);z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;';
+    el.innerHTML = '<div style="text-align:center;padding:32px;max-width:400px;">' +
+      '<div style="font-size:48px;margin-bottom:16px;">⚠️</div>' +
+      '<h2 style="color:#fff;margin:0 0 12px;font-size:20px;">Ошибка прокторинга</h2>' +
+      '<p style="color:#94a3b8;font-size:15px;margin:0 0 24px;">' + msg + '</p>' +
+      '<button onclick="location.reload()" style="padding:12px 24px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;">Обновить страницу</button>' +
+      '</div>';
+    document.body.appendChild(el);
   };
 
   // ─── Destroy ──────────────────────────────────────────────────────────────────
