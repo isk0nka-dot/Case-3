@@ -31,11 +31,11 @@ func TestLTIJWKToRSAPublicKey(t *testing.T) {
 		t.Fatalf("generate key: %v", err)
 	}
 
-	exponentBytes := big.NewInt(int64(privateKey.PublicKey.E)).Bytes()
+	exponentBytes := big.NewInt(int64(privateKey.E)).Bytes()
 	jwk := ltiJWK{
 		Kty: "RSA",
 		Kid: "lms-key-1",
-		N:   base64.RawURLEncoding.EncodeToString(privateKey.PublicKey.N.Bytes()),
+		N:   base64.RawURLEncoding.EncodeToString(privateKey.N.Bytes()),
 		E:   base64.RawURLEncoding.EncodeToString(exponentBytes),
 	}
 
@@ -44,10 +44,10 @@ func TestLTIJWKToRSAPublicKey(t *testing.T) {
 		t.Fatalf("convert jwk: %v", err)
 	}
 
-	if publicKey.E != privateKey.PublicKey.E {
-		t.Fatalf("exponent = %d, want %d", publicKey.E, privateKey.PublicKey.E)
+	if publicKey.E != privateKey.E {
+		t.Fatalf("exponent = %d, want %d", publicKey.E, privateKey.E)
 	}
-	if publicKey.N.Cmp(privateKey.PublicKey.N) != 0 {
+	if publicKey.N.Cmp(privateKey.N) != 0 {
 		t.Fatal("modulus mismatch")
 	}
 }

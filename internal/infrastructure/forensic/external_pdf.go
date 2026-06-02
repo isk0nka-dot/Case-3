@@ -343,11 +343,5 @@ func truncateStr(s string, n int) string {
 	return s
 }
 
-// externalReportHash returns the SHA-256 hex hash of the PDF bytes.
-func externalReportHash(data []byte) string {
-	h := sha256.Sum256(data)
-	return fmt.Sprintf("%x", h[:])
-}
-
 // ensure unused import doesn't fail
 var _ = bytes.NewBuffer
