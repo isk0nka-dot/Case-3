@@ -1625,6 +1625,22 @@ func (r *Repository) UpdateExternalSessionStatus(ctx context.Context, sessionID,
 	return err
 }
 
+func (r *Repository) TouchExternalSession(ctx context.Context, sessionID string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE external_sessions SET updated_at = NOW() WHERE session_id = $1 AND status NOT IN ('completed','cancelled','expired')`,
+		sessionID,
+	)
+	return err
+}
+
+func (r *Repository) ActivateExternalSession(ctx context.Context, sessionID string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE external_sessions SET status = 'active', started_at = COALESCE(started_at, NOW()), updated_at = NOW() WHERE session_id = $1 AND status = 'created'`,
+		sessionID,
+	)
+	return err
+}
+
 func (r *Repository) ListExternalSessionsByResult(ctx context.Context, examID, studentID string) ([]*entity.ExternalSession, error) {
 	query := `
 		SELECT id, session_id, org_id, exam_id, student_id, student_name, exam_name,

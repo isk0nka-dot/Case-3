@@ -155,6 +155,9 @@ func (h *ExternalHandler) RegisterRoutes(mux *http.ServeMux) {
 	// Event ingestion (proctoring session JWT auth) — for SDK / test clients.
 	mux.HandleFunc("POST /api/v1/external/events", h.requireSessionToken(h.handleIngestEvents))
 
+	// Session heartbeat — keeps session alive, marks session as active on first call.
+	mux.HandleFunc("POST /api/v1/external/heartbeat", h.requireSessionToken(h.handleHeartbeat))
+
 	// LiveKit student token (proctoring session JWT auth) — SDK calls this to publish camera.
 	mux.HandleFunc("POST /api/v1/external/sessions/{sessionId}/student-token", h.requireSessionToken(h.handleStudentMediaToken))
 	// Recording-ready signal — SDK calls this after student successfully joins LiveKit room.
@@ -339,9 +342,9 @@ func (h *ExternalHandler) handleCreateSession(w http.ResponseWriter, r *http.Req
 	// Generate unique session ID.
 	sessionID := generateSessionID()
 
-	// Token duration: default 4 hours, or custom if provided.
-	durationMin := 240
-	if req.DurationMin > 0 && req.DurationMin <= 480 {
+	// Token duration: default 24 hours, or custom if provided (max 48h).
+	durationMin := 1440
+	if req.DurationMin > 0 && req.DurationMin <= 2880 {
 		durationMin = req.DurationMin
 	}
 	tokenExpiry := time.Now().Add(time.Duration(durationMin) * time.Minute)
@@ -1985,4 +1988,33 @@ func (h *ExternalHandler) queryExternalReportRecordings(ctx context.Context, ses
 		recordings = append(recordings, rec)
 	}
 	return recordings, rows.Err()
+}
+
+// ==========================================================================
+// Session Heartbeat
+// ==========================================================================
+
+// handleHeartbeat keeps an external proctoring session alive and transitions
+// it from "created" → "active" on the first call (student has opened the exam page).
+func (h *ExternalHandler) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		h.jsonError(w, "missing session claims", http.StatusUnauthorized)
+		return
+	}
+
+	ctx := r.Context()
+
+	// Transition created → active on first heartbeat.
+	_ = h.repo.ActivateExternalSession(ctx, claims.SessionID)
+
+	// Update updated_at so monitoring can detect live sessions.
+	_ = h.repo.TouchExternalSession(ctx, claims.SessionID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"status":    "ok",
+		"sessionId": claims.SessionID,
+	})
 }
