@@ -116,7 +116,7 @@ sudo nginx -t
 sudo nginx -s reload
 
 echo "Restarting Argus app services (no rebuild)..."
-compose up -d --no-build --remove-orphans app worker inference ai-sidecar
+compose up -d --no-build app worker inference ai-sidecar livekit livekit-egress
 
 echo "Waiting for backend health..."
 for i in $(seq 1 20); do
