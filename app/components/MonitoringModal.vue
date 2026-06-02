@@ -358,6 +358,7 @@ const { noiseLevelColor, noiseLevelLabel } = useStatusHelpers()
 
 // Determine live or recorded status
 const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? true)
+const sessionEvents = computed(() => props.session?.events ?? [])
 </script>
 
 <template>
@@ -861,7 +862,7 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                       class="text-[10px] font-medium px-2 py-0.5 rounded-full"
                       :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }"
                     >
-                      {{ session.events.length }} событий
+                      {{ sessionEvents.length }} событий
                     </span>
                   </div>
 
@@ -964,11 +965,11 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                 <!-- Timeline -->
                 <div class="flex-1 overflow-y-auto">
                   <div
-                    v-if="session.events.length > 0"
+                    v-if="sessionEvents.length > 0"
                     class="px-5 py-3 space-y-0"
                   >
                     <div
-                      v-for="(event, idx) in session.events"
+                      v-for="(event, idx) in sessionEvents"
                       :key="event.id"
                       class="relative flex gap-3 pb-4"
                     >
@@ -987,7 +988,7 @@ const sessionIsLive = computed(() => props.isLive ?? props.session?.isOnline ?? 
                           />
                         </div>
                         <div
-                          v-if="idx < session.events.length - 1"
+                          v-if="idx < sessionEvents.length - 1"
                           class="w-px flex-1 mt-1"
                           style="background: var(--argus-border);"
                         />

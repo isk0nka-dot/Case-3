@@ -109,6 +109,9 @@ const seekPosition = ref(0)
 const isPlaying = ref(false)
 const videoUrl = ref<string | null>(null)
 const videoRef = ref<HTMLVideoElement | null>(null)
+const currentTimeSec = ref(0)
+const videoDurationSec = ref(0)
+const videoLoadError = ref('')
 
 async function openArchiveSession(session: ArchiveSession) {
   expandedArchive.value = session
@@ -122,6 +125,9 @@ async function openArchiveSession(session: ArchiveSession) {
   audioSyncActive.value = false
   highlightedCamera.value = null
   videoUrl.value = null
+  currentTimeSec.value = 0
+  videoDurationSec.value = 0
+  videoLoadError.value = ''
 
   // Fetch events from API if not already loaded
   if (!session.events || session.events.length === 0) {
@@ -153,19 +159,25 @@ function closeArchiveSession() {
 
 // Camera highlight on event seek
 const highlightedCamera = ref<'webcam' | 'side' | null>(null)
+const archiveEvents = computed(() => expandedArchive.value?.events ?? [])
 
 // Compute the total duration of the current session in seconds
 const sessionDurationSec = computed(() => {
-  if (!expandedArchive.value) return 3600 // default 1 hour
-  const events = expandedArchive.value.events
-  if (events.length === 0) return 3600
-  const maxVideoTs = Math.max(...events.map(e => e.videoTimestamp))
-  return Math.max(maxVideoTs + 60, 300) // at least 5 minutes, pad by 60s
+  if (Number.isFinite(videoDurationSec.value) && videoDurationSec.value > 0) {
+    return videoDurationSec.value
+  }
+  const maxVideoTs = Math.max(0, ...archiveEvents.value.map(e => Number(e.videoTimestamp) || 0))
+  return maxVideoTs > 0 ? Math.max(maxVideoTs + 5, 10) : 10
 })
 
 function seekToEvent(videoTimestamp: number, eventSource?: string) {
-  if (!expandedArchive.value) return
-  seekPosition.value = Math.min(100, (videoTimestamp / sessionDurationSec.value) * 100)
+  const targetTime = Math.max(0, Math.min(Number(videoTimestamp) || 0, sessionDurationSec.value))
+  currentTimeSec.value = targetTime
+  seekPosition.value = sessionDurationSec.value > 0 ? Math.min(100, (targetTime / sessionDurationSec.value) * 100) : 0
+  if (videoRef.value) {
+    videoRef.value.currentTime = targetTime
+    videoRef.value.play().catch(() => {})
+  }
   // Flash audio sync indicator
   audioSyncActive.value = true
   setTimeout(() => { audioSyncActive.value = false }, 1500)
@@ -176,6 +188,43 @@ function seekToEvent(videoTimestamp: number, eventSource?: string) {
   } else {
     highlightedCamera.value = null
   }
+}
+
+function handleVideoLoadedMetadata() {
+  if (!videoRef.value) return
+  const duration = videoRef.value.duration
+  videoDurationSec.value = Number.isFinite(duration) && duration > 0 ? duration : 0
+  currentTimeSec.value = videoRef.value.currentTime || 0
+  seekPosition.value = sessionDurationSec.value > 0 ? (currentTimeSec.value / sessionDurationSec.value) * 100 : 0
+}
+
+function handleVideoTimeUpdate() {
+  if (!videoRef.value) return
+  currentTimeSec.value = videoRef.value.currentTime || 0
+  seekPosition.value = sessionDurationSec.value > 0 ? (currentTimeSec.value / sessionDurationSec.value) * 100 : 0
+}
+
+function handleSeekInput() {
+  const targetTime = sessionDurationSec.value * (seekPosition.value / 100)
+  currentTimeSec.value = Number.isFinite(targetTime) ? targetTime : 0
+  if (videoRef.value) {
+    videoRef.value.currentTime = currentTimeSec.value
+  }
+}
+
+function skipRecording(deltaSec: number) {
+  const targetTime = Math.max(0, Math.min(currentTimeSec.value + deltaSec, sessionDurationSec.value))
+  currentTimeSec.value = targetTime
+  seekPosition.value = sessionDurationSec.value > 0 ? (targetTime / sessionDurationSec.value) * 100 : 0
+  if (videoRef.value) {
+    videoRef.value.currentTime = targetTime
+  }
+}
+
+function handleVideoError() {
+  videoLoadError.value = 'Запись ещё обрабатывается или видео недоступно'
+  videoUrl.value = null
+  isPlaying.value = false
 }
 
 function togglePlayback() {
@@ -1026,10 +1075,11 @@ onUnmounted(() => {
                         class="absolute inset-0 w-full h-full object-cover"
                         :muted="isMuted"
                         preload="metadata"
-                        @timeupdate="seekPosition = videoRef?.duration ? (videoRef.currentTime / videoRef.duration) * 100 : 0"
+                        @loadedmetadata="handleVideoLoadedMetadata"
+                        @timeupdate="handleVideoTimeUpdate"
                         @play="isPlaying = true"
                         @pause="isPlaying = false"
-                        @error="videoUrl = null"
+                        @error="handleVideoError"
                       />
                       <!-- Placeholder when no recording -->
                       <div v-else class="absolute inset-0 flex items-center justify-center">
@@ -1042,7 +1092,7 @@ onUnmounted(() => {
                           <span
                             class="text-xs font-medium"
                             style="color: var(--argus-text-dimmed);"
-                          >{{ camerasSwapped ? 'БОКОВАЯ КАМЕРА' : 'ЗАПИСЬ ВЕБ-КАМЕРЫ' }}</span>
+                          >{{ videoLoadError || (camerasSwapped ? 'БОКОВАЯ КАМЕРА' : 'ЗАПИСЬ ВЕБ-КАМЕРЫ') }}</span>
                         </div>
                       </div>
 
@@ -1062,15 +1112,16 @@ onUnmounted(() => {
                             :style="{
                               background: `linear-gradient(to right, var(--argus-accent) ${seekPosition}%, rgba(255,255,255,0.15) ${seekPosition}%)`
                             }"
+                            @input="handleSeekInput"
                           >
                           <!-- Event markers on seekbar -->
                           <div class="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 pointer-events-none">
                             <div
-                              v-for="event in expandedArchive.events"
+                              v-for="event in archiveEvents"
                               :key="event.id + '-marker'"
                               class="absolute top-0 w-1 h-full rounded-full"
                               :style="{
-                                left: `${Math.min(100, (event.videoTimestamp / sessionDurationSec) * 100)}%`,
+                                left: `${Math.min(100, ((Number(event.videoTimestamp) || 0) / sessionDurationSec) * 100)}%`,
                                 background: severityColor(event.severity),
                                 opacity: 0.8
                               }"
@@ -1094,6 +1145,7 @@ onUnmounted(() => {
                             <button
                               class="flex items-center justify-center size-7 rounded-md transition-all"
                               style="color: rgba(255,255,255,0.7);"
+                              @click="skipRecording(-5)"
                             >
                               <UIcon
                                 name="i-lucide-skip-back"
@@ -1103,6 +1155,7 @@ onUnmounted(() => {
                             <button
                               class="flex items-center justify-center size-7 rounded-md transition-all"
                               style="color: rgba(255,255,255,0.7);"
+                              @click="skipRecording(5)"
                             >
                               <UIcon
                                 name="i-lucide-skip-forward"
@@ -1110,7 +1163,7 @@ onUnmounted(() => {
                               />
                             </button>
                             <span class="text-[10px] font-mono text-white/60 ml-1">
-                              {{ formatVideoTimestamp(Math.floor(seekPosition / 100 * sessionDurationSec)) }} / {{ expandedArchive.duration }}
+                              {{ formatVideoTimestamp(Math.floor(currentTimeSec)) }} / {{ formatVideoTimestamp(Math.floor(sessionDurationSec)) }}
                             </span>
                           </div>
                           <div class="flex items-center gap-1">
@@ -1474,9 +1527,9 @@ onUnmounted(() => {
                       </div>
                       <span
                         class="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                        :style="{ background: expandedArchive.events.length > 3 ? errorBg(0.1) : accentBg(0.1), color: expandedArchive.events.length > 3 ? 'var(--argus-error)' : 'var(--argus-accent)' }"
+                        :style="{ background: archiveEvents.length > 3 ? errorBg(0.1) : accentBg(0.1), color: archiveEvents.length > 3 ? 'var(--argus-error)' : 'var(--argus-accent)' }"
                       >
-                        {{ expandedArchive.events.length }} событий
+                        {{ archiveEvents.length }} событий
                       </span>
                     </div>
                     <!-- Camera source summary -->
@@ -1489,7 +1542,7 @@ onUnmounted(() => {
                           name="i-lucide-video"
                           class="size-2.5"
                         />
-                        {{ expandedArchive.events.filter(e => e.source === 'webcam').length }} веб
+                        {{ archiveEvents.filter(e => e.source === 'webcam').length }} веб
                       </span>
                       <span
                         class="inline-flex items-center gap-1 text-[8px] font-medium px-1.5 py-0.5 rounded"
@@ -1499,7 +1552,7 @@ onUnmounted(() => {
                           name="i-lucide-camera"
                           class="size-2.5"
                         />
-                        {{ expandedArchive.events.filter(e => e.source === 'side').length }} бок.
+                        {{ archiveEvents.filter(e => e.source === 'side').length }} бок.
                       </span>
                       <span
                         class="inline-flex items-center gap-1 text-[8px] font-medium px-1.5 py-0.5 rounded"
@@ -1509,7 +1562,7 @@ onUnmounted(() => {
                           name="i-lucide-monitor"
                           class="size-2.5"
                         />
-                        {{ expandedArchive.events.filter(e => e.source === 'system').length }} сист.
+                        {{ archiveEvents.filter(e => e.source === 'system').length }} сист.
                       </span>
                     </div>
                     <!-- Stream sync indicator -->
@@ -1557,11 +1610,11 @@ onUnmounted(() => {
                       </p>
                     </div>
                     <div
-                      v-else-if="expandedArchive.events.length > 0"
+                      v-else-if="archiveEvents.length > 0"
                       class="px-5 py-3 space-y-0"
                     >
                       <div
-                        v-for="(event, idx) in expandedArchive.events"
+                        v-for="(event, idx) in archiveEvents"
                         :key="event.id"
                         class="relative flex gap-3 pb-4"
                       >
@@ -1580,7 +1633,7 @@ onUnmounted(() => {
                             />
                           </div>
                           <div
-                            v-if="idx < expandedArchive.events.length - 1"
+                            v-if="idx < archiveEvents.length - 1"
                             class="w-px flex-1 mt-1"
                             style="background: var(--argus-border);"
                           />
