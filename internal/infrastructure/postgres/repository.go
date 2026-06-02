@@ -173,9 +173,9 @@ func (r *Repository) CreateRecording(ctx context.Context, rec *entity.Recording)
 	query := `
 		INSERT INTO livekit_recordings (
 			egress_id, session_id, user_id, room_name,
-			video_track_id, audio_track_id, status
+			video_track_id, audio_track_id, status, file_url, error_message
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (egress_id) DO UPDATE SET
 			session_id = EXCLUDED.session_id,
 			user_id = EXCLUDED.user_id,
@@ -183,6 +183,8 @@ func (r *Repository) CreateRecording(ctx context.Context, rec *entity.Recording)
 			video_track_id = EXCLUDED.video_track_id,
 			audio_track_id = EXCLUDED.audio_track_id,
 			status = EXCLUDED.status,
+			file_url = COALESCE(NULLIF(EXCLUDED.file_url, ''), livekit_recordings.file_url),
+			error_message = COALESCE(NULLIF(EXCLUDED.error_message, ''), livekit_recordings.error_message),
 			updated_at = NOW()
 		RETURNING started_at, created_at, updated_at`
 
@@ -194,6 +196,8 @@ func (r *Repository) CreateRecording(ctx context.Context, rec *entity.Recording)
 		rec.VideoTrackID,
 		rec.AudioTrackID,
 		rec.Status,
+		rec.FileURL,
+		rec.ErrorMessage,
 	).Scan(&rec.StartedAt, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
 		return fmt.Errorf("postgres: create livekit recording: %w", err)
 	}

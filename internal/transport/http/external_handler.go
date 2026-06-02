@@ -16,6 +16,7 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -23,6 +24,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -538,10 +540,15 @@ type externalReportEvent struct {
 }
 
 type externalReportRecording struct {
+	RecordingID  string  `json:"recordingId"`
 	EgressID     string  `json:"egressId"`
+	SessionID    string  `json:"sessionId"`
 	Status       string  `json:"status"`
 	RoomName     string  `json:"roomName"`
 	FileURL      string  `json:"fileUrl,omitempty"`
+	VideoURL     string  `json:"videoUrl,omitempty"`
+	ContentType  string  `json:"contentType,omitempty"`
+	DurationSec  int64   `json:"durationSec"`
 	ErrorMessage string  `json:"errorMessage,omitempty"`
 	StartedAt    string  `json:"startedAt"`
 	EndedAt      *string `json:"endedAt,omitempty"`
@@ -809,13 +816,16 @@ func (h *ExternalHandler) handleCompleteSession(w http.ResponseWriter, r *http.R
 	)
 
 	// Enqueue webhook: verdict.ready
-	h.enqueueWebhook(r.Context(), apiCtx.OrgID, "verdict.ready", map[string]interface{}{
+	webhookPayload := map[string]interface{}{
+		"event":          "verdict.ready",
 		"sessionId":      sessionID,
 		"verdict":        req.Verdict,
 		"integrityScore": req.IntegrityScore,
 		"violationCount": req.ViolationCount,
 		"reportUrl":      fmt.Sprintf("/api/v1/external/sessions/%s/report", sessionID),
-	})
+	}
+	h.enqueueWebhook(r.Context(), apiCtx.OrgID, "verdict.ready", webhookPayload)
+	h.deliverSessionCallback(r.Context(), session, "verdict.ready", webhookPayload)
 
 	// Auto-trigger AI deep scan so backend inference runs asynchronously after
 	// every session completion. Load per-exam settings for threshold overrides.
@@ -1070,6 +1080,87 @@ func (h *ExternalHandler) enqueueWebhook(ctx context.Context, orgID, eventType s
 	}
 }
 
+// deliverSessionCallback sends the verdict to a per-session callbackUrl when a
+// partner supplied one on session creation. Registered webhook endpoints still
+// use the durable retry dispatcher; callbackUrl is a direct partner callback so
+// Ustaz can receive a result even before webhook endpoint setup is completed.
+func (h *ExternalHandler) deliverSessionCallback(ctx context.Context, session *entity.ExternalSession, eventType string, payload interface{}) {
+	if session == nil || strings.TrimSpace(session.CallbackURL) == "" {
+		return
+	}
+
+	callbackURL := strings.TrimSpace(session.CallbackURL)
+	if !strings.HasPrefix(callbackURL, "https://") && !strings.HasPrefix(callbackURL, "http://") {
+		h.logger.Warn("skipping invalid session callback URL",
+			zap.String("session_id", session.SessionID),
+			zap.String("callback_url", callbackURL),
+		)
+		return
+	}
+
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		h.logger.Warn("failed to marshal session callback payload",
+			zap.String("session_id", session.SessionID),
+			zap.Error(err),
+		)
+		return
+	}
+
+	go func() {
+		reqCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		timestamp := time.Now().Unix()
+		signingSecret := hex.EncodeToString(h.jwtSigningKey)
+		if signingSecret == "" {
+			signingSecret = "argus-session-callback"
+		}
+		signature := SignWebhookPayload(signingSecret, timestamp, payloadJSON)
+
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, callbackURL, bytes.NewReader(payloadJSON))
+		if err != nil {
+			h.logger.Warn("failed to build session callback request",
+				zap.String("session_id", session.SessionID),
+				zap.Error(err),
+			)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("User-Agent", "ArgusAI-SessionCallback/1.0")
+		req.Header.Set("X-Argus-Event", eventType)
+		req.Header.Set("X-Argus-Timestamp", fmt.Sprintf("%d", timestamp))
+		req.Header.Set("X-Argus-Signature", fmt.Sprintf("sha256=%s", signature))
+		req.Header.Set("X-Argus-Session-Id", session.SessionID)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			h.logger.Warn("session callback delivery failed",
+				zap.String("session_id", session.SessionID),
+				zap.String("callback_url", callbackURL),
+				zap.Error(err),
+			)
+			return
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			h.logger.Warn("session callback returned non-2xx",
+				zap.String("session_id", session.SessionID),
+				zap.String("callback_url", callbackURL),
+				zap.Int("status", resp.StatusCode),
+				zap.String("body", string(body)),
+			)
+			return
+		}
+		h.logger.Info("session callback delivered",
+			zap.String("session_id", session.SessionID),
+			zap.String("callback_url", callbackURL),
+			zap.Int("status", resp.StatusCode),
+		)
+	}()
+}
+
 // ==========================================================================
 // Helpers
 // ==========================================================================
@@ -1278,10 +1369,18 @@ func (h *ExternalHandler) handleStudentMediaToken(w http.ResponseWriter, r *http
 			// Retry every 5s for up to 60s until the room exists.
 			for attempt := 1; attempt <= 12; attempt++ {
 				time.Sleep(5 * time.Second)
+				if egressID, _, ok := h.findExistingRecording(context.Background(), capturedSessionID); ok {
+					h.logger.Info("auto-recording skipped: recording already exists",
+						zap.String("egress_id", egressID),
+						zap.String("room", capturedRoom),
+					)
+					return
+				}
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				egressID, err := h.egress.StartParticipantRecording(ctx, capturedRoom, capturedIdentity, capturedSessionID, capturedStudentID)
 				cancel()
 				if err == nil {
+					h.persistStartedRecording(context.Background(), egressID, capturedSessionID, capturedStudentID, capturedRoom)
 					h.logger.Info("auto-recording started",
 						zap.String("egress_id", egressID),
 						zap.String("room", capturedRoom),
@@ -1337,26 +1436,89 @@ func (h *ExternalHandler) handleRecordingReady(w http.ResponseWriter, r *http.Re
 	roomName := "argus-session-" + sessionID
 	identity := fmt.Sprintf("student-%s", claims.StudentID)
 
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		egressID, err := h.egress.StartParticipantRecording(ctx, roomName, identity, sessionID, claims.StudentID)
-		if err != nil {
-			h.logger.Warn("recording-ready: failed to start egress",
-				zap.String("room", roomName),
-				zap.Error(err),
-			)
-		} else {
-			h.logger.Info("recording-ready: egress started",
-				zap.String("egress_id", egressID),
-				zap.String("room", roomName),
-			)
-		}
-	}()
+	if existingEgressID, existingStatus, ok := h.findExistingRecording(r.Context(), sessionID); ok {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"status":   "recording_already_started",
+			"egressId": existingEgressID,
+			"state":    existingStatus,
+			"room":     roomName,
+		})
+		return
+	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+
+	egressID, err := h.egress.StartParticipantRecording(ctx, roomName, identity, sessionID, claims.StudentID)
+	if err != nil {
+		h.logger.Warn("recording-ready: failed to start egress",
+			zap.String("room", roomName),
+			zap.Error(err),
+		)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"status": "recording_requested",
+			"detail": "egress_start_failed",
+		})
+		return
+	}
+
+	h.logger.Info("recording-ready: egress started",
+		zap.String("egress_id", egressID),
+		zap.String("room", roomName),
+	)
+	h.persistStartedRecording(ctx, egressID, sessionID, claims.StudentID, roomName)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "recording_requested"})
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"status":   "recording_started",
+		"egressId": egressID,
+		"room":     roomName,
+	})
+}
+
+func (h *ExternalHandler) findExistingRecording(ctx context.Context, sessionID string) (string, string, bool) {
+	queryCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	var egressID, status string
+	err := h.repo.DB().QueryRowContext(queryCtx, `
+		SELECT egress_id, status
+		FROM livekit_recordings
+		WHERE session_id = $1
+			AND status IN ('EGRESS_STARTING', 'EGRESS_ACTIVE', 'EGRESS_ENDING', 'EGRESS_COMPLETE', 'EGRESS_COMPLETED')
+		ORDER BY created_at DESC
+		LIMIT 1`, sessionID).Scan(&egressID, &status)
+	if err != nil {
+		return "", "", false
+	}
+	return egressID, status, true
+}
+
+func (h *ExternalHandler) persistStartedRecording(ctx context.Context, egressID, sessionID, studentID, roomName string) {
+	if strings.TrimSpace(egressID) == "" {
+		return
+	}
+	persistCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	rec := &entity.Recording{
+		EgressID:  egressID,
+		SessionID: sessionID,
+		UserID:    studentID,
+		RoomName:  roomName,
+		Status:    "EGRESS_ACTIVE",
+		FileURL:   fmt.Sprintf("content/recordings/%s/%s-%s.mp4", roomName, sessionID, studentID),
+	}
+	if err := h.repo.CreateRecording(persistCtx, rec); err != nil {
+		h.logger.Warn("failed to persist egress metadata",
+			zap.String("egress_id", egressID),
+			zap.String("session_id", sessionID),
+			zap.Error(err),
+		)
+	}
 }
 
 // generateStudentLiveKitToken creates a LiveKit JWT for a publishing student.
@@ -1615,7 +1777,7 @@ func (h *ExternalHandler) queryAIDetections(ctx context.Context, sessionID strin
 
 func (h *ExternalHandler) queryExternalReportRecordings(ctx context.Context, sessionID string) ([]externalReportRecording, error) {
 	rows, err := h.repo.DB().QueryContext(ctx, `
-		SELECT egress_id, status, room_name, file_url, error_message, started_at, ended_at
+		SELECT egress_id, session_id, status, room_name, file_url, error_message, started_at, ended_at
 		FROM livekit_recordings
 		WHERE session_id = $1
 		ORDER BY created_at DESC`, sessionID)
@@ -1631,6 +1793,7 @@ func (h *ExternalHandler) queryExternalReportRecordings(ctx context.Context, ses
 		var endedAt *time.Time
 		if err := rows.Scan(
 			&rec.EgressID,
+			&rec.SessionID,
 			&rec.Status,
 			&rec.RoomName,
 			&rec.FileURL,
@@ -1640,10 +1803,21 @@ func (h *ExternalHandler) queryExternalReportRecordings(ctx context.Context, ses
 		); err != nil {
 			return nil, err
 		}
+		rec.RecordingID = rec.EgressID
+		rec.ContentType = "video/mp4"
 		rec.StartedAt = startedAt.UTC().Format(time.RFC3339)
 		if endedAt != nil {
 			formatted := endedAt.UTC().Format(time.RFC3339)
 			rec.EndedAt = &formatted
+			rec.DurationSec = int64(endedAt.Sub(startedAt).Seconds())
+		} else if rec.Status == "EGRESS_ACTIVE" || rec.Status == "EGRESS_STARTING" {
+			rec.DurationSec = int64(time.Since(startedAt).Seconds())
+		}
+		if rec.DurationSec < 0 {
+			rec.DurationSec = 0
+		}
+		if strings.TrimSpace(rec.FileURL) != "" {
+			rec.VideoURL = fmt.Sprintf("/api/v1/archive/sessions/%s/video", sessionID)
 		}
 		recordings = append(recordings, rec)
 	}
