@@ -24,7 +24,7 @@ export default {
   plugins: [
     resolve({ browser: true }),
     typescript({
-      tsconfig: './tsconfig.json',
+      tsconfig: './tsconfig.build.json',
       declaration: true,
       declarationDir: 'dist',
     }),

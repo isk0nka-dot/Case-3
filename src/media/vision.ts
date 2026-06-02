@@ -82,11 +82,14 @@ export class VisionEngine extends EventEmitter<VisionEvents> {
       this._running = true;
       this._processLoop();
     } catch (err) {
+      // Graceful degradation — emit warning but don't throw.
+      // Session continues without face detection (e.g. when @mediapipe/tasks-vision
+      // is not resolvable in the current browser environment).
       this.emit('error', {
         code: 'VISION_INIT_FAILED',
         message: err instanceof Error ? err.message : 'Failed to initialize vision engine',
       });
-      throw err;
+      // Do not rethrow — proctoring session proceeds without AI vision.
     }
   }
 

@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Argus — Боковая камера</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #1f6feb;
+      --success: #3fb950;
+      --warn: #d29922;
+      --error: #f85149;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .screen {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 20px 16px;
+      gap: 16px;
+    }
+    .screen.active { display: flex; }
+
+    /* Video preview */
+    #video-wrap {
+      width: 100%;
+      max-width: 400px;
+      aspect-ratio: 9/16;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    video {
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+
+    /* Status overlay on video */
+    .video-badge {
+      position: absolute;
+      top: 12px; left: 12px;
+      background: rgba(0,0,0,.65);
+      backdrop-filter: blur(4px);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+    /* Card */
+    .card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    p  { font-size: 14px; color: var(--muted); line-height: 1.55; }
+
+    /* Status list */
+    .status-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .status-item {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px;
+    }
+    .status-icon { width: 18px; height: 18px; flex-shrink: 0; font-size: 14px; text-align: center; }
+    .status-ok   { color: var(--success); }
+    .status-warn { color: var(--warn); }
+    .status-err  { color: var(--error); }
+
+    /* Buttons */
+    .btn {
+      width: 100%; max-width: 400px;
+      min-height: 48px;
+      border: 0; border-radius: 10px;
+      font: inherit; font-size: 15px; font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary  { background: var(--accent); color: #fff; }
+    .btn-danger   { background: var(--error); color: #fff; }
+
+    /* Error banner */
+    .error-card {
+      width: 100%; max-width: 400px;
+      background: rgba(248,81,73,.1);
+      border: 1px solid var(--error);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 13px;
+      color: var(--error);
+      line-height: 1.5;
+    }
+
+    /* Done */
+    .done-icon { font-size: 56px; margin-top: 30px; }
+
+    /* Camera flip button */
+    #flip-btn {
+      position: absolute;
+      bottom: 12px; right: 12px;
+      background: rgba(0,0,0,.6);
+      border: 0;
+      border-radius: 50%;
+      width: 40px; height: 40px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ SCREEN: fatal ══ -->
+<div id="screen-fatal" class="screen">
+  <div class="card">
+    <h2>Ошибка ссылки</h2>
+    <p id="fatal-msg" style="margin-top:8px;"></p>
+  </div>
+</div>
+
+<!-- ══ SCREEN: consent ══ -->
+<div id="screen-consent" class="screen">
+  <div class="card">
+    <h2>Боковая камера<br><span style="font-size:13px;color:var(--muted)">Argus Proctoring</span></h2>
+    <p style="margin-top:10px;">Эта страница публикует видео с вашего телефона как боковую камеру для прокторинга экзамена.</p>
+    <p style="margin-top:8px;">Камера будет активна до завершения экзамена. Направьте телефон так, чтобы было видно стол и руки.</p>
+  </div>
+  <button class="btn btn-primary" id="btn-allow">Разрешить камеру / Камераға рұқсат беру</button>
+</div>
+
+<!-- ══ SCREEN: publishing ══ -->
+<div id="screen-publishing" class="screen">
+  <div id="video-wrap">
+    <video id="sidecam-video" autoplay muted playsinline></video>
+    <div class="video-badge">
+      <span class="live-dot"></span>
+      <span id="live-label">Подключение...</span>
+    </div>
+    <button id="flip-btn" title="Переключить камеру">🔄</button>
+  </div>
+
+  <ul class="status-list">
+    <li class="status-item">
+      <span class="status-icon" id="icon-camera">⏳</span>
+      <span id="label-camera">Инициализация камеры...</span>
+    </li>
+    <li class="status-item">
+      <span class="status-icon" id="icon-livekit">⏳</span>
+      <span id="label-livekit">Подключение к серверу...</span>
+    </li>
+    <li class="status-item">
+      <span class="status-icon" id="icon-publish">⏳</span>
+      <span id="label-publish">Публикация потока...</span>
+    </li>
+  </ul>
+
+  <div id="error-banner" class="error-card" style="display:none"></div>
+
+  <button class="btn btn-danger" id="btn-stop" style="display:none">Остановить камеру</button>
+</div>
+
+<!-- ══ SCREEN: done ══ -->
+<div id="screen-done" class="screen">
+  <div class="done-icon">✅</div>
+  <div class="card" style="text-align:center;margin-top:16px;">
+    <h2>Камера отключена</h2>
+    <p style="margin-top:8px;">Экзамен завершён. Можете закрыть эту страницу.</p>
+  </div>
+</div>
+
+<script>
+/*
+ * Supported query parameters:
+ * - Pairing from backend QR payload:
+ *   ?sid=<sessionId>&tok=<pairingToken>&url=<backendBaseUrl>
+ *   or ?pairing=<base64url/json payload with sid,tok,url>
+ * - Optional LiveKit publishing:
+ *   ?token=<liveKitToken>&wsUrl=<wss://livekit.example>
+ *
+ * Pairing and device heartbeat use the Argus sidecam REST API. LiveKit is
+ * intentionally optional because the backend may issue media tokens separately.
+ */
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const $ = id => document.getElementById(id);
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+function setStatus(iconId, labelId, icon, text, cls) {
+  $(iconId).textContent = icon;
+  $(iconId).className = 'status-icon ' + (cls || '');
+  $(labelId).textContent = text;
+}
+
+function parseParams() {
+  const p = new URLSearchParams(location.search);
+  const pairingPayload = parsePairingPayload(p.get('pairing') || p.get('qr') || '');
+
+  return {
+    // LiveKit credentials
+    livekitToken : p.get('token') || p.get('lkToken') || '',
+    livekitWsUrl : p.get('wsUrl') || p.get('ws') || '',
+    // Argus session context
+    sessionId    : p.get('sessionId') || p.get('sid') || pairingPayload.sid || '',
+    pairingToken : p.get('pairingToken') || p.get('tok') || pairingPayload.tok || '',
+    serverUrl    : (p.get('serverUrl') || p.get('server') || p.get('url') || pairingPayload.url || '').replace(/\/+$/, ''),
+    argusToken   : p.get('argusToken') || '',
+    // UI
+    locale       : p.get('locale') || 'ru',
+  };
+}
+
+function parsePairingPayload(raw) {
+  if (!raw) return {};
+  const candidates = [raw];
+  try { candidates.push(decodeURIComponent(raw)); } catch { /* ignore */ }
+  try {
+    const normalized = raw.replace(/-/g, '+').replace(/_/g, '/');
+    candidates.push(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')));
+  } catch { /* ignore */ }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch { /* try next */ }
+  }
+  return {};
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (window.LivekitClient || window.LiveKitClient) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Failed to load LiveKit SDK: ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function postJSON(url, body, headers = {}) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!response.ok) {
+    throw new Error(data.error || data.message || `HTTP ${response.status}`);
+  }
+  return data;
+}
+
+async function getDeviceInfo(frameRate = 0) {
+  let batteryLevel = 0;
+  let isCharging = false;
+  if (navigator.getBattery) {
+    try {
+      const battery = await navigator.getBattery();
+      batteryLevel = typeof battery.level === 'number' ? battery.level : 0;
+      isCharging = Boolean(battery.charging);
+    } catch { /* best effort */ }
+  }
+
+  return {
+    deviceModel: navigator.userAgent || 'mobile-browser',
+    osVersion: navigator.platform || 'unknown',
+    batteryLevel,
+    isCharging,
+    thermalState: 'nominal',
+    fpsCurrent: frameRate,
+    fpsTarget: 24,
+    accelX: 0,
+    accelY: 0,
+    accelZ: 0,
+    gyroMagnitude: 0,
+  };
+}
+
+async function completePairing(params) {
+  if (!params.serverUrl || !params.sessionId || !params.pairingToken) {
+    return { deviceToken: '', paired: false };
+  }
+
+  const result = await postJSON(`${params.serverUrl}/api/v1/sidecam/pair/complete`, {
+    sessionId: params.sessionId,
+    pairingToken: params.pairingToken,
+    device: await getDeviceInfo(),
+  });
+
+  return {
+    paired: true,
+    deviceToken: result.deviceToken || result.session?.deviceToken || '',
+  };
+}
+
+function startDeviceHealthLoops(params, deviceToken) {
+  if (!params.serverUrl || !params.sessionId || !deviceToken) return () => {};
+
+  const headers = {
+    'X-Device-Token': deviceToken,
+    'X-Session-ID': params.sessionId,
+  };
+
+  const sendHeartbeat = () => postJSON(`${params.serverUrl}/api/v1/sidecam/heartbeat`, {
+    sessionId: params.sessionId,
+    clientTs: new Date().toISOString(),
+    frameRate: 24,
+    droppedFrames: 0,
+  }, headers).catch(() => {});
+
+  const sendTelemetry = async () => postJSON(`${params.serverUrl}/api/v1/sidecam/telemetry`, {
+    sessionId: params.sessionId,
+    device: await getDeviceInfo(24),
+  }, headers).catch(() => {});
+
+  sendHeartbeat();
+  sendTelemetry();
+
+  const heartbeatTimer = setInterval(sendHeartbeat, 5000);
+  const telemetryTimer = setInterval(sendTelemetry, 30000);
+
+  return () => {
+    clearInterval(heartbeatTimer);
+    clearInterval(telemetryTimer);
+  };
+}
+
+async function requestSidecamMediaToken(params, deviceToken) {
+  if (!params.serverUrl || !params.sessionId || !deviceToken) return;
+
+  const result = await postJSON(`${params.serverUrl}/api/v1/sidecam/media-token`, {
+    sessionId: params.sessionId,
+  }, {
+    'X-Device-Token': deviceToken,
+    'X-Session-ID': params.sessionId,
+  });
+
+  params.livekitToken = params.livekitToken || result.livekitToken || '';
+  params.livekitWsUrl = params.livekitWsUrl || result.livekitUrl || result.wsUrl || '';
+}
+
+// ── Main ────────────────────────────────────────────────────────────────────
+
+(async function main() {
+  const params = parseParams();
+
+  if (!params.serverUrl && (!params.livekitToken || !params.livekitWsUrl)) {
+    show('screen-fatal');
+    $('fatal-msg').textContent = 'Отсутствуют данные подключения. Отсканируйте QR-код из экзаменационной системы.';
+    return;
+  }
+  if (params.serverUrl && (!params.sessionId || !params.pairingToken)) {
+    show('screen-fatal');
+    $('fatal-msg').textContent = 'QR-код неполный: нужны sessionId/sid и pairingToken/tok.';
+    return;
+  }
+
+  show('screen-consent');
+
+  await new Promise(resolve => $('btn-allow').addEventListener('click', resolve, { once: true }));
+
+  show('screen-publishing');
+
+  let room = null;
+  let localTrack = null;
+  let previewStream = null;
+  let stopHealthLoops = () => {};
+  let facingMode = 'environment'; // back camera by default for side cam
+  let shouldPublishLiveKit = Boolean(params.livekitToken && params.livekitWsUrl);
+
+  // ── Get camera stream ──────────────────────────────────────────────────────
+  try {
+    setStatus('icon-camera', 'label-camera', '⏳', 'Запрашиваем камеру...', '');
+    previewStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    });
+    $('sidecam-video').srcObject = previewStream;
+    setStatus('icon-camera', 'label-camera', '✓', 'Камера активна', 'status-ok');
+  } catch (err) {
+    setStatus('icon-camera', 'label-camera', '✗', 'Нет доступа к камере: ' + err.message, 'status-err');
+    $('error-banner').textContent = 'Разрешите доступ к камере и перезагрузите страницу.';
+    $('error-banner').style.display = 'block';
+    return;
+  }
+
+  // ── Pair with Argus sidecam API ───────────────────────────────────────────
+  try {
+    if (params.serverUrl) {
+      setStatus('icon-livekit', 'label-livekit', '⏳', 'Регистрация телефона...', '');
+      const pairing = await completePairing(params);
+      if (pairing.deviceToken) {
+        stopHealthLoops = startDeviceHealthLoops(params, pairing.deviceToken);
+        if (!shouldPublishLiveKit) {
+          setStatus('icon-livekit', 'label-livekit', '⏳', 'Получение видео-токена...', '');
+          await requestSidecamMediaToken(params, pairing.deviceToken);
+          shouldPublishLiveKit = Boolean(params.livekitToken && params.livekitWsUrl);
+        }
+      }
+      setStatus('icon-livekit', 'label-livekit', '✓', 'Телефон привязан к сессии', 'status-ok');
+    }
+  } catch (err) {
+    setStatus('icon-livekit', 'label-livekit', '✗', 'Ошибка pairing: ' + err.message, 'status-err');
+    $('error-banner').textContent = 'Не удалось привязать боковую камеру. ' + err.message;
+    $('error-banner').style.display = 'block';
+    return;
+  }
+
+  if (!shouldPublishLiveKit) {
+    setStatus('icon-publish', 'label-publish', '✓', 'Pairing активен, видео-токен не передан', 'status-warn');
+    $('live-label').textContent = 'PAIRING';
+    $('btn-stop').style.display = 'block';
+    $('flip-btn').style.display = 'none';
+  } else {
+    // ── Load LiveKit Client SDK ─────────────────────────────────────────────
+    // Try to load from the same server, fallback to CDN.
+    const livekitSDKUrls = [
+      params.serverUrl ? `${params.serverUrl}/livekit-client.umd.min.js` : '',
+      'https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js',
+      'https://unpkg.com/livekit-client@latest/dist/livekit-client.umd.min.js',
+    ].filter(Boolean);
+
+    let lkLoaded = false;
+    for (const url of livekitSDKUrls) {
+      try {
+        await loadScript(url);
+        lkLoaded = true;
+        break;
+      } catch { /* try next */ }
+    }
+
+    if (!lkLoaded) {
+      $('error-banner').textContent = 'Не удалось загрузить LiveKit SDK. Проверьте подключение.';
+      $('error-banner').style.display = 'block';
+      setStatus('icon-publish', 'label-publish', '✗', 'Ошибка загрузки SDK', 'status-err');
+      return;
+    }
+
+    const LK = window.LivekitClient || window.LiveKitClient;
+
+  // ── Connect to LiveKit room ────────────────────────────────────────────────
+    try {
+      setStatus('icon-livekit', 'label-livekit', '⏳', 'Подключение к комнате...', '');
+      room = new LK.Room({
+        adaptiveStream: true,
+        dynacast: true,
+        videoCaptureDefaults: { facingMode },
+      });
+
+      await room.connect(params.livekitWsUrl, params.livekitToken, {
+        autoSubscribe: false,
+      });
+
+      setStatus('icon-livekit', 'label-livekit', '✓', 'Подключено к комнате', 'status-ok');
+    } catch (err) {
+      setStatus('icon-livekit', 'label-livekit', '✗', 'Ошибка подключения: ' + err.message, 'status-err');
+      $('error-banner').textContent = 'Не удалось подключиться к серверу видео. ' + err.message;
+      $('error-banner').style.display = 'block';
+      return;
+    }
+
+  // ── Publish camera track ───────────────────────────────────────────────────
+    try {
+      setStatus('icon-publish', 'label-publish', '⏳', 'Публикация видео...', '');
+
+      localTrack = await LK.createLocalVideoTrack({
+        facingMode,
+        resolution: LK.VideoPresets.h720.resolution,
+      });
+
+      await room.localParticipant.publishTrack(localTrack, {
+        name: 'sidecam',
+        source: LK.Track.Source.Camera,
+      });
+
+      setStatus('icon-publish', 'label-publish', '✓', 'Видео публикуется', 'status-ok');
+      $('live-label').textContent = 'LIVE';
+      $('btn-stop').style.display = 'block';
+
+    } catch (err) {
+      setStatus('icon-publish', 'label-publish', '✗', 'Ошибка публикации: ' + err.message, 'status-err');
+      $('error-banner').textContent = err.message;
+      $('error-banner').style.display = 'block';
+      return;
+    }
+
+    // ── Room disconnect handling ────────────────────────────────────────────
+    room.on(LK.RoomEvent.Disconnected, () => {
+      if ($('screen-done').classList.contains('active')) return;
+      $('live-label').textContent = 'Отключено';
+      setStatus('icon-livekit', 'label-livekit', '✗', 'Соединение разорвано', 'status-err');
+    });
+  }
+
+  // ── Camera flip ────────────────────────────────────────────────────────────
+  $('flip-btn').addEventListener('click', async () => {
+    if (!room) return;
+    facingMode = facingMode === 'environment' ? 'user' : 'environment';
+    try {
+      await localTrack?.restartTrack({ facingMode });
+    } catch { /* ignore */ }
+  });
+
+  // ── Stop button ────────────────────────────────────────────────────────────
+  $('btn-stop').addEventListener('click', async () => {
+    stopHealthLoops();
+    previewStream?.getTracks().forEach(track => track.stop());
+    localTrack?.stop();
+    await room?.disconnect();
+    show('screen-done');
+  });
+
+  // ── Screen keep-alive (prevent phone from sleeping) ────────────────────────
+  if ('wakeLock' in navigator) {
+    try { await navigator.wakeLock.request('screen'); } catch { /* best effort */ }
+  }
+
+})();
+</script>
+</body>
+</html>

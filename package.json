@@ -12,6 +12,10 @@
     "build": "rollup -c rollup.config.mjs",
     "dev": "rollup -c rollup.config.mjs --watch",
     "typecheck": "tsc --noEmit",
+    "contract:paths": "node scripts/verify-service-paths.mjs",
+    "contract:codec": "node scripts/verify-codec.mjs",
+    "contract:session": "node scripts/verify-session-transport.mjs",
+    "contract": "npm run contract:paths && npm run contract:codec && npm run contract:session",
     "clean": "rm -rf dist"
   },
   "keywords": [

@@ -49,11 +49,23 @@ export enum EventType {
   CONTEXT_MENU_ATTEMPT = 33,
   FULLSCREEN_EXIT = 34,
   EXTERNAL_DISPLAY_DETECTED = 35,
-  CAMERA_BLOCKED = 36,
+
+  // Network events (40-41)
+  VPN_PROXY_DETECTED = 40,
+  SUSPICIOUS_NETWORK_DEVICE = 41,
+
+  // Psychometry events (50-52)
+  EMOTION_STRESS_SPIKE = 50,
+  FOCUS_LOSS_DETECTED = 51,
+  BLINK_PATTERN_ANOMALY = 52,
 
   // Telemetry (100-106)
   GAZE_TELEMETRY = 100,
+  MOUSE_TELEMETRY = 101,
+  KEYBOARD_TELEMETRY = 102,
+  FOCUS_SCORE_UPDATE = 103,
   HEAD_POSE_TELEMETRY = 104,
+  FACE_EMBEDDING_TELEMETRY = 105,
   AUDIO_LEVEL_TELEMETRY = 106,
 }
 
@@ -116,6 +128,55 @@ export interface ArgusSDKConfig {
 
   /** Callback: preflight step completed. */
   onPreflightStep?: (step: PreflightStep) => void;
+
+  /** Callback: detailed preflight check updated. */
+  onPreflightCheck?: (check: PreflightCheckResult) => void;
+
+  /** Callback: full preflight result produced. */
+  onPreflightComplete?: (result: PreflightResult) => void;
+
+  /** Callback: SDK event delivery queue changed. */
+  onDeliveryUpdate?: (state: DeliveryState) => void;
+
+  /** Callback: LiveKit publishing state changed. */
+  onLiveKitStateChange?: (state: LiveKitPublishingState) => void;
+
+  /** Preflight behavior and self-hosting options. */
+  preflight?: {
+    /** Must be true before a production session starts. */
+    consentAccepted?: boolean;
+    /** Optional health check URL. Defaults to `${serverUrl}/healthz`. */
+    networkCheckUrl?: string;
+    /** Health check timeout in ms. Default: 5000. */
+    networkTimeoutMs?: number;
+    /** Whether screen capture support is mandatory. Default: false for Phase 1. */
+    requireScreenCapture?: boolean;
+    /** Self-hosted MediaPipe WASM base path. */
+    mediapipeBasePath?: string;
+    /** Self-hosted face landmarker model URL. */
+    mediapipeModelAssetPath?: string;
+    /** Allow face checks to be skipped if MediaPipe cannot initialize. Default: false. */
+    allowFaceCheckFallback?: boolean;
+    /**
+     * Enable liveness challenge: detect natural face micro-movement across
+     * 3 frames to distinguish a live person from a static photo.
+     * Default: false. Set true for strict/standard proctoring modes.
+     */
+    requireLivenessChallenge?: boolean;
+    /**
+     * Require the Argus Desktop Agent to be running on localhost.
+     * When true, preflight fails if the agent health check fails.
+     * Default: false. Enable for strict/standard proctoring modes.
+     */
+    requireDesktopAgent?: boolean;
+    /**
+     * Port where the desktop agent's local health server listens. Default: 7373.
+     */
+    desktopAgentPort?: number;
+  };
+
+  /** Optional LiveKit publishing for session recording. */
+  liveKit?: LiveKitPublishingConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +212,70 @@ export interface IngestBatchRequest {
   signal?: AbortSignal;
 }
 
+/** Batch ingest response. */
+export interface IngestBatchResponse {
+  acceptedCount: number;
+  rejectedCount: number;
+  rejectedEventIds?: string[];
+  batchSequence?: number;
+}
+
+/** SDK delivery queue state. */
+export interface DeliveryState {
+  queueDepth: number;
+  inFlight: boolean;
+  droppedEvents: number;
+  lastAcceptedCount?: number;
+  lastRejectedCount?: number;
+}
+
+/** Minimal LiveKit client module shape used by the optional SDK adapter. */
+export interface LiveKitClientModule {
+  Room: new (options?: Record<string, unknown>) => LiveKitRoom;
+  RoomEvent?: Record<string, string>;
+  Track?: {
+    Source?: {
+      Camera?: string;
+      Microphone?: string;
+    };
+  };
+}
+
+export interface LiveKitRoom {
+  connect(url: string, token: string, options?: Record<string, unknown>): Promise<void>;
+  disconnect(): void;
+  localParticipant: {
+    publishTrack(track: MediaStreamTrack, options?: Record<string, unknown>): Promise<LiveKitTrackPublication>;
+  };
+}
+
+export interface LiveKitTrackPublication {
+  trackSid?: string;
+  sid?: string;
+}
+
+export interface LiveKitPublishingConfig {
+  /** Enable student media publishing. Default: false until partner enables recording. */
+  enabled?: boolean;
+  /** Throw startSession() if LiveKit publish fails. Default: false. */
+  required?: boolean;
+  /** Optional livekit-client module. If omitted, SDK tries window.LivekitClient. */
+  client?: LiveKitClientModule;
+  /** Optional explicit token endpoint. Defaults to External API student-token endpoint. */
+  tokenEndpoint?: string;
+  /** Optional explicit recording-ready endpoint. Defaults to External API recording-ready endpoint. */
+  recordingReadyEndpoint?: string;
+}
+
+export interface LiveKitPublishingState {
+  connected: boolean;
+  room?: string;
+  livekitUrl?: string;
+  videoTrackId?: string;
+  audioTrackId?: string;
+  recordingReadyStatus?: string;
+}
+
 /** Heartbeat request. */
 export interface HeartbeatRequest {
   sessionId: string;
@@ -159,6 +284,17 @@ export interface HeartbeatRequest {
   clientTimestamp: string;
   currentFocusScore: number;
   violationCount: number;
+}
+
+/** Heartbeat response. */
+export interface HeartbeatResponse {
+  sessionActive: boolean;
+  serverTimestamp?: string;
+  directive?: {
+    telemetryMode?: TelemetryMode;
+    terminate?: boolean;
+    terminateReason?: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -177,11 +313,51 @@ export type SessionStatus =
   | 'error';
 
 /** Preflight check result. */
+export type PreflightCheckId =
+  | 'consent'
+  | 'cameraPermission'
+  | 'microphonePermission'
+  | 'facePresent'
+  | 'singleFace'
+  | 'livenessChallenge'
+  | 'secureContext'
+  | 'fullscreenSupport'
+  | 'screenCaptureSupport'
+  | 'browserCompatibility'
+  | 'networkHealth'
+  | 'desktopAgent';
+
+export interface PreflightCheckResult {
+  id: PreflightCheckId;
+  group: PreflightStep['id'];
+  status: 'pending' | 'checking' | 'passed' | 'failed' | 'skipped';
+  required: boolean;
+  severity: 'info' | 'blocking';
+  message: string;
+  details?: string;
+  checkedAt: string;
+}
+
 export interface PreflightStep {
-  id: 'hardware' | 'environment' | 'system';
+  id: 'consent' | 'hardware' | 'environment' | 'system' | 'network';
   status: 'pending' | 'checking' | 'passed' | 'failed';
   message: string;
   details?: string;
+}
+
+export interface PreflightResult {
+  allPassed: boolean;
+  startedAt: string;
+  completedAt: string;
+  locale: 'kk' | 'ru' | 'en';
+  steps: PreflightStep[];
+  checks: PreflightCheckResult[];
+  summary: {
+    passed: number;
+    failed: number;
+    skipped: number;
+    requiredFailed: number;
+  };
 }
 
 /** Violation event emitted to the partner. */

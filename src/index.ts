@@ -18,6 +18,8 @@
 import type {
   ArgusSDKConfig,
   SessionStatus,
+  PreflightCheckResult,
+  PreflightResult,
   PreflightStep,
   ViolationEvent,
   SDKError,
@@ -26,6 +28,9 @@ import type {
   TierConfig,
   VisionFrame,
   AudioFrame,
+  EventPayload,
+  DeliveryState,
+  LiveKitPublishingState,
 } from './types';
 
 import { GrpcWebTransport } from './core/transport';
@@ -34,15 +39,19 @@ import { EventEmitter } from './core/event-emitter';
 import { HealthGovernor } from './health/governor';
 import { VisionEngine } from './media/vision';
 import { AudioEngine } from './media/audio';
+import { LiveKitPublisher } from './media/livekit';
 import { BrowserIntegrityMonitor } from './security/browser';
 import { CameraWidget } from './ui/widget';
 import { PreflightChecker } from './ui/preflight';
+import { EventSource, EventType, Severity } from './types';
 
 // Re-export public types and classes.
 export {
   // Types
   type ArgusSDKConfig,
   type SessionStatus,
+  type PreflightCheckResult,
+  type PreflightResult,
   type PreflightStep,
   type ViolationEvent,
   type SDKError,
@@ -51,14 +60,19 @@ export {
   type TierConfig,
   type VisionFrame,
   type AudioFrame,
+  type EventPayload,
+  type DeliveryState,
+  type LiveKitPublishingState,
 } from './types';
 
 export { EventType, Severity, EventSource } from './types';
 export { GrpcWebTransport } from './core/transport';
 export { SessionManager } from './core/session';
+export { EVENT_COLLECTOR_SERVICE_PATHS } from './core/service-paths';
 export { HealthGovernor } from './health/governor';
 export { VisionEngine } from './media/vision';
 export { AudioEngine } from './media/audio';
+export { LiveKitPublisher } from './media/livekit';
 export { BrowserIntegrityMonitor } from './security/browser';
 export { CameraWidget } from './ui/widget';
 export { PreflightChecker } from './ui/preflight';
@@ -73,6 +87,10 @@ interface SDKEvents {
   violation: ViolationEvent;
   error: SDKError;
   preflightStep: PreflightStep;
+  preflightCheck: PreflightCheckResult;
+  preflightComplete: PreflightResult;
+  deliveryUpdate: DeliveryState;
+  liveKitStateChange: LiveKitPublishingState;
   healthUpdate: HealthMetrics;
   tierChange: { from: ResilienceTier; to: ResilienceTier; config: TierConfig };
 }
@@ -93,7 +111,7 @@ interface SDKEvents {
  *
  * @example
  * ```html
- * <script src="https://argusai.kz/sdk/argus-sdk.umd.js"></script>
+ * <script src="https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js"></script>
  * <script>
  *   const proctoring = new ArgusSDK({
  *     sessionToken: 'eyJ...',
@@ -114,6 +132,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
   private _governor: HealthGovernor | null = null;
   private _vision: VisionEngine | null = null;
   private _audio: AudioEngine | null = null;
+  private _liveKit: LiveKitPublisher | null = null;
   private _security: BrowserIntegrityMonitor | null = null;
   private _widget: CameraWidget | null = null;
   private _preflight: PreflightChecker | null = null;
@@ -121,6 +140,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
   // State.
   private _status: SessionStatus = 'idle';
   private _videoStream: MediaStream | null = null;
+  private _lastPreflightResult: PreflightResult | null = null;
 
   constructor(config: ArgusSDKConfig) {
     super();
@@ -132,6 +152,10 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
     if (config.onViolation) this.on('violation', config.onViolation);
     if (config.onStatusChange) this.on('statusChange', config.onStatusChange);
     if (config.onPreflightStep) this.on('preflightStep', config.onPreflightStep);
+    if (config.onPreflightCheck) this.on('preflightCheck', config.onPreflightCheck);
+    if (config.onPreflightComplete) this.on('preflightComplete', config.onPreflightComplete);
+    if (config.onDeliveryUpdate) this.on('deliveryUpdate', config.onDeliveryUpdate);
+    if (config.onLiveKitStateChange) this.on('liveKitStateChange', config.onLiveKitStateChange);
   }
 
   // ---------------------------------------------------------------------------
@@ -153,6 +177,18 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
   /** Violation count (0 before session start). */
   get violationCount(): number { return this._session?.violationCount ?? 0; }
 
+  /** Buffered event queue depth. */
+  get eventQueueDepth(): number { return this._session?.queueDepth ?? 0; }
+
+  /** Number of events dropped due to bounded queue pressure. */
+  get droppedEventCount(): number { return this._session?.droppedEventCount ?? 0; }
+
+  /** Current LiveKit publishing state. */
+  get liveKitState(): LiveKitPublishingState | null { return this._liveKit?.currentState ?? null; }
+
+  /** Last structured preflight result (null before startPreflight()). */
+  get lastPreflightResult(): PreflightResult | null { return this._lastPreflightResult; }
+
   /**
    * Run preflight checks.
    *
@@ -166,15 +202,48 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
   async startPreflight(): Promise<boolean> {
     this._setStatus('preflight');
 
+    this._ensureTransportAndSession();
+    const consentAccepted = this._config.preflight?.consentAccepted ?? false;
+    if (consentAccepted) {
+      void this._sendPreflightLifecycleEvent('PREFLIGHT_STARTED', 'Preflight started');
+    }
+
     this._preflight = new PreflightChecker({
       locale: this._config.locale,
+      consentAccepted,
+      serverUrl: this._config.serverUrl,
+      networkCheckUrl: this._config.preflight?.networkCheckUrl,
+      networkTimeoutMs: this._config.preflight?.networkTimeoutMs,
+      requireScreenCapture: this._config.preflight?.requireScreenCapture,
+      mediapipeBasePath: this._config.preflight?.mediapipeBasePath ?? this._config.mediapipeBasePath,
+      mediapipeModelAssetPath: this._config.preflight?.mediapipeModelAssetPath,
+      allowFaceCheckFallback: this._config.preflight?.allowFaceCheckFallback,
+      requireLivenessChallenge: this._config.preflight?.requireLivenessChallenge,
+      requireDesktopAgent: this._config.preflight?.requireDesktopAgent,
+      desktopAgentPort: this._config.preflight?.desktopAgentPort,
     });
 
     this._preflight.on('stepUpdate', (step) => {
       this.emit('preflightStep', step);
     });
+    this._preflight.on('checkUpdate', (check) => {
+      this.emit('preflightCheck', check);
+    });
+    this._preflight.on('complete', (result) => {
+      this._lastPreflightResult = result;
+      this.emit('preflightComplete', result);
+    });
 
-    const passed = await this._preflight.run();
+    const result = await this._preflight.runDetailed();
+    const passed = result.allPassed;
+    this._lastPreflightResult = result;
+    if (consentAccepted) {
+      await this._sendPreflightLifecycleEvent(
+        passed ? 'PREFLIGHT_PASSED' : 'PREFLIGHT_FAILED',
+        passed ? 'Preflight passed' : 'Preflight failed',
+        result,
+      );
+    }
 
     if (passed) {
       this._videoStream = this._preflight.videoStream;
@@ -183,7 +252,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
       this._setStatus('error');
       this.emit('error', {
         code: 'PREFLIGHT_FAILED',
-        message: 'One or more preflight checks failed',
+        message: this._formatPreflightFailure(result),
         recoverable: true,
       });
     }
@@ -205,19 +274,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
     this._setStatus('initializing');
 
     try {
-      // Initialize transport.
-      this._transport = new GrpcWebTransport({
-        baseUrl: this._config.serverUrl,
-        timeout: 10_000,
-        maxRetries: 3,
-      });
-
-      // Initialize session manager.
-      this._session = new SessionManager(this._transport, this._config.sessionToken);
-
-      this._session.on('violation', (v) => this.emit('violation', v));
-      this._session.on('error', (e) => this.emit('error', e));
-      this._session.on('statusChange', (s) => this._setStatus(s));
+      this._ensureTransportAndSession();
 
       // Initialize camera widget.
       this._widget = new CameraWidget({
@@ -227,6 +284,10 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
 
       if (this._videoStream) {
         this._widget.setStream(this._videoStream);
+      }
+
+      if (this._config.liveKit?.enabled) {
+        await this._startLiveKitPublishing();
       }
 
       // Initialize health governor.
@@ -298,7 +359,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
       });
 
       // Start everything.
-      this._session.start();
+      this._session!.start();
       this._governor.start();
       this._security.start();
 
@@ -313,6 +374,9 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
       this._widget.setStatus('active');
       this._setStatus('active');
       this.emit('ready', undefined as unknown as void);
+
+      // Notify browser extension (if installed) to start monitoring this tab.
+      this._notifyExtensionStart();
     } catch (err) {
       this._setStatus('error');
       this.emit('error', {
@@ -335,6 +399,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
     // Stop monitoring.
     this._vision?.stop();
     this._audio?.stop();
+    this._liveKit?.stop();
     this._security?.stop();
     this._governor?.stop();
 
@@ -345,6 +410,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
 
     this._widget?.setStatus('completed');
     this._setStatus('completed');
+    this._notifyExtensionStop();
   }
 
   /**
@@ -356,6 +422,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
     // Stop all modules.
     this._vision?.destroy();
     this._audio?.destroy();
+    this._liveKit?.destroy();
     this._security?.destroy();
     this._governor?.destroy();
     this._session?.destroy();
@@ -382,6 +449,127 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
     this._status = status;
     this.emit('statusChange', status);
     this._widget?.setStatus(status);
+  }
+
+  private async _startLiveKitPublishing(): Promise<void> {
+    if (!this._videoStream || !this._session) return;
+
+    try {
+      this._liveKit = new LiveKitPublisher({
+        serverUrl: this._config.serverUrl,
+        sessionId: this._session.sessionId,
+        sessionToken: this._config.sessionToken,
+        config: this._config.liveKit,
+      });
+      const state = await this._liveKit.start(this._videoStream);
+      this.emit('liveKitStateChange', state);
+    } catch (err) {
+      const error: SDKError = {
+        code: 'LIVEKIT_PUBLISH_FAILED',
+        message: err instanceof Error ? err.message : 'Failed to publish LiveKit media',
+        recoverable: !this._config.liveKit?.required,
+      };
+      this.emit('error', error);
+      if (this._config.liveKit?.required) {
+        throw err;
+      }
+    }
+  }
+
+  private _ensureTransportAndSession(): void {
+    if (!this._transport) {
+      this._transport = new GrpcWebTransport({
+        baseUrl: this._config.serverUrl,
+        timeout: 10_000,
+        maxRetries: 3,
+      });
+    }
+
+    if (!this._session) {
+      this._session = new SessionManager(this._transport, this._config.sessionToken);
+      this._session.on('violation', (v) => this.emit('violation', v));
+      this._session.on('error', (e) => this.emit('error', e));
+      this._session.on('statusChange', (s) => this._setStatus(s));
+      this._session.on('delivery', (state) => this.emit('deliveryUpdate', state));
+    }
+  }
+
+  private async _sendPreflightLifecycleEvent(
+    code: 'PREFLIGHT_STARTED' | 'PREFLIGHT_PASSED' | 'PREFLIGHT_FAILED',
+    label: string,
+    result?: PreflightResult,
+  ): Promise<void> {
+    if (!this._session) return;
+
+    const payload: EventPayload = {
+      type: 'system',
+      data: {
+        category: code.toLowerCase(),
+        terminated: false,
+      },
+    };
+
+    this._session.sendLifecycleEvent(
+      EventType.FOCUS_SCORE_UPDATE,
+      code === 'PREFLIGHT_FAILED' ? Severity.WARNING : Severity.INFO,
+      EventSource.SYSTEM,
+      label,
+      result?.allPassed === false ? 0.99 : 1,
+      payload,
+    );
+
+    if (result) {
+      this._session.sendLifecycleEvent(
+        EventType.FOCUS_SCORE_UPDATE,
+        Severity.INFO,
+        EventSource.SYSTEM,
+        `Preflight summary: ${result.summary.passed} passed, ${result.summary.requiredFailed} blocking failures`,
+        1,
+        {
+          type: 'system',
+          data: {
+            category: 'preflight_summary',
+            terminated: false,
+          },
+        },
+      );
+    }
+
+    await this._session.flushNow();
+  }
+
+  /** Notify Argus browser extension (if installed) that a session has started. */
+  private _notifyExtensionStart(): void {
+    try {
+      if (typeof window !== 'undefined') {
+        window.postMessage({
+          argus: {
+            type: 'SESSION_START',
+            payload: {
+              sessionToken: this._config.sessionToken,
+              serverUrl: this._config.serverUrl,
+            },
+          },
+        }, '*');
+      }
+    } catch { /* Extension may not be installed — non-fatal */ }
+  }
+
+  /** Notify Argus browser extension that the session has ended. */
+  private _notifyExtensionStop(): void {
+    try {
+      if (typeof window !== 'undefined') {
+        window.postMessage({ argus: { type: 'SESSION_END' } }, '*');
+      }
+    } catch { /* non-fatal */ }
+  }
+
+  private _formatPreflightFailure(result: PreflightResult): string {
+    const failures = result.checks
+      .filter(check => check.required && check.status !== 'passed')
+      .map(check => check.message);
+    if (failures.length === 0) return 'One or more preflight checks failed';
+    return failures.join('; ');
   }
 }
 

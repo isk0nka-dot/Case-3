@@ -107,7 +107,7 @@ export class GrpcWebTransport {
   /**
    * Send a unary RPC call (POST with JSON body).
    *
-   * @param path  - gRPC service path (e.g., '/argus.v1.EventCollector/IngestBatch')
+   * @param path  - gRPC service path (e.g., '/argus.eventcollector.v1.EventCollectorService/IngestBatch')
    * @param body  - JSON-encoded request body
    * @param headers - Additional headers (e.g., Authorization)
    * @param signal - AbortSignal for cancellation
