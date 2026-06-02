@@ -1,0 +1,70 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: argus-production
+    env: production
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []  # add alertmanager host when deployed
+
+# Load alert rules
+rule_files:
+  - "alerts.yml"
+
+scrape_configs:
+
+  # ── Prometheus self-monitoring ─────────────────────────────────────────
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ── Argus Backend (HTTP metrics endpoint) ─────────────────────────────
+  - job_name: argus-backend
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['backend:8080']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: argus-backend
+
+  # ── PostgreSQL (via postgres_exporter) ────────────────────────────────
+  - job_name: postgres
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  # ── ClickHouse (built-in metrics) ─────────────────────────────────────
+  - job_name: clickhouse
+    metrics_path: /metrics
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['clickhouse:9363']
+
+  # ── Redis (via redis_exporter) ────────────────────────────────────────
+  - job_name: redis
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # ── MinIO ─────────────────────────────────────────────────────────────
+  - job_name: minio
+    metrics_path: /minio/v2/metrics/cluster
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['minio:9010']
+
+  # ── LiveKit (server metrics) ───────────────────────────────────────────
+  - job_name: livekit
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['livekit:6789']
+
+  # ── Node Exporter (host system metrics) ───────────────────────────────
+  - job_name: node
+    static_configs:
+      - targets: ['node-exporter:9100']

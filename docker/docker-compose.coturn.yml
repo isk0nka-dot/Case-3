@@ -1,0 +1,35 @@
+# =============================================================================
+#  Argus AI — TURN/STUN Server (coturn)
+#
+#  Нужен для WebRTC (LiveKit) вне localhost — когда студент и сервер в
+#  разных сетях/за NAT.
+#
+#  Запуск:
+#    docker compose -f docker-compose.dev.yml -f docker-compose.coturn.yml up -d
+#
+#  Обязательные переменные (.env):
+#    TURN_SECRET=<случайная строка 32+ символов>
+#    TURN_REALM=argusai.kz          # ваш домен
+#    TURN_EXTERNAL_IP=<публичный IP сервера>
+#
+#  После запуска обновить config.yaml и/или LiveKit env:
+#    LIVEKIT_TURN_HOST=<публичный IP или домен>
+#    LIVEKIT_TURN_PORT=3478
+#    LIVEKIT_TURN_SECRET=<TURN_SECRET>
+# =============================================================================
+
+networks:
+  argus-dev:
+    external: true
+    name: argus-dev-network
+
+services:
+
+  coturn:
+    image: coturn/coturn:4.6
+    container_name: argus-coturn
+    network_mode: host  # must be host for proper external IP detection
+    restart: unless-stopped
+    volumes:
+      - ../coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command: -c /etc/coturn/turnserver.conf

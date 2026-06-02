@@ -21,6 +21,7 @@ fail() { echo -e "  ${RED}✗${NC} $1"; ((FAIL++)); }
 
 BACKEND="http://localhost:8080"
 FRONTEND="http://localhost:3000"
+EVENT_COLLECTOR_SERVICE="/argus.eventcollector.v1.EventCollectorService"
 
 echo -e "\n${BOLD}${CYAN}╔══════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}${CYAN}║       ARGUS AI — GRAND FINALE SMOKE TEST        ║${NC}"
@@ -69,9 +70,9 @@ before_count=$(docker exec argus-clickhouse clickhouse-client \
 pass "ClickHouse baseline: $before_count events in proctoring_events"
 
 # Attempt gRPC-Web ingest (JSON over HTTP to gRPC-Web proxy)
-# The backend exposes gRPC-Web at /argus.proctoring.v1.EventCollectorService/*
+# The backend exposes gRPC-Web at /argus.eventcollector.v1.EventCollectorService/*
 ingest_resp=$(curl -sf --max-time 5 \
-  -X POST "$BACKEND/argus.proctoring.v1.EventCollectorService/IngestEvent" \
+  -X POST "$BACKEND$EVENT_COLLECTOR_SERVICE/IngestEvent" \
   -H "Content-Type: application/json" \
   -H "X-Session-Id: smoke-test-session-001" \
   -d '{
@@ -95,7 +96,7 @@ if [[ "$ingest_resp" != "FAIL" && -n "$ingest_resp" ]]; then
 else
   # gRPC-Web may use binary framing; try checking if the endpoint exists
   ingest_status=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 5 \
-    -X POST "$BACKEND/argus.proctoring.v1.EventCollectorService/IngestEvent" \
+    -X POST "$BACKEND$EVENT_COLLECTOR_SERVICE/IngestEvent" \
     -H "Content-Type: application/grpc-web+json" \
     -d '{}' 2>/dev/null || echo "000")
   if [[ "$ingest_status" != "000" && "$ingest_status" != "404" ]]; then

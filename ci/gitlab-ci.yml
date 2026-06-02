@@ -100,6 +100,7 @@ sync-infra:
     - sh ci/scripts/sync_infra.sh
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
 
 reset-project:
   stage: sync
@@ -126,6 +127,7 @@ run-migrations:
     - sh ci/scripts/run_migrations.sh
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
 
 # ── Stage: deploy ────────────────────────────────────────────────────────────
 # Restarts only Argus app containers (app, worker, inference, ai-sidecar).
@@ -146,3 +148,4 @@ deploy-argus:
     url: https://argusai.kz
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual

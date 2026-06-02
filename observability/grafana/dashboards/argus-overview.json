@@ -1,0 +1,199 @@
+{
+  "title": "Argus AI — System Overview",
+  "uid": "argus-overview",
+  "version": 1,
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "time": { "from": "now-3h", "to": "now" },
+  "tags": ["argus", "production"],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Backend Status",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "up{job=\"argus-backend\"}",
+          "legendFormat": "Backend"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["last"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } }, "type": "value" }
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Event Ingestion Rate (req/s)",
+      "type": "timeseries",
+      "gridPos": { "x": 4, "y": 0, "w": 10, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{job=\"argus-backend\",path=~\".*(IngestBatch|IngestEvent|Heartbeat).*\"}[1m])",
+          "legendFormat": "{{path}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": { "mode": "palette-classic" }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "HTTP Error Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 14, "y": 0, "w": 10, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{job=\"argus-backend\",status=~\"5..\"}[1m])",
+          "legendFormat": "5xx errors/s"
+        },
+        {
+          "expr": "rate(http_requests_total{job=\"argus-backend\",status=~\"4..\"}[1m])",
+          "legendFormat": "4xx errors/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Active Proctoring Sessions",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 4, "w": 4, "h": 4 },
+      "targets": [
+        {
+          "expr": "argus_active_sessions_total",
+          "legendFormat": "Active"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "sparkline"
+      },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [
+          { "color": "green", "value": null },
+          { "color": "yellow", "value": 50 },
+          { "color": "red", "value": 100 }
+        ]}}
+      }
+    },
+    {
+      "id": 5,
+      "title": "Request Latency p50 / p95 / p99",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"argus-backend\"}[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"argus-backend\"}[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"argus-backend\"}[5m]))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Events Dropped",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(argus_events_dropped_total[1m])",
+          "legendFormat": "dropped/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "fixedColor": "red", "mode": "fixed" } }
+      }
+    },
+    {
+      "id": 7,
+      "title": "PostgreSQL Connections",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "pg_stat_database_numbackends{datname=\"argus\"}",
+          "legendFormat": "connections"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Redis Memory Usage",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 16, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "used"
+        },
+        {
+          "expr": "redis_memory_max_bytes",
+          "legendFormat": "max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Disk Usage",
+      "type": "gauge",
+      "gridPos": { "x": 16, "y": 16, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "(node_filesystem_size_bytes{mountpoint=\"/\"} - node_filesystem_free_bytes{mountpoint=\"/\"}) / node_filesystem_size_bytes{mountpoint=\"/\"} * 100",
+          "legendFormat": "/ disk used %"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["last"] },
+        "minVizWidth": 75,
+        "minVizHeight": 75
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0, "max": 100,
+          "thresholds": { "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 70 },
+            { "color": "red", "value": 85 }
+          ]}
+        }
+      }
+    }
+  ]
+}

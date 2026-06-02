@@ -1,0 +1,29 @@
+# =============================================================================
+#  Argus AI — LiveKit TURN/STUN override
+#
+#  Extends the base docker-compose to configure LiveKit to use coturn.
+#
+#  Запуск (все три вместе):
+#    docker compose \
+#      -f docker-compose.dev.yml \
+#      -f docker-compose.coturn.yml \
+#      -f docker-compose.coturn-livekit.yml \
+#      up -d
+#
+#  Переменные (.env):
+#    TURN_SECRET=<shared secret>
+#    TURN_EXTERNAL_IP=<public IP>
+#    TURN_REALM=argusai.kz
+# =============================================================================
+
+services:
+  livekit:
+    command: >
+      --dev
+      --bind 0.0.0.0
+      --node-ip ${TURN_EXTERNAL_IP:-127.0.0.1}
+      --turn-enabled
+      --turn-host ${TURN_EXTERNAL_IP:-127.0.0.1}
+      --turn-port 3478
+      --turn-tls-port 5349
+      --turn-auth-secret ${TURN_SECRET:-change-me-secret-32-chars-minimum}
