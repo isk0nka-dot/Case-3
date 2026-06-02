@@ -10,47 +10,47 @@ const (
 	EventTypeUnspecified EventType = 0
 
 	// Video & Face events (Видео-правила)
-	GazeDeviation            EventType = 1
-	FaceMismatch             EventType = 2
-	FaceNotDetected          EventType = 3
-	FaceSpoofDetected        EventType = 4
-	MultiplePersons          EventType = 5
-	DynamicFaceRecheckFail   EventType = 6
+	GazeDeviation          EventType = 1
+	FaceMismatch           EventType = 2
+	FaceNotDetected        EventType = 3
+	FaceSpoofDetected      EventType = 4
+	MultiplePersons        EventType = 5
+	DynamicFaceRecheckFail EventType = 6
 
 	// Object detection events
-	PhoneDetected            EventType = 10
-	BookDetected             EventType = 11
-	EarbudsDetected          EventType = 12
-	UnknownObjectDetected    EventType = 13
+	PhoneDetected         EventType = 10
+	BookDetected          EventType = 11
+	EarbudsDetected       EventType = 12
+	UnknownObjectDetected EventType = 13
 
 	// Audio events (Чувствительность ИИ)
-	VoiceActivity            EventType = 20
-	AudioAnomaly             EventType = 21
-	AudioPeripheryDetected   EventType = 22
-	SmartNoiseClassified     EventType = 23
+	VoiceActivity          EventType = 20
+	AudioAnomaly           EventType = 21
+	AudioPeripheryDetected EventType = 22
+	SmartNoiseClassified   EventType = 23
 
 	// Browser events (Ограничения браузера)
-	TabSwitch                EventType = 30
-	CopyPasteAttempt         EventType = 31
-	PrintScreenAttempt       EventType = 32
-	ContextMenuAttempt       EventType = 33
-	FullscreenExit           EventType = 34
-	ExternalDisplayDetected  EventType = 35
+	TabSwitch               EventType = 30
+	CopyPasteAttempt        EventType = 31
+	PrintScreenAttempt      EventType = 32
+	ContextMenuAttempt      EventType = 33
+	FullscreenExit          EventType = 34
+	ExternalDisplayDetected EventType = 35
 
 	// Network events (Сетевой контроль)
-	VPNProxyDetected         EventType = 40
-	SuspiciousNetworkDevice  EventType = 41
+	VPNProxyDetected        EventType = 40
+	SuspiciousNetworkDevice EventType = 41
 
 	// Psychometry events (Психометрия и AI-аналитика)
-	EmotionStressSpike       EventType = 50
-	FocusLossDetected        EventType = 51
-	BlinkPatternAnomaly      EventType = 52
+	EmotionStressSpike  EventType = 50
+	FocusLossDetected   EventType = 51
+	BlinkPatternAnomaly EventType = 52
 
 	// Behavioral analysis events (Поведенческий анализ)
 	// NOTE: These use kernel-level data (SourceKernelAgent) for 100% integrity,
 	// but conceptually belong to behavioral biometrics, not system control.
-	TypingDynamicsAnomaly    EventType = 60
-	HandCursorDesync         EventType = 61
+	TypingDynamicsAnomaly EventType = 60
+	HandCursorDesync      EventType = 61
 
 	// Kernel-level events (Системный контроль)
 	ForbiddenProcessDetected EventType = 62
@@ -61,14 +61,14 @@ const (
 	VirtualMachineDetected   EventType = 67
 
 	// AI Vision events (biometric inference results)
-	HeadPoseAnomaly          EventType = 7  // Yaw/Pitch/Roll outside threshold
-	LivenessCheckFailed      EventType = 8  // Eye-blink + texture liveness failure
-	FaceOccluded             EventType = 9  // Partial face occlusion detected
+	HeadPoseAnomaly     EventType = 7 // Yaw/Pitch/Roll outside threshold
+	LivenessCheckFailed EventType = 8 // Eye-blink + texture liveness failure
+	FaceOccluded        EventType = 9 // Partial face occlusion detected
 
 	// AI Audio events (sound activity detection)
-	WhisperDetected          EventType = 24 // Low-amplitude speech (<40dB)
-	SecondSpeakerDetected    EventType = 25 // Voice embedding mismatch
-	AudioPlaybackDetected    EventType = 26 // TTS/recorded audio fingerprint
+	WhisperDetected       EventType = 24 // Low-amplitude speech (<40dB)
+	SecondSpeakerDetected EventType = 25 // Voice embedding mismatch
+	AudioPlaybackDetected EventType = 26 // TTS/recorded audio fingerprint
 
 	// Secondary Camera (Side Camera) events (Fix 7)
 	SidecamDeviceDisplaced    EventType = 70 // Accelerometer displacement > 2.0
@@ -87,15 +87,16 @@ const (
 	BackendAIVoiceSynth       EventType = 85 // Voice synthesis / TTS detected
 
 	// Telemetry (high-frequency, low-severity)
-	GazeTelemetry            EventType = 100
-	MouseTelemetry           EventType = 101
-	KeyboardTelemetry        EventType = 102
-	FocusScoreUpdate         EventType = 103
+	GazeTelemetry     EventType = 100
+	MouseTelemetry    EventType = 101
+	KeyboardTelemetry EventType = 102
+	FocusScoreUpdate  EventType = 103
 
 	// AI Telemetry (continuous inference streams)
-	HeadPoseTelemetry        EventType = 104 // Continuous yaw/pitch/roll
-	FaceEmbeddingTelemetry   EventType = 105 // Periodic face embedding snapshot
-	AudioLevelTelemetry      EventType = 106 // Continuous dB + VAD stream
+	HeadPoseTelemetry      EventType = 104 // Continuous yaw/pitch/roll
+	FaceEmbeddingTelemetry EventType = 105 // Periodic face embedding snapshot
+	AudioLevelTelemetry    EventType = 106 // Continuous dB + VAD stream
+	BackendAIFrameAnalyzed EventType = 107 // Backend analyzed a sampled browser frame
 )
 
 // IsTelemetry returns true for high-frequency telemetry event types.
@@ -167,13 +168,14 @@ var eventTypeNames = map[EventType]string{
 	BackendAIHiddenObject:     "BACKEND_AI_HIDDEN_OBJECT",
 	BackendAIDeepfakeDetected: "BACKEND_AI_DEEPFAKE_DETECTED",
 	BackendAIVoiceSynth:       "BACKEND_AI_VOICE_SYNTH",
-	GazeTelemetry:            "gaze_telemetry",
-	MouseTelemetry:           "mouse_telemetry",
-	KeyboardTelemetry:        "keyboard_telemetry",
-	FocusScoreUpdate:         "focus_score_update",
-	HeadPoseTelemetry:        "head_pose_telemetry",
-	FaceEmbeddingTelemetry:   "face_embedding_telemetry",
-	AudioLevelTelemetry:      "audio_level_telemetry",
+	GazeTelemetry:             "gaze_telemetry",
+	MouseTelemetry:            "mouse_telemetry",
+	KeyboardTelemetry:         "keyboard_telemetry",
+	FocusScoreUpdate:          "focus_score_update",
+	HeadPoseTelemetry:         "head_pose_telemetry",
+	FaceEmbeddingTelemetry:    "face_embedding_telemetry",
+	AudioLevelTelemetry:       "audio_level_telemetry",
+	BackendAIFrameAnalyzed:    "BACKEND_AI_FRAME_ANALYZED",
 }
 
 // String returns a human-readable label for the event type.

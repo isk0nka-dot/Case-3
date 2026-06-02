@@ -27,6 +27,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -158,6 +159,8 @@ func (h *ExternalHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/external/sessions/{sessionId}/student-token", h.requireSessionToken(h.handleStudentMediaToken))
 	// Recording-ready signal — SDK calls this after student successfully joins LiveKit room.
 	mux.HandleFunc("POST /api/v1/external/sessions/{sessionId}/recording-ready", h.requireSessionToken(h.handleRecordingReady))
+	// Near-real-time AI frame snapshots — SDK samples webcam frames for backend inference.
+	mux.HandleFunc("POST /api/v1/external/sessions/{sessionId}/ai-frame", h.requireSessionToken(h.handleAIFrame))
 }
 
 // ==========================================================================
@@ -264,10 +267,12 @@ type createSessionRequest struct {
 }
 
 type createSessionResponse struct {
-	SessionID         string `json:"sessionId"`
-	ArgusSessionToken string `json:"argusSessionToken"`
-	SDKUrl            string `json:"sdkUrl"`
-	ExpiresAt         string `json:"expiresAt"`
+	SessionID          string `json:"sessionId"`
+	ArgusSessionToken  string `json:"argusSessionToken"`
+	SDKUrl             string `json:"sdkUrl"`
+	ExpiresAt          string `json:"expiresAt"`
+	EnrollmentRequired bool   `json:"enrollmentRequired"`
+	EnrollmentStatus   string `json:"enrollmentStatus"`
 }
 
 func (h *ExternalHandler) handleCreateSession(w http.ResponseWriter, r *http.Request) {
@@ -313,16 +318,19 @@ func (h *ExternalHandler) handleCreateSession(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if existing != nil {
+			enrollmentStatus := h.resolveEnrollmentStatus(r.Context(), apiCtx.OrgID, existing.StudentID, "")
 			h.logger.Info("External session idempotency replay",
 				zap.String("session_id", existing.SessionID),
 				zap.String("org_id", apiCtx.OrgID),
 				zap.String("idempotency_key", idempotencyKey),
 			)
 			h.jsonResponse(w, createSessionResponse{
-				SessionID:         existing.SessionID,
-				ArgusSessionToken: existing.SessionToken,
-				SDKUrl:            h.sdkURL,
-				ExpiresAt:         existing.TokenExpiresAt.UTC().Format(time.RFC3339),
+				SessionID:          existing.SessionID,
+				ArgusSessionToken:  existing.SessionToken,
+				SDKUrl:             h.sdkURL,
+				ExpiresAt:          existing.TokenExpiresAt.UTC().Format(time.RFC3339),
+				EnrollmentRequired: enrollmentStatus != "ready",
+				EnrollmentStatus:   enrollmentStatus,
 			}, http.StatusOK)
 			return
 		}
@@ -380,16 +388,19 @@ func (h *ExternalHandler) handleCreateSession(w http.ResponseWriter, r *http.Req
 		if idempotencyKey != "" {
 			existing, lookupErr := h.repo.GetExternalSessionByIdempotencyKey(r.Context(), apiCtx.OrgID, idempotencyKey)
 			if lookupErr == nil && existing != nil {
+				enrollmentStatus := h.resolveEnrollmentStatus(r.Context(), apiCtx.OrgID, existing.StudentID, "")
 				h.logger.Info("External session idempotency replay after create conflict",
 					zap.String("session_id", existing.SessionID),
 					zap.String("org_id", apiCtx.OrgID),
 					zap.String("idempotency_key", idempotencyKey),
 				)
 				h.jsonResponse(w, createSessionResponse{
-					SessionID:         existing.SessionID,
-					ArgusSessionToken: existing.SessionToken,
-					SDKUrl:            h.sdkURL,
-					ExpiresAt:         existing.TokenExpiresAt.UTC().Format(time.RFC3339),
+					SessionID:          existing.SessionID,
+					ArgusSessionToken:  existing.SessionToken,
+					SDKUrl:             h.sdkURL,
+					ExpiresAt:          existing.TokenExpiresAt.UTC().Format(time.RFC3339),
+					EnrollmentRequired: enrollmentStatus != "ready",
+					EnrollmentStatus:   enrollmentStatus,
 				}, http.StatusOK)
 				return
 			}
@@ -438,12 +449,35 @@ func (h *ExternalHandler) handleCreateSession(w http.ResponseWriter, r *http.Req
 		}
 	}
 
+	enrollmentStatus := h.resolveEnrollmentStatus(r.Context(), apiCtx.OrgID, req.StudentID, req.ReferencePhotoURL)
 	h.jsonResponse(w, createSessionResponse{
-		SessionID:         sessionID,
-		ArgusSessionToken: sessionToken,
-		SDKUrl:            h.sdkURL,
-		ExpiresAt:         tokenExpiry.UTC().Format(time.RFC3339),
+		SessionID:          sessionID,
+		ArgusSessionToken:  sessionToken,
+		SDKUrl:             h.sdkURL,
+		ExpiresAt:          tokenExpiry.UTC().Format(time.RFC3339),
+		EnrollmentRequired: enrollmentStatus != "ready",
+		EnrollmentStatus:   enrollmentStatus,
 	}, http.StatusCreated)
+}
+
+func (h *ExternalHandler) resolveEnrollmentStatus(ctx context.Context, orgID, studentID, referencePhotoURL string) string {
+	if h.repo == nil || strings.TrimSpace(studentID) == "" || strings.TrimSpace(orgID) == "" {
+		if strings.TrimSpace(referencePhotoURL) != "" {
+			return "queued"
+		}
+		return "unknown"
+	}
+	enrollment, err := h.repo.GetEnrollment(ctx, studentID, orgID)
+	if err == nil && enrollment != nil && len(enrollment.Embedding) > 0 {
+		return "ready"
+	}
+	if strings.TrimSpace(referencePhotoURL) != "" {
+		if h.asynqClient != nil {
+			return "queued"
+		}
+		return "photo_provided_queue_unavailable"
+	}
+	return "missing"
 }
 
 func (h *ExternalHandler) handleGetSession(w http.ResponseWriter, r *http.Request) {
@@ -1518,6 +1552,135 @@ func (h *ExternalHandler) persistStartedRecording(ctx context.Context, egressID,
 			zap.String("session_id", sessionID),
 			zap.Error(err),
 		)
+	}
+}
+
+const maxAIFrameUploadBytes = 768 * 1024
+
+// handleAIFrame accepts a sampled webcam frame from the browser SDK and queues
+// it for backend inference. It intentionally does not block the exam flow:
+// if the inference queue is disabled, the SDK receives a clear non-fatal status.
+//
+//	POST /api/v1/external/sessions/{sessionId}/ai-frame
+func (h *ExternalHandler) handleAIFrame(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		h.jsonError(w, "missing session claims", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID := r.PathValue("sessionId")
+	if sessionID == "" {
+		sessionID = claims.SessionID
+	}
+	if sessionID != claims.SessionID {
+		h.jsonError(w, "session mismatch", http.StatusForbidden)
+		return
+	}
+
+	if h.asynqClient == nil {
+		h.jsonResponse(w, map[string]string{"status": "inference_disabled"}, http.StatusAccepted)
+		return
+	}
+
+	session, err := h.repo.GetExternalSessionByID(r.Context(), sessionID)
+	if err != nil || session == nil {
+		h.jsonError(w, "session not found", http.StatusNotFound)
+		return
+	}
+	if session.IsTerminal() {
+		h.jsonResponse(w, map[string]string{"status": "session_terminal"}, http.StatusAccepted)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxAIFrameUploadBytes+64*1024)
+	if err := r.ParseMultipartForm(maxAIFrameUploadBytes + 64*1024); err != nil {
+		h.jsonError(w, "invalid multipart frame upload", http.StatusBadRequest)
+		return
+	}
+
+	contentType := strings.TrimSpace(r.FormValue("contentType"))
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+	if !isAllowedAIFrameContentType(contentType) {
+		h.jsonError(w, "unsupported frame content type", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	videoTimestampSec := 0.0
+	if raw := strings.TrimSpace(r.FormValue("videoTimestampSec")); raw != "" {
+		parsed, err := strconv.ParseFloat(raw, 64)
+		if err != nil || parsed < 0 {
+			h.jsonError(w, "invalid videoTimestampSec", http.StatusBadRequest)
+			return
+		}
+		videoTimestampSec = parsed
+	}
+
+	file, _, err := r.FormFile("frame")
+	if err != nil {
+		h.jsonError(w, "missing frame file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	frameData, err := io.ReadAll(io.LimitReader(file, maxAIFrameUploadBytes+1))
+	if err != nil {
+		h.jsonError(w, "failed to read frame", http.StatusBadRequest)
+		return
+	}
+	if len(frameData) == 0 {
+		h.jsonError(w, "empty frame", http.StatusBadRequest)
+		return
+	}
+	if len(frameData) > maxAIFrameUploadBytes {
+		h.jsonError(w, "frame is too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	payload := worker.AIFrameAnalysisPayload{
+		SessionID:         sessionID,
+		OrgID:             claims.OrgID,
+		ExamID:            claims.ExamID,
+		StudentID:         claims.StudentID,
+		ContentType:       contentType,
+		FrameData:         frameData,
+		VideoTimestampSec: videoTimestampSec,
+	}
+
+	task, err := worker.NewAIFrameAnalysisTask(payload)
+	if err != nil {
+		h.logger.Warn("failed to build AI frame task",
+			zap.String("session_id", sessionID),
+			zap.Error(err),
+		)
+		h.jsonError(w, "failed to queue frame", http.StatusInternalServerError)
+		return
+	}
+	if _, err := h.asynqClient.Enqueue(task); err != nil {
+		h.logger.Warn("failed to enqueue AI frame task",
+			zap.String("session_id", sessionID),
+			zap.Error(err),
+		)
+		h.jsonError(w, "failed to queue frame", http.StatusBadGateway)
+		return
+	}
+
+	h.jsonResponse(w, map[string]interface{}{
+		"status":            "queued",
+		"videoTimestampSec": videoTimestampSec,
+		"sizeBytes":         len(frameData),
+	}, http.StatusAccepted)
+}
+
+func isAllowedAIFrameContentType(contentType string) bool {
+	mediaType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
+	switch mediaType {
+	case "image/jpeg", "image/jpg", "image/png", "image/webp":
+		return true
+	default:
+		return false
 	}
 }
 

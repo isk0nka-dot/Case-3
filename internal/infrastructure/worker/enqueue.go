@@ -67,6 +67,23 @@ func NewAIAnalysisTask(payload AIAnalysisPayload) (*asynq.Task, error) {
 	), nil
 }
 
+// NewAIFrameAnalysisTask creates an asynq task for one browser snapshot.
+// Frame jobs are intentionally not deduplicated by session: each sampled frame
+// can produce a distinct timestamped anomaly for live monitoring.
+func NewAIFrameAnalysisTask(payload AIFrameAnalysisPayload) (*asynq.Task, error) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal AIFrameAnalysisPayload: %w", err)
+	}
+	return asynq.NewTask(
+		TypeAIFrameAnalysis,
+		data,
+		asynq.MaxRetry(1),
+		asynq.Timeout(45*time.Second),
+		asynq.Queue(QueueInference),
+	), nil
+}
+
 // NewEnrollStudentTask creates an asynq task for student biometric enrollment.
 // Fetches reference photo, extracts ArcFace embedding via inference gateway,
 // and stores it in student_enrollments. Enqueued on the default queue.

@@ -96,6 +96,10 @@ func (h *AIAnalysisHandler) ConfigureMaxFrameBytes(maxBytes int) {
 
 // ProcessTask implements the asynq.Handler interface.
 func (h *AIAnalysisHandler) ProcessTask(ctx context.Context, t *asynq.Task) error {
+	if t.Type() == TypeAIFrameAnalysis {
+		return h.processFrameTask(ctx, t)
+	}
+
 	start := time.Now()
 
 	var payload AIAnalysisPayload
@@ -260,6 +264,102 @@ func (h *AIAnalysisHandler) ProcessTask(ctx context.Context, t *asynq.Task) erro
 	)
 
 	NotifyJobCompleted(h.alerter, TypeAIAnalysis, payload.SessionID, duration)
+	return nil
+}
+
+func (h *AIAnalysisHandler) processFrameTask(ctx context.Context, t *asynq.Task) error {
+	start := time.Now()
+
+	var payload AIFrameAnalysisPayload
+	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
+		return fmt.Errorf("unmarshal AIFrameAnalysisPayload: %w", err)
+	}
+	if strings.TrimSpace(payload.SessionID) == "" {
+		return fmt.Errorf("AIFrameAnalysisPayload session_id is required")
+	}
+	if len(payload.FrameData) == 0 {
+		return fmt.Errorf("AIFrameAnalysisPayload frame_data is required")
+	}
+	if len(payload.FrameData) > h.effectiveMaxFrameBytes() {
+		return fmt.Errorf("AIFrameAnalysisPayload frame exceeds maximum size: %d bytes > %d bytes", len(payload.FrameData), h.effectiveMaxFrameBytes())
+	}
+	if !isSupportedEvidenceFrameContentType(payload.ContentType) {
+		return fmt.Errorf("%w: %s", errUnsupportedEvidenceContentType, payload.ContentType)
+	}
+
+	thresholds := h.thresholds
+	if payload.FaceMismatchThreshold > 0 {
+		thresholds.FaceMismatch = payload.FaceMismatchThreshold
+	}
+	if payload.LivenessThreshold > 0 {
+		thresholds.Liveness = payload.LivenessThreshold
+	}
+	if payload.ObjectConfidenceThreshold > 0 {
+		thresholds.ObjectConfidence = payload.ObjectConfidenceThreshold
+	}
+	if payload.SpoofConfidenceThreshold > 0 {
+		thresholds.SpoofConfidence = payload.SpoofConfidenceThreshold
+	}
+
+	if len(payload.ReferenceEmbedding) == 0 && h.pgRepo != nil {
+		enrollment, err := h.pgRepo.GetEnrollment(ctx, payload.StudentID, payload.OrgID)
+		if err != nil {
+			h.logger.Warn("failed to look up enrollment for frame analysis",
+				zap.String("session_id", payload.SessionID),
+				zap.String("student_id", payload.StudentID),
+				zap.Error(err),
+			)
+		} else if enrollment != nil {
+			payload.ReferenceEmbedding = enrollment.Embedding
+		}
+	}
+
+	conn, err := grpc.NewClient(
+		h.inferenceAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return fmt.Errorf("connect to inference gateway at %s: %w", h.inferenceAddr, err)
+	}
+	defer conn.Close()
+
+	client := inferencepb.NewInferenceServiceClient(conn)
+	resp, err := client.AnalyzeFrame(ctx, &inferencepb.AnalyzeFrameRequest{
+		SessionId:          payload.SessionID,
+		StudentId:          payload.StudentID,
+		ExamId:             payload.ExamID,
+		OrgId:              payload.OrgID,
+		FrameData:          payload.FrameData,
+		ContentType:        payload.ContentType,
+		VideoTimestampSec:  payload.VideoTimestampSec,
+		ReferenceEmbedding: append([]float32(nil), payload.ReferenceEmbedding...),
+	})
+	if err != nil {
+		return fmt.Errorf("analyze realtime frame: %w", err)
+	}
+
+	frame := &inferencepb.FrameAnalysis{
+		TimestampSec: payload.VideoTimestampSec,
+		Faces:        resp.Faces,
+		Objects:      resp.Objects,
+		Liveness:     resp.Liveness,
+	}
+	eventsWritten, err := h.writeBackAnomalies(ctx, AIAnalysisPayload{
+		SessionID:          payload.SessionID,
+		OrgID:              payload.OrgID,
+		ExamID:             payload.ExamID,
+		StudentID:          payload.StudentID,
+		ReferenceEmbedding: payload.ReferenceEmbedding,
+	}, []*inferencepb.FrameAnalysis{frame}, thresholds)
+	if err != nil {
+		return fmt.Errorf("write realtime frame anomalies: %w", err)
+	}
+
+	h.logger.Debug("AI frame analysis completed",
+		zap.String("session_id", payload.SessionID),
+		zap.Int("events_written", eventsWritten),
+		zap.Duration("duration", time.Since(start)),
+	)
 	return nil
 }
 
@@ -459,7 +559,23 @@ func (h *AIAnalysisHandler) writeBackAnomalies(
 	now := time.Now().UTC()
 
 	for _, frame := range frames {
-		for _, anomaly := range classifyFrameAnomalies(frame, thresholds) {
+		if frame == nil {
+			continue
+		}
+		anomalies := classifyFrameAnomalies(frame, thresholds)
+		if err := h.chWriter.Write(ctx, h.buildEvent(payload, now, frame.TimestampSec, detectedAIAnomaly{
+			eventType:   valueobject.BackendAIFrameAnalyzed,
+			severity:    valueobject.SeverityInfo,
+			label:       "Backend AI frame analyzed",
+			confidence:  1,
+			payload:     marshalAIAnomalyPayload(newAIFrameAnalyzedPayload(frame, len(anomalies))),
+			payloadType: "ai_frame",
+		})); err != nil {
+			h.logger.Warn("failed to write AI frame telemetry event", zap.Error(err))
+		} else {
+			count++
+		}
+		for _, anomaly := range anomalies {
 			evt := h.buildEvent(payload, now, frame.TimestampSec, anomaly)
 			if err := h.chWriter.Write(ctx, evt); err != nil {
 				h.logger.Warn("failed to write AI anomaly event", zap.Error(err))
@@ -470,6 +586,25 @@ func (h *AIAnalysisHandler) writeBackAnomalies(
 	}
 
 	return count, nil
+}
+
+type aiFrameAnalyzedPayload struct {
+	FaceCount        int  `json:"face_count"`
+	ObjectCount      int  `json:"object_count"`
+	AnomalyCount     int  `json:"anomaly_count"`
+	LivenessReported bool `json:"liveness_reported"`
+}
+
+func newAIFrameAnalyzedPayload(frame *inferencepb.FrameAnalysis, anomalyCount int) aiFrameAnalyzedPayload {
+	if frame == nil {
+		return aiFrameAnalyzedPayload{AnomalyCount: anomalyCount}
+	}
+	return aiFrameAnalyzedPayload{
+		FaceCount:        len(frame.Faces),
+		ObjectCount:      len(frame.Objects),
+		AnomalyCount:     anomalyCount,
+		LivenessReported: frame.Liveness != nil,
+	}
 }
 
 type detectedAIAnomaly struct {

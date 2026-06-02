@@ -31,6 +31,11 @@ const (
 	// back to ClickHouse, and fires Telegram alerts for critical fraud.
 	TypeAIAnalysis = "job:ai_analysis"
 
+	// TypeAIFrameAnalysis is the asynq task type for near-real-time browser
+	// frame analysis. The SDK periodically uploads JPEG snapshots; the worker
+	// runs inference and writes BACKEND_AI events to ClickHouse for SSE/report.
+	TypeAIFrameAnalysis = "job:ai_frame_analysis"
+
 	// TypeEnrollStudent is the asynq task type for student biometric enrollment.
 	// The worker fetches the reference photo from the provided URL, passes it
 	// through the inference gateway to extract an ArcFace embedding, and stores
@@ -140,4 +145,24 @@ type AIAnalysisPayload struct {
 	SpoofConfidenceThreshold  float32 `json:"spoof_confidence_threshold,omitempty"`
 	CleanThreshold            float64 `json:"clean_threshold,omitempty"`
 	WarningThreshold          float64 `json:"warning_threshold,omitempty"`
+}
+
+// AIFrameAnalysisPayload is a single browser snapshot from an active session.
+// It is intentionally small and transient: durable evidence remains in the
+// recording/evidence stores, while this job powers near-real-time AI events.
+type AIFrameAnalysisPayload struct {
+	SessionID         string  `json:"session_id"`
+	OrgID             string  `json:"org_id"`
+	ExamID            string  `json:"exam_id"`
+	StudentID         string  `json:"student_id"`
+	ContentType       string  `json:"content_type"`
+	FrameData         []byte  `json:"frame_data"`
+	VideoTimestampSec float64 `json:"video_timestamp_sec"`
+
+	ReferenceEmbedding []float32 `json:"reference_embedding,omitempty"`
+
+	FaceMismatchThreshold     float32 `json:"face_mismatch_threshold,omitempty"`
+	LivenessThreshold         float32 `json:"liveness_threshold,omitempty"`
+	ObjectConfidenceThreshold float32 `json:"object_confidence_threshold,omitempty"`
+	SpoofConfidenceThreshold  float32 `json:"spoof_confidence_threshold,omitempty"`
 }

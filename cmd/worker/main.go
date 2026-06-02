@@ -304,12 +304,14 @@ func run() error {
 
 	inferenceMux := asynq.NewServeMux()
 	inferenceMux.Handle(worker.TypeAIAnalysis, aiAnalysisHandler)
+	inferenceMux.Handle(worker.TypeAIFrameAnalysis, aiAnalysisHandler)
 
 	logger.Info("asynq handlers registered (dual-server isolation)",
 		zap.String(worker.TypeVideoExport, "VideoExportHandler → general"),
 		zap.String(worker.TypeForensicReport, "ForensicReportHandler → general"),
 		zap.String(worker.TypeEnrollStudent, "EnrollStudentHandler → general"),
 		zap.String(worker.TypeAIAnalysis, "AIAnalysisHandler → inference"),
+		zap.String(worker.TypeAIFrameAnalysis, "AIAnalysisHandler(frame) → inference"),
 		zap.Int("general_concurrency", cfg.Redis.WorkerConcurrency),
 		zap.Int("inference_concurrency", cfg.Redis.InferenceConcurrency),
 	)
