@@ -109,6 +109,56 @@ services:
       ARGUS_MINIO_BUCKET: ${ARGUS_MINIO_BUCKET:-argus-evidence}
       ARGUS_MINIO_EXPORT_BUCKET: ${ARGUS_MINIO_EXPORT_BUCKET:-argus-exports}
 
+  livekit:
+    image: livekit/livekit-server:v1.8.3
+    container_name: argus-livekit
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
+    ports:
+      - "127.0.0.1:7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-argus-livekit-prod}: ${LIVEKIT_API_SECRET:-argus-livekit-secret-production-2026-secure-key}"
+      LIVEKIT_REDIS_ADDRESS: redis:6379
+      LIVEKIT_RTC_TCP_PORT: "7881"
+      LIVEKIT_RTC_PORT_RANGE_START: "7882"
+      LIVEKIT_RTC_PORT_RANGE_END: "7882"
+      LIVEKIT_WEBHOOK_URLS: "http://app:8080/api/v1/livekit/webhook"
+      LIVEKIT_WEBHOOK_API_KEY: "${LIVEKIT_API_KEY:-argus-livekit-prod}"
+    depends_on:
+      - redis
+
+  livekit-egress:
+    image: livekit/egress:v1.9.0
+    container_name: argus-livekit-egress
+    restart: unless-stopped
+    mem_limit: 2g
+    memswap_limit: 2g
+    environment:
+      EGRESS_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY:-argus-livekit-prod}
+        api_secret: ${LIVEKIT_API_SECRET:-argus-livekit-secret-production-2026-secure-key}
+        ws_url: ws://livekit:7880
+        insecure: true
+        redis:
+          address: redis:6379
+        logging:
+          level: info
+        storage:
+          s3:
+            endpoint: http://minio:9000
+            access_key: ${ARGUS_MINIO_ROOT_USER:-argus-minio-admin}
+            secret: ${ARGUS_MINIO_ROOT_PASSWORD}
+            bucket: ${ARGUS_MINIO_EXPORT_BUCKET:-argus-exports}
+            region: us-east-1
+            force_path_style: true
+    depends_on:
+      - livekit
+      - redis
+      - minio
+
   ai-sidecar:
     build:
       context: ./ai-sidecar
