@@ -36,6 +36,7 @@ const capturing = ref(false)
 
 // Evidence count for badge
 const evidenceCount = computed(() => inspectorStore.getEvidenceCount(props.session.sessionId))
+const riskTrend = computed(() => props.riskScore?.trend ?? [])
 
 // Risk color for sparkline
 const riskColor = computed(() => {
@@ -233,8 +234,8 @@ function formatStudentName(studentId: string): string {
 
       <!-- Sparkline -->
       <RiskSparkline
-        v-if="riskScore.trend.length >= 2"
-        :data="riskScore.trend"
+        v-if="riskTrend.length >= 2"
+        :data="riskTrend"
         :color="riskColor"
         :width="compact ? 80 : 120"
         :height="16"

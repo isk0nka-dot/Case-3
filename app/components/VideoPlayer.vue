@@ -95,6 +95,7 @@ async function connect() {
 
     room.on(RoomEvent.ParticipantConnected, () => {
       participantCount.value = room?.remoteParticipants?.size ?? 0
+      attachExistingVideoTracks()
     })
 
     room.on(RoomEvent.ParticipantDisconnected, () => {
@@ -106,19 +107,27 @@ async function connect() {
     participantCount.value = room.remoteParticipants.size
 
     // Attach any existing video tracks
-    room.remoteParticipants.forEach((participant: RemoteParticipant) => {
-      participant.trackPublications.forEach((publication: RemoteTrackPublication) => {
-        if (publication.track && publication.track.kind === Track.Kind.Video && videoRef.value) {
-          publication.track.attach(videoRef.value)
-          hasVideo.value = true
-        }
-      })
-    })
+    attachExistingVideoTracks()
   } catch (err: any) {
     connectionState.value = 'error'
     errorMessage.value = err.message || 'Connection failed'
     emit('error', errorMessage.value)
   }
+}
+
+function attachExistingVideoTracks() {
+  if (!room) return
+  room.remoteParticipants.forEach((participant: RemoteParticipant) => {
+    participant.trackPublications.forEach((publication: RemoteTrackPublication) => {
+      if (publication.kind === Track.Kind.Video && !publication.isSubscribed) {
+        publication.setSubscribed(true)
+      }
+      if (publication.track && publication.track.kind === Track.Kind.Video && videoRef.value) {
+        publication.track.attach(videoRef.value)
+        hasVideo.value = true
+      }
+    })
+  })
 }
 
 // --- Disconnect ---

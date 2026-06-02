@@ -187,8 +187,8 @@ export const useInspectorStore = defineStore('inspector', () => {
   let sessionsRef: ActiveSession[] = []
 
   /** Update the session reference for risk computation. */
-  function updateSessions(sessions: ActiveSession[]) {
-    sessionsRef = sessions
+  function updateSessions(sessions: ActiveSession[] | null | undefined) {
+    sessionsRef = Array.isArray(sessions) ? sessions : []
   }
 
   /** Compute risk scores for all sessions and sort. */
@@ -293,10 +293,11 @@ export const useInspectorStore = defineStore('inspector', () => {
   // =========================================================================
 
   /** Get sessions sorted by risk. Falls back to input order if no risk data. */
-  function sortSessionsByRisk(sessions: ActiveSession[]): ActiveSession[] {
-    if (sortedSessionIds.value.length === 0) return sessions
+  function sortSessionsByRisk(sessions: ActiveSession[] | null | undefined): ActiveSession[] {
+    const safeSessions = Array.isArray(sessions) ? sessions : []
+    if (sortedSessionIds.value.length === 0) return safeSessions
 
-    const sessionMap = new Map(sessions.map(s => [s.sessionId, s]))
+    const sessionMap = new Map(safeSessions.map(s => [s.sessionId, s]))
     const result: ActiveSession[] = []
 
     // First add sessions that appear in sortedSessionIds (in sorted order)

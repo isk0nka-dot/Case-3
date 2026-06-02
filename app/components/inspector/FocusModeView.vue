@@ -32,6 +32,7 @@ const filmstripSessions = computed(() =>
 
 // Current session risk score
 const riskScore = computed(() => inspectorStore.getRiskScore(props.session.sessionId))
+const riskTrend = computed(() => riskScore.value?.trend ?? [])
 
 // Evidence for this session
 const evidence = computed(() => inspectorStore.getEvidence(props.session.sessionId))
@@ -249,8 +250,8 @@ function formatStudentName(studentId: string): string {
                 style="color: var(--argus-text-dimmed);"
               >Тренд риска</span>
               <RiskSparkline
-                v-if="riskScore.trend.length >= 2"
-                :data="riskScore.trend"
+                v-if="riskTrend.length >= 2"
+                :data="riskTrend"
                 :color="riskColorValue"
                 :width="160"
                 :height="24"
