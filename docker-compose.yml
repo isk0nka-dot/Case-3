@@ -221,6 +221,10 @@ services:
       EVENT_COLLECTOR_MINIO_BUCKET: ${ARGUS_MINIO_BUCKET:-argus-evidence}
       EVENT_COLLECTOR_DLQ_ENABLED: "true"
       EVENT_COLLECTOR_DLQ_DATA_DIR: /data/argus-dlq
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
+      LIVEKIT_WS_URL: ${LIVEKIT_WS_URL:-ws://livekit:7880}
+      LIVEKIT_PUBLIC_WS_URL: ${LIVEKIT_PUBLIC_WS_URL:-wss://argusai.kz/livekit}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
       interval: 30s
