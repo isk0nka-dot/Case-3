@@ -7,10 +7,12 @@
 // session data, event timelines, and per-exam summaries.
 //
 // Endpoints:
-//   GET  /api/v1/archive/sessions            — List archived sessions with filters
-//   GET  /api/v1/archive/sessions/{id}/events — All events for a specific session
-//   GET  /api/v1/archive/exams                — Exam summaries for archive filters
-//   GET  /api/v1/archive/sessions/{id}/export — Export session report (JSON)
+//
+//	GET  /api/v1/archive/sessions            — List archived sessions with filters
+//	GET  /api/v1/archive/sessions/{id}/events — All events for a specific session
+//	GET  /api/v1/archive/exams                — Exam summaries for archive filters
+//	GET  /api/v1/archive/sessions/{id}/export — Export session report (JSON)
+//
 // =============================================================================
 package http
 
@@ -21,6 +23,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -135,15 +138,15 @@ type ArchiveSessionEventsResponse struct {
 
 // ArchiveExamSummary represents an exam with aggregated session stats.
 type ArchiveExamSummary struct {
-	ExamID          string  `json:"examId"`
-	OrgID           string  `json:"orgId"`
-	SessionCount    uint64  `json:"sessionCount"`
-	TotalEvents     uint64  `json:"totalEvents"`
-	TotalCritical   uint64  `json:"totalCritical"`
-	TotalWarning    uint64  `json:"totalWarning"`
-	AvgIntegrity    float64 `json:"avgIntegrity"`
-	FirstEventTime  string  `json:"firstEventTime"`
-	LastEventTime   string  `json:"lastEventTime"`
+	ExamID         string  `json:"examId"`
+	OrgID          string  `json:"orgId"`
+	SessionCount   uint64  `json:"sessionCount"`
+	TotalEvents    uint64  `json:"totalEvents"`
+	TotalCritical  uint64  `json:"totalCritical"`
+	TotalWarning   uint64  `json:"totalWarning"`
+	AvgIntegrity   float64 `json:"avgIntegrity"`
+	FirstEventTime string  `json:"firstEventTime"`
+	LastEventTime  string  `json:"lastEventTime"`
 }
 
 // ArchiveExamsResponse wraps exam summaries.
@@ -770,21 +773,21 @@ func (h *ArchiveHandler) queryExamSummaries(ctx context.Context, orgID string) (
 // ReviewRequest is the request body for submitting a review decision.
 type ReviewRequest struct {
 	Decision       string   `json:"decision"`       // confirmed | dismissed | escalated
-	Notes          string   `json:"notes"`           // Free-text reviewer notes
-	EvidenceIDs    []string `json:"evidenceIds"`     // Reviewed evidence fragment IDs
-	IntegrityScore float64  `json:"integrityScore"`  // Integrity score at review time
+	Notes          string   `json:"notes"`          // Free-text reviewer notes
+	EvidenceIDs    []string `json:"evidenceIds"`    // Reviewed evidence fragment IDs
+	IntegrityScore float64  `json:"integrityScore"` // Integrity score at review time
 }
 
 // ReviewResponse is the response for review operations.
 type ReviewResponse struct {
-	SessionID    string   `json:"sessionId"`
-	ReviewerID   string   `json:"reviewerId"`
-	ReviewerName string   `json:"reviewerName"`
-	Decision     string   `json:"decision"`
-	Notes        string   `json:"notes"`
-	EvidenceIDs  []string `json:"evidenceIds"`
-	IntegrityScore float64 `json:"integrityScore"`
-	ReviewedAt   string   `json:"reviewedAt"`
+	SessionID      string   `json:"sessionId"`
+	ReviewerID     string   `json:"reviewerId"`
+	ReviewerName   string   `json:"reviewerName"`
+	Decision       string   `json:"decision"`
+	Notes          string   `json:"notes"`
+	EvidenceIDs    []string `json:"evidenceIds"`
+	IntegrityScore float64  `json:"integrityScore"`
+	ReviewedAt     string   `json:"reviewedAt"`
 }
 
 // ReviewStatsResponse contains aggregate review statistics.
@@ -1068,7 +1071,7 @@ func (h *ArchiveHandler) handleStreamVideo(w http.ResponseWriter, r *http.Reques
 		ORDER BY created_at DESC LIMIT 1`, sessionID,
 	).Scan(&fileURL)
 	if fileURL != "" {
-		objectKey = fileURL
+		objectKey = normalizeRecordingObjectKey(fileURL, h.minio.Bucket())
 	}
 
 	// Second try: construct key from external_sessions student_id (webhook not needed).
@@ -1101,4 +1104,28 @@ func (h *ArchiveHandler) handleStreamVideo(w http.ResponseWriter, r *http.Reques
 			h.jsonError(w, "recording not found or not yet ready", http.StatusNotFound)
 		}
 	}
+}
+
+func normalizeRecordingObjectKey(fileURL, bucket string) string {
+	key := strings.TrimSpace(fileURL)
+	if key == "" {
+		return ""
+	}
+
+	if strings.HasPrefix(key, "s3://") {
+		withoutScheme := strings.TrimPrefix(key, "s3://")
+		if bucket != "" && strings.HasPrefix(withoutScheme, bucket+"/") {
+			return strings.TrimPrefix(withoutScheme, bucket+"/")
+		}
+		if slash := strings.Index(withoutScheme, "/"); slash >= 0 {
+			return withoutScheme[slash+1:]
+		}
+		return withoutScheme
+	}
+
+	key = strings.TrimPrefix(key, "/")
+	if bucket != "" && strings.HasPrefix(key, bucket+"/") {
+		return strings.TrimPrefix(key, bucket+"/")
+	}
+	return key
 }

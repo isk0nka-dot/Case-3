@@ -279,6 +279,11 @@ func (s *Store) StreamKey(ctx context.Context, key string, w http.ResponseWriter
 			if n == 2 && re < totalSize {
 				end = re
 			}
+			if start < 0 || start >= totalSize || end < start {
+				w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", totalSize))
+				w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+				return nil
+			}
 			isRange = true
 		}
 	}
