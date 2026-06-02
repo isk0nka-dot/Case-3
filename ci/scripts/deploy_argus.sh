@@ -53,12 +53,14 @@ ARGUS_DEPLOY_HOST="${ARGUS_DEPLOY_HOST:-${DEPLOY_HOST:-}}"
 ARGUS_DEPLOY_USER="${ARGUS_DEPLOY_USER:-${DEPLOY_USER:-}}"
 ARGUS_PROJECT_ROOT="${ARGUS_PROJECT_ROOT:-/opt/argus-ai}"
 ARGUS_BACKEND_DEPLOY_PATH="${ARGUS_BACKEND_DEPLOY_PATH:-$ARGUS_PROJECT_ROOT/argus-backend}"
+ARGUS_INFRA_DEPLOY_PATH="${ARGUS_INFRA_DEPLOY_PATH:-$ARGUS_PROJECT_ROOT/argus-infra}"
 
 [ -n "$ARGUS_DEPLOY_HOST" ] || fail "DEPLOY_HOST or ARGUS_DEPLOY_HOST is required"
 [ -n "$ARGUS_DEPLOY_USER" ] || fail "DEPLOY_USER or ARGUS_DEPLOY_USER is required"
 
 safe_abs_path "ARGUS_PROJECT_ROOT" "$ARGUS_PROJECT_ROOT"
 safe_abs_path "ARGUS_BACKEND_DEPLOY_PATH" "$ARGUS_BACKEND_DEPLOY_PATH"
+safe_abs_path "ARGUS_INFRA_DEPLOY_PATH" "$ARGUS_INFRA_DEPLOY_PATH"
 
 require_cmd ssh
 require_cmd ssh-agent
@@ -92,7 +94,7 @@ echo "Commit: ${CI_COMMIT_SHORT_SHA:-local}"
 echo "============================================================"
 
 ssh "$ARGUS_DEPLOY_USER@$ARGUS_DEPLOY_HOST" \
-  "ARGUS_BACKEND_DEPLOY_PATH='$ARGUS_BACKEND_DEPLOY_PATH' sh -s" <<'REMOTE_SCRIPT'
+  "ARGUS_BACKEND_DEPLOY_PATH='$ARGUS_BACKEND_DEPLOY_PATH' ARGUS_INFRA_DEPLOY_PATH='$ARGUS_INFRA_DEPLOY_PATH' sh -s" <<'REMOTE_SCRIPT'
 set -eu
 
 compose() {
@@ -108,11 +110,13 @@ compose() {
 
 cd "$ARGUS_BACKEND_DEPLOY_PATH"
 
+echo "Applying nginx config..."
+sudo cp "$ARGUS_INFRA_DEPLOY_PATH/nginx/nginx.conf" /etc/nginx/nginx.conf
+sudo nginx -t
+sudo nginx -s reload
+
 echo "Restarting Argus app services (no rebuild)..."
 compose up -d --no-build --remove-orphans app worker inference ai-sidecar
-
-echo "Reloading nginx config..."
-sudo nginx -s reload 2>/dev/null || true
 
 echo "Waiting for backend health..."
 for i in $(seq 1 20); do
