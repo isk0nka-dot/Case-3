@@ -66,6 +66,10 @@ const topNavigation = computed(() => {
   if (authStore.isSuperAdmin) {
     items.push({ label: 'API и Интеграции', icon: 'i-lucide-plug', to: '/api' })
   }
+  // Privacy & Data Retention — org_admin + super_admin
+  if (authStore.isSuperAdmin || authStore.isOrgAdmin) {
+    items.push({ label: 'Приватность', icon: 'i-lucide-shield', to: '/privacy' })
+  }
   return items
 })
 

@@ -288,6 +288,7 @@ const featureToggles = reactive<OrgFeatureToggles>({
 })
 
 const featureSaving = ref(false)
+const featureTogglesPreviewOnly = true
 
 // Feature toggle groups for display
 interface FeatureGroup {
@@ -380,18 +381,15 @@ function isGroupPartiallyEnabled(group: FeatureGroup): boolean {
   return group.features.some(f => featureToggles[f.key]) && !isGroupFullyEnabled(group)
 }
 
-// Save feature toggles (mock)
+// Feature toggles are visible for product planning, but not persisted until backend support lands.
 async function saveFeatureToggles() {
-  featureSaving.value = true
-  try {
-    // In real implementation, call adminAPI.updateOrgFeatures(selectedOrg.value.orgId, featureToggles)
-    await new Promise(r => setTimeout(r, 800))
-    toast.add({ title: 'Feature toggles сохранены', icon: 'i-lucide-check-circle', color: 'success' })
-  } catch {
-    toast.add({ title: 'Ошибка сохранения', icon: 'i-lucide-alert-circle', color: 'error' })
-  } finally {
-    featureSaving.value = false
-  }
+  toast.add({
+    title: 'Feature toggles пока preview-only',
+    description: 'Backend endpoint для сохранения правил организации еще не подключен',
+    icon: 'i-lucide-flask-conical',
+    color: 'warning',
+    duration: 5000
+  })
 }
 
 // Load feature toggles when opening detail (add to loadTabData for 'features')
@@ -3125,12 +3123,25 @@ onMounted(() => {
               <!-- Header -->
               <div class="flex items-center justify-between">
                 <div>
-                  <h4
-                    class="text-sm font-bold"
-                    style="color: var(--argus-text);"
-                  >
-                    Feature Toggles
-                  </h4>
+                  <div class="flex items-center gap-2">
+                    <h4
+                      class="text-sm font-bold"
+                      style="color: var(--argus-text);"
+                    >
+                      Feature Toggles
+                    </h4>
+                    <span
+                      v-if="featureTogglesPreviewOnly"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                      :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
+                    >
+                      <UIcon
+                        name="i-lucide-flask-conical"
+                        class="size-3"
+                      />
+                      Preview
+                    </span>
+                  </div>
                   <p
                     class="text-[11px] mt-0.5"
                     style="color: var(--argus-text-dimmed);"
@@ -3149,7 +3160,7 @@ onMounted(() => {
                     class="size-3"
                     :class="{ 'animate-spin': featureSaving }"
                   />
-                  {{ featureSaving ? 'Сохранение...' : 'Сохранить' }}
+                  {{ featureSaving ? 'Сохранение...' : featureTogglesPreviewOnly ? 'Preview only' : 'Сохранить' }}
                 </button>
               </div>
 

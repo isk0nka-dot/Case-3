@@ -82,6 +82,7 @@ export interface CreateOrgRequest {
   plan?: string
   maxSessions?: number
   maxEventsRps?: number
+  retentionDays?: number
 }
 
 export interface CreateOrgWithAdminRequest extends CreateOrgRequest {
@@ -142,6 +143,25 @@ export interface AuditLogParams {
   resourceType?: string
   limit?: number
   offset?: number
+}
+
+export interface RetentionCleanupRequest {
+  dryRun?: boolean
+  videoRetentionDays?: number
+  auditRetentionDays?: number
+}
+
+export interface RetentionCleanupResult {
+  orgId: string
+  dryRun: boolean
+  videoRetentionDays: number
+  auditRetentionDays: number
+  videoCutoff: string
+  auditCutoff: string
+  recordingsMatched: number
+  recordingsDeleted: number
+  auditMatched: number
+  auditDeleted: number
 }
 
 // ---------------------------------------------------------------------------
@@ -1069,6 +1089,10 @@ export function useAdminAPI() {
     return request<Organization>('PUT', `/api/v1/admin/organizations/${orgId}`, data)
   }
 
+  async function applyRetentionPolicy(orgId: string, data: RetentionCleanupRequest): Promise<RetentionCleanupResult> {
+    return request<RetentionCleanupResult>('POST', `/api/v1/admin/organizations/${orgId}/retention/apply`, data)
+  }
+
   async function deleteOrg(orgId: string): Promise<{ status: string }> {
     return request<{ status: string }>('DELETE', `/api/v1/admin/organizations/${orgId}`)
   }
@@ -1510,6 +1534,12 @@ export function useAdminAPI() {
     return request<ProctoringRuleRegistryResponse>('GET', '/api/v1/proctoring/rule-registry')
   }
 
+  // ── Enrollment (biometric data) ───────────────────────────────────────────
+
+  async function deleteEnrollment(studentId: string, _orgId: string): Promise<{ status: string }> {
+    return request<{ status: string }>('DELETE', `/api/v1/external/students/${encodeURIComponent(studentId)}/enrollment`)
+  }
+
   // ── SSE Session Stream URL Builder ────────────────────────────────────
 
   function getSessionStreamUrl(sessionId: string): string {
@@ -1554,6 +1584,7 @@ export function useAdminAPI() {
     createOrg,
     createOrgWithAdmin,
     updateOrg,
+    applyRetentionPolicy,
     deleteOrg,
 
     // Users
@@ -1656,6 +1687,9 @@ export function useAdminAPI() {
     listIPWhitelist,
     addIPWhitelist,
     removeIPWhitelist,
+
+    // Enrollment (biometric data)
+    deleteEnrollment,
 
     // SSE Session Stream
     getSessionStreamUrl,

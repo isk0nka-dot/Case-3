@@ -19,6 +19,7 @@ ChartJS.register(ArcElement, BarElement, LineElement, PointElement, CategoryScal
 
 const api = useAdminAPI()
 const authStore = useAuthStore()
+const { demoMode } = useDemoMode()
 const { isDark, accentBg, errorBg, successBg, warningBg } = useColors()
 const { formatTimeShort, formatCompactNumber } = useFormatters()
 
@@ -27,6 +28,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const data = ref<AnalyticsOverview | null>(null)
 const autoRefresh = ref(true)
+const usingDemoData = ref(false)
 let refreshInterval: ReturnType<typeof setInterval> | null = null
 
 // --- Demo data for offline/demo mode ---
@@ -63,11 +65,14 @@ async function fetchData() {
   try {
     error.value = null
     data.value = await api.getAnalyticsOverview()
+    usingDemoData.value = false
   } catch (err: unknown) {
-    // Backend offline or demo session — show demo data instead of error.
-    if (!data.value) {
+    if (demoMode.value && !data.value) {
       data.value = DEMO_DATA
+      usingDemoData.value = true
       console.info('[Executive] Backend unavailable, showing demo data.')
+    } else if (!data.value) {
+      error.value = err instanceof Error ? err.message : 'Не удалось загрузить executive analytics'
     } else {
       console.warn('[Executive] Refresh failed:', err)
     }
@@ -309,6 +314,17 @@ const eventsPerSec = computed(() => {
         >
           Executive Dashboard
         </h1>
+        <span
+          v-if="usingDemoData"
+          class="inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-full text-[10px] font-bold"
+          :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
+        >
+          <UIcon
+            name="i-lucide-flask-conical"
+            class="size-3"
+          />
+          Demo data
+        </span>
         <p
           class="text-sm mt-1"
           style="color: var(--argus-text-dimmed);"

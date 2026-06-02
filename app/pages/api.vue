@@ -7,6 +7,8 @@ import type { Organization, APIKey } from '~/composables/useAdminAPI'
 const store = useDashboardStore()
 const authStore = useAuthStore()
 const adminAPI = useAdminAPI()
+const toast = useToast()
+const { demoMode } = useDemoMode()
 const { isDark, accentBg, errorBg, successBg, warningBg } = useColors()
 
 // --- Multi-tenant state ---
@@ -77,12 +79,11 @@ async function fetchAPIKeys() {
   }
 }
 
-// --- Determine data source: backend or mock fallback ---
-const useBackendData = computed(() => backendKeys.value.length > 0 || backendKeysLoading.value)
-
-// Unified keys list — backend keys mapped to display format, or store mock data
+// Unified keys list — backend keys mapped to display format.
+// Local mock keys are shown only in explicit demo mode.
+const usingDemoApiKeys = computed(() => demoMode.value && !backendKeysLoading.value && backendKeys.value.length === 0)
 const displayKeys = computed(() => {
-  if (useBackendData.value && backendKeys.value.length > 0) {
+  if (backendKeys.value.length > 0) {
     return backendKeys.value.map(k => ({
       id: k.id,
       orgId: k.orgId,
@@ -97,7 +98,7 @@ const displayKeys = computed(() => {
       rateLimitRps: k.rateLimitRps
     }))
   }
-  // Fallback to store mock data
+  if (!usingDemoApiKeys.value) return []
   return store.apiKeys.map(k => ({
     id: k.id,
     orgId: authStore.user?.orgId || 'unknown',
@@ -172,8 +173,17 @@ async function revokeKey(keyId: string) {
     await adminAPI.revokeAPIKey(keyId)
     // Refresh keys
     await fetchAPIKeys()
-  } catch {
-    // Fallback to mock store
+  } catch (err) {
+    if (!demoMode.value) {
+      toast.add({
+        title: 'Не удалось отозвать API-ключ',
+        description: err instanceof Error ? err.message : 'Backend не подтвердил операцию',
+        icon: 'i-lucide-alert-circle',
+        color: 'error',
+        duration: 5000
+      })
+      return
+    }
     const key = store.apiKeys.find(k => k.id === keyId)
     if (key) key.status = 'revoked'
   }
@@ -187,7 +197,7 @@ async function generateNewKey() {
     : authStore.user?.orgId
 
   if (!targetOrgId) {
-    useToast().add({
+    toast.add({
       title: 'Выберите организацию',
       description: 'Укажите организацию в поле "Организация" перед созданием ключа',
       color: 'error',
@@ -212,8 +222,17 @@ async function generateNewKey() {
     newKeyEnvironment.value = 'live'
     newKeyOrgId.value = null
     // Keep form open to show secret
-  } catch {
-    // Fallback to local mock generation
+  } catch (err) {
+    if (!demoMode.value) {
+      toast.add({
+        title: 'API-ключ не создан',
+        description: err instanceof Error ? err.message : 'Backend не подтвердил создание ключа',
+        icon: 'i-lucide-alert-circle',
+        color: 'error',
+        duration: 5000
+      })
+      return
+    }
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
     let randomPart = ''
     for (let i = 0; i < 24; i++) {
@@ -260,6 +279,16 @@ const availableEvents = [
 
 function addWebhook() {
   if (!newWebhookUrl.value.trim() || selectedWebhookEvents.value.length === 0) return
+  if (!demoMode.value) {
+    toast.add({
+      title: 'Webhook UI пока в preview',
+      description: 'Backend endpoint для webhooks еще не подключен в Phase 1',
+      icon: 'i-lucide-flask-conical',
+      color: 'warning',
+      duration: 5000
+    })
+    return
+  }
   store.webhooks.push({
     id: `wh-${Date.now()}`,
     url: newWebhookUrl.value.trim(),
@@ -274,6 +303,16 @@ function addWebhook() {
 }
 
 function toggleWebhookStatus(webhookId: string) {
+  if (!demoMode.value) {
+    toast.add({
+      title: 'Webhook UI пока в preview',
+      description: 'Статус webhooks не сохраняется без backend endpoint',
+      icon: 'i-lucide-flask-conical',
+      color: 'warning',
+      duration: 5000
+    })
+    return
+  }
   const wh = store.webhooks.find(w => w.id === webhookId)
   if (wh) wh.status = wh.status === 'active' ? 'paused' : 'active'
 }
@@ -298,7 +337,7 @@ function handleLMSClick(lms: typeof lmsIntegrations[0]) {
   if (lms.status === 'connected') {
     navigateTo('/integrations')
   } else {
-    useToast().add({
+    toast.add({
       title: `Интеграция ${lms.name}`,
       description: 'Скоро доступно. Обратитесь к документации для ручной настройки.',
       color: 'info',
@@ -788,6 +827,39 @@ function copyToClipboard(text: string) {
       </div>
     </div>
 
+    <div
+      v-if="usingDemoApiKeys || backendKeysError || !demoMode"
+      class="rounded-xl border px-4 py-3 flex items-start gap-3"
+      :style="{
+        background: usingDemoApiKeys ? warningBg(0.08) : backendKeysError ? errorBg(0.08) : accentBg(0.05),
+        borderColor: usingDemoApiKeys ? warningBg(0.2) : backendKeysError ? errorBg(0.2) : accentBg(0.16)
+      }"
+    >
+      <UIcon
+        :name="usingDemoApiKeys ? 'i-lucide-flask-conical' : backendKeysError ? 'i-lucide-alert-circle' : 'i-lucide-database'"
+        class="size-4 mt-0.5 shrink-0"
+        :style="{ color: usingDemoApiKeys ? 'var(--argus-warning)' : backendKeysError ? 'var(--argus-error)' : 'var(--argus-accent)' }"
+      />
+      <div>
+        <p
+          class="text-xs font-bold"
+          :style="{ color: usingDemoApiKeys ? 'var(--argus-warning)' : backendKeysError ? 'var(--argus-error)' : 'var(--argus-text)' }"
+        >
+          {{ usingDemoApiKeys ? 'Demo data' : backendKeysError ? 'Backend API недоступен' : 'Production mode' }}
+        </p>
+        <p
+          class="text-[11px] mt-0.5"
+          style="color: var(--argus-text-dimmed);"
+        >
+          {{ usingDemoApiKeys
+            ? 'API-ключи и webhooks показаны из локального demo store и не являются реальными учетными данными.'
+            : backendKeysError
+              ? backendKeysError
+              : 'Mock fallback отключен. Операции с API-ключами должны подтверждаться backend.' }}
+        </p>
+      </div>
+    </div>
+
     <!-- ============================== -->
     <!--  SUPER ADMIN: KEY QUOTAS       -->
     <!-- ============================== -->
@@ -917,6 +989,17 @@ function copyToClipboard(text: string) {
               class="size-3 animate-spin"
             />
             Загрузка...
+          </span>
+          <span
+            v-if="usingDemoApiKeys"
+            class="text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1"
+            :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
+          >
+            <UIcon
+              name="i-lucide-flask-conical"
+              class="size-3"
+            />
+            Demo
           </span>
         </div>
         <button
@@ -1368,6 +1451,16 @@ function copyToClipboard(text: string) {
             :style="{ background: accentBg(0.1), color: 'var(--argus-accent)' }"
           >
             {{ activeWebhooksCount }} активных
+          </span>
+          <span
+            class="text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1"
+            :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
+          >
+            <UIcon
+              name="i-lucide-flask-conical"
+              class="size-3"
+            />
+            Preview
           </span>
         </div>
         <button
@@ -1852,7 +1945,7 @@ function copyToClipboard(text: string) {
         class="glass-card rounded-xl p-5 cursor-pointer video-card-hover"
         @mouseenter="($event.currentTarget as HTMLElement).style.borderColor = 'var(--argus-accent)'"
         @mouseleave="($event.currentTarget as HTMLElement).style.borderColor = 'var(--argus-border)'"
-        @click="useToast().add({ title: 'Поддержка', description: 'Обратитесь по email: support@argus.ai', color: 'info', duration: 4000 })"
+        @click="toast.add({ title: 'Поддержка', description: 'Обратитесь по email: support@argus.ai', color: 'info', duration: 4000 })"
       >
         <div class="flex items-center gap-3">
           <div

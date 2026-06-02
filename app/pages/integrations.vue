@@ -16,6 +16,8 @@ import type { IPWhitelistEntry } from '~/stores/useDashboardStore'
 const store = useDashboardStore()
 const authStore = useAuthStore()
 const adminAPI = useAdminAPI()
+const toast = useToast()
+const { demoMode } = useDemoMode()
 const { accentBg, errorBg, successBg, warningBg } = useColors()
 const runtimeConfig = useRuntimeConfig()
 
@@ -168,8 +170,17 @@ async function generateNewKey() {
     newKeyName.value = ''
     newKeyPermissions.value = ['read:sessions', 'read:reports']
     newKeyEnvironment.value = 'live'
-  } catch {
-    // Fallback to mock
+  } catch (err) {
+    if (!demoMode.value) {
+      toast.add({
+        title: 'API-ключ не создан',
+        description: err instanceof Error ? err.message : 'Backend не подтвердил создание ключа',
+        icon: 'i-lucide-alert-circle',
+        color: 'error',
+        duration: 5000
+      })
+      return
+    }
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
     let randomPart = ''
     for (let i = 0; i < 24; i++) {
@@ -198,7 +209,17 @@ async function revokeKey(keyId: string) {
   try {
     await adminAPI.revokeAPIKey(keyId)
     await fetchAPIKeys()
-  } catch {
+  } catch (err) {
+    if (!demoMode.value) {
+      toast.add({
+        title: 'Не удалось отозвать API-ключ',
+        description: err instanceof Error ? err.message : 'Backend не подтвердил операцию',
+        icon: 'i-lucide-alert-circle',
+        color: 'error',
+        duration: 5000
+      })
+      return
+    }
     const key = store.apiKeys.find(k => k.id === keyId)
     if (key) key.status = 'revoked'
   }
@@ -207,6 +228,16 @@ async function revokeKey(keyId: string) {
 // --- Webhook actions ---
 function addWebhook() {
   if (!newWebhookUrl.value.trim() || selectedWebhookEvents.value.length === 0) return
+  if (!demoMode.value) {
+    toast.add({
+      title: 'Webhooks пока preview-only',
+      description: 'Backend endpoint для webhooks еще не подключен в Phase 1',
+      icon: 'i-lucide-flask-conical',
+      color: 'warning',
+      duration: 5000
+    })
+    return
+  }
   store.webhooks.push({
     id: `wh-${Date.now()}`,
     url: newWebhookUrl.value.trim(),
@@ -221,11 +252,31 @@ function addWebhook() {
 }
 
 function toggleWebhookStatus(webhookId: string) {
+  if (!demoMode.value) {
+    toast.add({
+      title: 'Webhooks пока preview-only',
+      description: 'Статус webhooks не сохраняется без backend endpoint',
+      icon: 'i-lucide-flask-conical',
+      color: 'warning',
+      duration: 5000
+    })
+    return
+  }
   const wh = store.webhooks.find(w => w.id === webhookId)
   if (wh) wh.status = wh.status === 'active' ? 'paused' : 'active'
 }
 
 async function sendTestPayload(webhookId: string) {
+  if (!demoMode.value) {
+    toast.add({
+      title: 'Test payload пока preview-only',
+      description: 'Отправка тестовых webhook payload будет подключена после backend endpoint',
+      icon: 'i-lucide-flask-conical',
+      color: 'warning',
+      duration: 5000
+    })
+    return
+  }
   testPayloadSending.value = webhookId
   // Simulate sending test payload (no backend implementation yet)
   await new Promise(resolve => setTimeout(resolve, 1500))
@@ -236,6 +287,16 @@ async function sendTestPayload(webhookId: string) {
 // --- IP Whitelist actions ---
 function addIPEntry() {
   ipValidationError.value = null
+  if (!demoMode.value) {
+    toast.add({
+      title: 'IP Whitelist пока preview-only',
+      description: 'Локальный список IP не сохраняется в backend',
+      icon: 'i-lucide-flask-conical',
+      color: 'warning',
+      duration: 5000
+    })
+    return
+  }
   if (!newIP.value.trim()) {
     ipValidationError.value = 'Введите IP-адрес'
     return
@@ -265,6 +326,16 @@ function addIPEntry() {
 }
 
 function removeIPEntry(entryId: string) {
+  if (!demoMode.value) {
+    toast.add({
+      title: 'IP Whitelist пока preview-only',
+      description: 'Удаление IP не сохраняется без backend endpoint',
+      icon: 'i-lucide-flask-conical',
+      color: 'warning',
+      duration: 5000
+    })
+    return
+  }
   store.removeIPEntry(entryId)
 }
 
@@ -458,6 +529,36 @@ onUnmounted(() => {
       </NuxtLink>
     </div>
 
+    <div
+      class="rounded-xl border px-4 py-3 flex items-start gap-3"
+      :style="{
+        background: demoMode ? warningBg(0.08) : accentBg(0.05),
+        borderColor: demoMode ? warningBg(0.2) : accentBg(0.16)
+      }"
+    >
+      <UIcon
+        :name="demoMode ? 'i-lucide-flask-conical' : 'i-lucide-database'"
+        class="size-4 mt-0.5 shrink-0"
+        :style="{ color: demoMode ? 'var(--argus-warning)' : 'var(--argus-accent)' }"
+      />
+      <div>
+        <p
+          class="text-xs font-bold"
+          :style="{ color: demoMode ? 'var(--argus-warning)' : 'var(--argus-text)' }"
+        >
+          {{ demoMode ? 'Demo mode' : 'Production mode' }}
+        </p>
+        <p
+          class="text-[11px] mt-0.5"
+          style="color: var(--argus-text-dimmed);"
+        >
+          {{ demoMode
+            ? 'Локальные webhooks и IP whitelist работают как demo-preview и не являются production-настройками.'
+            : 'Mock fallback отключен. API keys требуют backend; webhooks/IP whitelist помечены как preview до подключения endpoint.' }}
+        </p>
+      </div>
+    </div>
+
     <!-- ============================== -->
     <!--  QUICK STATS                   -->
     <!-- ============================== -->
@@ -594,6 +695,17 @@ onUnmounted(() => {
         >
           Управление API ключами
         </h2>
+        <span
+          v-if="backendKeysError"
+          class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold"
+          :style="{ background: errorBg(0.1), color: 'var(--argus-error)' }"
+        >
+          <UIcon
+            name="i-lucide-alert-circle"
+            class="size-3"
+          />
+          Backend unavailable
+        </span>
         <button
           class="scanner-btn flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium cursor-pointer"
           @click="showNewKeyForm = !showNewKeyForm"
@@ -878,12 +990,24 @@ onUnmounted(() => {
       class="space-y-4"
     >
       <div class="flex items-center justify-between">
-        <h2
-          class="text-sm font-semibold"
-          style="color: var(--argus-text);"
-        >
-          Конфигурация вебхуков
-        </h2>
+        <div class="flex items-center gap-2">
+          <h2
+            class="text-sm font-semibold"
+            style="color: var(--argus-text);"
+          >
+            Конфигурация вебхуков
+          </h2>
+          <span
+            class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold"
+            :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
+          >
+            <UIcon
+              name="i-lucide-flask-conical"
+              class="size-3"
+            />
+            Preview
+          </span>
+        </div>
         <button
           class="scanner-btn flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium cursor-pointer"
           @click="showWebhookForm = !showWebhookForm"
@@ -1094,8 +1218,18 @@ onUnmounted(() => {
           >
             IP Whitelist
           </h2>
+          <span
+            class="inline-flex items-center gap-1 mt-1 px-2 py-1 rounded-full text-[10px] font-bold"
+            :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
+          >
+            <UIcon
+              name="i-lucide-flask-conical"
+              class="size-3"
+            />
+            Preview
+          </span>
           <p
-            class="text-[10px] mt-0.5"
+            class="text-[10px] mt-1"
             style="color: var(--argus-text-dimmed);"
           >
             Ограничение доступа к API по IP-адресам

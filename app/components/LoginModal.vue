@@ -13,6 +13,7 @@ const emit = defineEmits<{
 
 const authStore = useAuthStore()
 const adminAPI = useAdminAPI()
+const { demoMode } = useDemoMode()
 
 // Form state
 const phoneDigits = ref('')
@@ -75,12 +76,12 @@ async function handleSubmit() {
     // Navigate to main dashboard.
     navigateTo('/dashboard')
   } catch (err: unknown) {
-    // If API is not available, fall back to demo login.
+    // Demo login is allowed only when the operator explicitly enables demo mode.
     const fullPhone = `+7${phoneDigits.value}`
     const VALID_PHONE = '+77077469966'
     const VALID_PASSWORD = 'Astana01+'
 
-    if (fullPhone === VALID_PHONE && password.value === VALID_PASSWORD) {
+    if (demoMode.value && fullPhone === VALID_PHONE && password.value === VALID_PASSWORD) {
       // Demo fallback — set basic auth state, a demo JWT, and mock user data.
       authStore.login(fullPhone, password.value)
       authStore.setToken('demo-jwt-token', 'demo-session', 'demo-super-admin', '*')
@@ -181,6 +182,17 @@ onUnmounted(() => {
             <p class="text-sm text-white/40 mt-1">
               Argus AI — Панель прокторинга
             </p>
+            <div
+              v-if="demoMode"
+              class="inline-flex items-center gap-1.5 mt-3 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+              style="background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.25); color: #fbbf24;"
+            >
+              <UIcon
+                name="i-lucide-flask-conical"
+                class="size-3"
+              />
+              Demo mode
+            </div>
           </div>
 
           <!-- Form -->

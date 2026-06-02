@@ -50,7 +50,10 @@ export default defineNuxtConfig({
     public: {
       // Nuxt auto-maps NUXT_PUBLIC_API_BASE_URL env var at runtime.
       // Backwards-compat: NUXT_PUBLIC_GRPC_URL is read via fallback below.
-      apiBaseUrl: 'http://localhost:8080'
+      apiBaseUrl: 'http://localhost:8080',
+      // Explicit demo mode gate for local-only fallback data.
+      // Enable with NUXT_PUBLIC_DEMO_MODE=true.
+      demoMode: false
     }
   },
 

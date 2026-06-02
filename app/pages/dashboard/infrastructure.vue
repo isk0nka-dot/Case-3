@@ -4,7 +4,8 @@ import { useAuthStore } from '~/stores/useAuthStore'
 
 const adminAPI = useAdminAPI()
 const authStore = useAuthStore()
-const { isDark, accentBg } = useColors()
+const { demoMode } = useDemoMode()
+const { isDark, accentBg, warningBg } = useColors()
 
 // ---------------------------------------------------------------------------
 // Reactive state — populated from the real API
@@ -20,6 +21,7 @@ const p99LatencyMs = ref(0)
 const loading = ref(true)
 const error = ref('')
 const lastUpdated = ref('')
+const usingDemoData = ref(false)
 
 // ---------------------------------------------------------------------------
 // Data fetching with 10s polling
@@ -54,11 +56,11 @@ async function fetchInfraStats() {
     p99LatencyMs.value = stats.p99LatencyMs || 0
     lastUpdated.value = new Date().toLocaleTimeString('ru-RU')
     error.value = ''
+    usingDemoData.value = false
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
-    console.info('[Infrastructure] Backend unavailable, showing demo data.')
-    // Show demo data when backend is offline.
-    if (serverNodes.value.length === 0) {
+    if (demoMode.value && serverNodes.value.length === 0) {
+      console.info('[Infrastructure] Backend unavailable, showing demo data.')
       serverNodes.value = DEMO_INFRA_NODES
       networkMetrics.value = [
         { label: 'Входящий трафик', value: 2840, unit: 'Mbps', status: 'healthy', trend: 'up' },
@@ -71,6 +73,10 @@ async function fetchInfraStats() {
       loadPercent.value = 38
       avgLatencyMs.value = 19
       p99LatencyMs.value = 48
+      usingDemoData.value = true
+      error.value = ''
+    } else if (serverNodes.value.length === 0) {
+      error.value = msg
     }
     lastUpdated.value = new Date().toLocaleTimeString('ru-RU')
   } finally {
@@ -143,6 +149,17 @@ function trendIcon(trend: string): string {
         >
           Infrastructure Health
         </h1>
+        <span
+          v-if="usingDemoData"
+          class="inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-full text-[10px] font-bold"
+          :style="{ background: warningBg(0.1), color: 'var(--argus-warning)' }"
+        >
+          <UIcon
+            name="i-lucide-flask-conical"
+            class="size-3"
+          />
+          Demo data
+        </span>
         <p
           class="text-sm mt-1"
           style="color: var(--argus-text-dimmed);"

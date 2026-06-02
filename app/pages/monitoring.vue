@@ -47,6 +47,53 @@ const _actionLoading = ref<Record<string, boolean>>({})
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 // ---------------------------------------------------------------------------
+// SSE Connection Pool — one EventSource per active session (capped at 20)
+// ---------------------------------------------------------------------------
+
+const MAX_SSE_CONNECTIONS = 20
+const ssePool = new Map<string, EventSource>()
+
+function syncSSEPool(activeSessions: ActiveSession[]) {
+  const activeIds = new Set(activeSessions.map(s => s.sessionId))
+
+  // Close connections for sessions that are no longer active
+  for (const [id, es] of ssePool) {
+    if (!activeIds.has(id)) {
+      es.close()
+      ssePool.delete(id)
+    }
+  }
+
+  // Open connections for new sessions (up to cap)
+  for (const session of activeSessions) {
+    if (ssePool.has(session.sessionId)) continue
+    if (ssePool.size >= MAX_SSE_CONNECTIONS) break
+
+    const url = api.getSessionStreamUrl(session.sessionId)
+    let es: EventSource
+    try {
+      es = new EventSource(url)
+    } catch {
+      continue
+    }
+
+    es.addEventListener('violation', (e: MessageEvent) => {
+      try {
+        const v = JSON.parse(e.data)
+        feedStore.ingestFromSSE(session.sessionId, session.studentId, session.examId, v)
+      } catch { /* ignore malformed SSE JSON */ }
+    })
+
+    es.onerror = () => {
+      // EventSource reconnects automatically; clean up the map entry only on
+      // explicit close or when the session is no longer active.
+    }
+
+    ssePool.set(session.sessionId, es)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Data Fetching
 // ---------------------------------------------------------------------------
 
@@ -68,6 +115,7 @@ async function fetchActiveSessions() {
 
     // Feed sessions to the inspector store for risk computation
     inspectorStore.updateSessions(data.sessions)
+    syncSSEPool(data.sessions)
   } catch (e: any) {
     console.info('[Inspector] Backend unavailable:', e.message)
     if (sessions.value.length === 0) {
@@ -157,6 +205,8 @@ onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
   feedStore.stopUpdates()
   inspectorStore.stopRiskUpdates()
+  for (const es of ssePool.values()) es.close()
+  ssePool.clear()
 })
 </script>
 

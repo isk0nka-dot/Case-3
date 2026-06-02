@@ -131,7 +131,8 @@ async function openArchiveSession(session: ArchiveSession) {
   }
 
   // Set video URL immediately — the <video> element's @error handler clears it if not found.
-  const apiBase = useRuntimeConfig().public.apiBaseUrl || ''
+  const runtimeConfig = useRuntimeConfig()
+  const apiBase = runtimeConfig.public.apiBaseUrl || runtimeConfig.public.grpcUrl || ''
   const token = authStore.jwtToken || ''
   if (token) {
     videoUrl.value = `${apiBase}/api/v1/archive/sessions/${session.id}/video?token=${encodeURIComponent(token)}`
@@ -262,6 +263,54 @@ const waveformHeights = computed(() => {
     return Math.max(8, Math.min(100, base + (i % 3 === 0 ? 20 : 0)))
   })
 })
+
+// AI deep scan summary — aggregates BACKEND_AI events from the loaded event list.
+const aiScanSummary = computed(() => {
+  const events = expandedArchive.value?.events ?? []
+  const aiEvents = events.filter(e => (e.source as string) === 'BACKEND_AI')
+  if (aiEvents.length === 0) return null
+
+  const objectTypes = new Map<string, number>()
+  let faceMismatch = 0
+  let livenessFail = 0
+  let deepfake = 0
+  let voiceSynth = 0
+
+  for (const e of aiEvents) {
+    if (e.type === 'FACE_MISMATCH' || e.type === 'DYNAMIC_FACE_RECHECK_FAIL' || e.type === 'BACKEND_AI_FACE_MISMATCH') {
+      if (e.label.toLowerCase().includes('liveness')) livenessFail++
+      else faceMismatch++
+    }
+    if (e.type === 'LIVENESS_CHECK_FAILED' || e.type === 'FACE_SPOOF_DETECTED') livenessFail++
+    if (e.type === 'BACKEND_AI_DEEPFAKE_DETECTED') {
+      deepfake++
+      livenessFail++
+    }
+    if (e.type === 'BACKEND_AI_VOICE_SYNTH') voiceSynth++
+    if (['PHONE_DETECTED', 'BOOK_DETECTED', 'EARBUDS_DETECTED', 'UNKNOWN_OBJECT_DETECTED', 'BACKEND_AI_HIDDEN_OBJECT', 'BACKEND_AI_SCREEN_REFLECTION'].includes(e.type)) {
+      const objectType = extractAIObjectType(e.type, e.label)
+      objectTypes.set(objectType, (objectTypes.get(objectType) ?? 0) + 1)
+    }
+  }
+
+  return {
+    totalEvents: aiEvents.length,
+    faceMismatch,
+    livenessFail,
+    deepfake,
+    voiceSynth,
+    identityOk: faceMismatch === 0,
+    objects: Array.from(objectTypes.entries()).map(([type, count]) => ({ type, count }))
+  }
+})
+
+function extractAIObjectType(eventType: string, label: string): string {
+  const match = label.match(/Backend AI:\s+([a-z0-9_-]+)\s+detected/i)
+  if (match?.[1]) return match[1]
+  if (eventType === 'BACKEND_AI_SCREEN_REFLECTION') return 'screen_reflection'
+  if (eventType === 'BACKEND_AI_HIDDEN_OBJECT') return 'hidden_object'
+  return eventType.replace('_DETECTED', '').toLowerCase()
+}
 
 // Noise level derived from seek position (simulated)
 const noiseLevel = computed(() => {
@@ -1674,6 +1723,123 @@ onUnmounted(() => {
                     style="border-color: var(--argus-border);"
                   >
                     <EvidenceViewer :session-id="expandedArchive.id" />
+                  </div>
+
+                  <!-- AI Deep Scan Results -->
+                  <div
+                    v-if="aiScanSummary"
+                    class="px-5 py-4 border-t"
+                    style="border-color: var(--argus-border);"
+                  >
+                    <div class="flex items-center gap-2 mb-3">
+                      <UIcon
+                        name="i-lucide-scan-face"
+                        class="size-4"
+                        style="color: var(--argus-accent);"
+                      />
+                      <h4
+                        class="text-sm font-semibold"
+                        style="color: var(--argus-text);"
+                      >
+                        AI Deep Scan
+                      </h4>
+                      <span
+                        class="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                        :style="{
+                          background: accentBg(0.1),
+                          color: 'var(--argus-accent)'
+                        }"
+                      >
+                        {{ aiScanSummary.totalEvents }} событий
+                      </span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                      <!-- Identity -->
+                      <div
+                        class="rounded-lg p-3"
+                        :style="{
+                          background: aiScanSummary.identityOk ? successBg(0.08) : errorBg(0.08),
+                          border: `1px solid ${aiScanSummary.identityOk ? 'var(--argus-success)' : 'var(--argus-error)'}30`
+                        }"
+                      >
+                        <p
+                          class="text-[10px] font-medium mb-1"
+                          style="color: var(--argus-text-dimmed);"
+                        >
+                          Идентификация
+                        </p>
+                        <p
+                          class="text-sm font-semibold"
+                          :style="{ color: aiScanSummary.identityOk ? 'var(--argus-success)' : 'var(--argus-error)' }"
+                        >
+                          {{ aiScanSummary.identityOk ? 'Подтверждена' : 'Несоответствие' }}
+                        </p>
+                        <p
+                          v-if="aiScanSummary.faceMismatch > 0"
+                          class="text-[10px]"
+                          style="color: var(--argus-error);"
+                        >
+                          {{ aiScanSummary.faceMismatch }} несовпадений
+                        </p>
+                      </div>
+                      <!-- Liveness -->
+                      <div
+                        class="rounded-lg p-3"
+                        :style="{
+                          background: aiScanSummary.livenessFail === 0 ? successBg(0.08) : errorBg(0.08),
+                          border: `1px solid ${aiScanSummary.livenessFail === 0 ? 'var(--argus-success)' : 'var(--argus-error)'}30`
+                        }"
+                      >
+                        <p
+                          class="text-[10px] font-medium mb-1"
+                          style="color: var(--argus-text-dimmed);"
+                        >
+                          Живость
+                        </p>
+                        <p
+                          class="text-sm font-semibold"
+                          :style="{ color: aiScanSummary.livenessFail === 0 ? 'var(--argus-success)' : 'var(--argus-error)' }"
+                        >
+                          {{ aiScanSummary.livenessFail === 0 ? 'Норма' : 'Подозрение' }}
+                        </p>
+                        <p
+                          v-if="aiScanSummary.livenessFail > 0"
+                          class="text-[10px]"
+                          style="color: var(--argus-error);"
+                        >
+                          {{ aiScanSummary.livenessFail }} случаев
+                        </p>
+                      </div>
+                      <!-- Objects -->
+                      <div
+                        class="rounded-lg p-3"
+                        :style="{
+                          background: aiScanSummary.objects.length === 0 ? successBg(0.08) : errorBg(0.08),
+                          border: `1px solid ${aiScanSummary.objects.length === 0 ? 'var(--argus-success)' : 'var(--argus-error)'}30`
+                        }"
+                      >
+                        <p
+                          class="text-[10px] font-medium mb-1"
+                          style="color: var(--argus-text-dimmed);"
+                        >
+                          Объекты
+                        </p>
+                        <p
+                          class="text-sm font-semibold"
+                          :style="{ color: aiScanSummary.objects.length === 0 ? 'var(--argus-success)' : 'var(--argus-error)' }"
+                        >
+                          {{ aiScanSummary.objects.length === 0 ? 'Не найдены' : `${aiScanSummary.objects.length} тип(а)` }}
+                        </p>
+                        <p
+                          v-for="obj in aiScanSummary.objects"
+                          :key="obj.type"
+                          class="text-[10px]"
+                          style="color: var(--argus-error);"
+                        >
+                          {{ obj.type.replace('_DETECTED', '').toLowerCase() }}: {{ obj.count }}×
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- Forensic Ledger / Integrity Verification -->

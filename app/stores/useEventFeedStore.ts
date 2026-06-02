@@ -403,6 +403,60 @@ export const useEventFeedStore = defineStore('eventFeed', () => {
   // Actions
   // -------------------------------------------------------------------------
 
+  /**
+   * Ingest a violation received from the SSE monitoring stream.
+   *
+   * The SSE stream sends string event types and severities; this method maps
+   * them to the EventType/Severity enums before pushing to the ring buffer.
+   * Telemetry-range events are skipped (SSE only sends violations in practice).
+   */
+  function ingestFromSSE(
+    sessionId: string,
+    studentId: string,
+    examId: string,
+    v: { eventType: string, severity: string, label: string, confidence: number, timestamp: string }
+  ): void {
+    totalIngested++
+    const now = Date.now()
+    recentIngestTimes.push(now)
+    while (recentIngestTimes.length > 0 && recentIngestTimes[0]! < now - RATE_WINDOW_MS) {
+      recentIngestTimes.shift()
+    }
+
+    const evType = (EventType[v.eventType as keyof typeof EventType] ?? EventType.EVENT_TYPE_UNSPECIFIED) as EventType
+    const sevKey = v.severity.toUpperCase() as keyof typeof Severity
+    const severity = (Severity[sevKey] ?? Severity.INFO) as Severity
+
+    if (isTelemetryEvent(evType)) return // SSE doesn't send telemetry, guard anyway
+
+    if (severity === Severity.CRITICAL) criticalCount++
+    else if (severity === Severity.WARNING) warningCount++
+    else infoCount++
+
+    const feedEvent: FeedEvent = Object.freeze({
+      id: `sse-${sessionId}-${now}`,
+      sessionId,
+      studentId,
+      examId,
+      eventType: evType,
+      eventTypeLabel: EVENT_TYPE_LABELS[evType] ?? v.label,
+      severity,
+      severityLabel: SEVERITY_LABELS[severity] ?? v.severity,
+      category: getEventCategory(evType),
+      label: v.label,
+      confidence: v.confidence,
+      timestamp: v.timestamp,
+      receivedAt: now
+    })
+
+    eventBuffer.push(feedEvent)
+    hasNewEvents.value = true
+
+    if (isCriticalEvent(evType)) {
+      lastCriticalEvent.value = feedEvent
+    }
+  }
+
   /** Clear all events from the feed. */
   function clearFeed(): void {
     eventBuffer.clear()
@@ -449,6 +503,7 @@ export const useEventFeedStore = defineStore('eventFeed', () => {
 
     // Actions
     ingestEvent,
+    ingestFromSSE,
     clearFeed,
     setDisplayLimit,
     startUpdates,
