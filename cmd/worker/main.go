@@ -205,6 +205,12 @@ func run() error {
 		minioClient, logger, telegramAlerter,
 	)
 
+	enrollStudentHandler := worker.NewEnrollStudentHandler(
+		cfg.Inference.GRPCAddr(),
+		pgRepo,
+		logger,
+	)
+
 	aiAnalysisHandler := worker.NewAIAnalysisHandler(
 		cfg.Inference.GRPCAddr(),
 		chWriter.Conn(), chWriter, pgRepo,
@@ -283,6 +289,7 @@ func run() error {
 	mux := asynq.NewServeMux()
 	mux.Handle(worker.TypeVideoExport, videoExportHandler)
 	mux.Handle(worker.TypeForensicReport, forensicReportHandler)
+	mux.Handle(worker.TypeEnrollStudent, enrollStudentHandler)
 
 	// ── Server 2: Inference (isolated GPU queue) ──────────────────────
 	inferenceSrv := asynq.NewServer(redisOpt, asynq.Config{
@@ -301,6 +308,7 @@ func run() error {
 	logger.Info("asynq handlers registered (dual-server isolation)",
 		zap.String(worker.TypeVideoExport, "VideoExportHandler → general"),
 		zap.String(worker.TypeForensicReport, "ForensicReportHandler → general"),
+		zap.String(worker.TypeEnrollStudent, "EnrollStudentHandler → general"),
 		zap.String(worker.TypeAIAnalysis, "AIAnalysisHandler → inference"),
 		zap.Int("general_concurrency", cfg.Redis.WorkerConcurrency),
 		zap.Int("inference_concurrency", cfg.Redis.InferenceConcurrency),

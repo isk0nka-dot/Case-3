@@ -24,11 +24,17 @@ Implemented components:
 
 ## Data Flow
 
-1. The frontend obtains a LiveKit token from `POST /api/v1/media/token`.
+1. The frontend obtains a LiveKit token from `POST /api/v1/media/token`, or the
+   browser SDK obtains a student-scoped token from
+   `POST /api/v1/external/sessions/{sessionId}/student-token`.
 2. The student publishes camera/microphone tracks into room
    `argus-session-{sessionId}`.
-3. A proctor/admin calls `POST /api/v1/media/recordings/start` with the
-   `sessionId`, `studentId`, and LiveKit track IDs.
+3. Recording starts either when:
+   - a proctor/admin calls `POST /api/v1/media/recordings/start` with the
+     `sessionId`, `studentId`, and LiveKit track IDs; or
+   - the browser SDK calls
+     `POST /api/v1/external/sessions/{sessionId}/recording-ready` after joining
+     the room.
 4. Backend calls LiveKit `StartTrackCompositeEgress` with:
    - video encoding: `1280x720`, `15 FPS`, H.264 main profile
    - output type: MP4
@@ -120,6 +126,41 @@ Response:
 
 The final status and file URL are still written by the LiveKit webhook once the
 egress process finishes.
+
+### Browser SDK Student Token
+
+`POST /api/v1/external/sessions/{sessionId}/student-token`
+
+Auth: `Authorization: Bearer <argusSessionToken>`.
+
+Response:
+
+```json
+{
+  "livekitToken": "eyJ...",
+  "livekitUrl": "wss://livekit.argusai.kz",
+  "room": "argus-session-ses_123"
+}
+```
+
+### Browser SDK Recording Ready
+
+`POST /api/v1/external/sessions/{sessionId}/recording-ready`
+
+Auth: `Authorization: Bearer <argusSessionToken>`.
+
+Request:
+
+```json
+{
+  "videoTrackId": "TR_VC...",
+  "audioTrackId": "TR_AM..."
+}
+```
+
+Current backend behavior accepts the request and starts participant recording
+based on room name and student identity. Track IDs are sent by the SDK for
+forward compatibility and observability.
 
 ### LiveKit Webhook
 

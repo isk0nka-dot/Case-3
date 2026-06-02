@@ -103,12 +103,49 @@ func (h *AIAnalysisHandler) ProcessTask(ctx context.Context, t *asynq.Task) erro
 		return fmt.Errorf("unmarshal AIAnalysisPayload: %w", err)
 	}
 
+	// Apply per-exam threshold overrides if present in payload.
+	thresholds := h.thresholds
+	if payload.FaceMismatchThreshold > 0 {
+		thresholds.FaceMismatch = payload.FaceMismatchThreshold
+	}
+	if payload.LivenessThreshold > 0 {
+		thresholds.Liveness = payload.LivenessThreshold
+	}
+	if payload.ObjectConfidenceThreshold > 0 {
+		thresholds.ObjectConfidence = payload.ObjectConfidenceThreshold
+	}
+	if payload.SpoofConfidenceThreshold > 0 {
+		thresholds.SpoofConfidence = payload.SpoofConfidenceThreshold
+	}
+
 	h.logger.Info("processing AI analysis job",
 		zap.String("session_id", payload.SessionID),
 		zap.String("org_id", payload.OrgID),
 		zap.String("exam_id", payload.ExamID),
 		zap.String("analysis_type", payload.AnalysisType),
+		zap.Float32("face_mismatch_threshold", thresholds.FaceMismatch),
+		zap.Float32("liveness_threshold", thresholds.Liveness),
 	)
+
+	// ── Step 0: Load reference embedding from enrollment (if not in payload) ─
+	// The HTTP trigger may not supply ReferenceEmbedding; look it up from
+	// student_enrollments so the inference gateway can run identity checks.
+	if len(payload.ReferenceEmbedding) == 0 && h.pgRepo != nil {
+		enrollment, err := h.pgRepo.GetEnrollment(ctx, payload.StudentID, payload.OrgID)
+		if err != nil {
+			h.logger.Warn("failed to look up enrollment, proceeding without identity check",
+				zap.String("student_id", payload.StudentID),
+				zap.String("org_id", payload.OrgID),
+				zap.Error(err),
+			)
+		} else if enrollment != nil {
+			payload.ReferenceEmbedding = enrollment.Embedding
+			h.logger.Info("loaded reference embedding from enrollment",
+				zap.String("student_id", payload.StudentID),
+				zap.Int("embedding_dim", len(enrollment.Embedding)),
+			)
+		}
+	}
 
 	// ── Step 1: Connect to inference gateway ──────────────────────────────
 	conn, err := grpc.NewClient(
@@ -180,7 +217,7 @@ func (h *AIAnalysisHandler) ProcessTask(ctx context.Context, t *asynq.Task) erro
 	)
 
 	// ── Step 4: Write detected anomalies back to ClickHouse ───────────────
-	eventsWritten, err := h.writeBackAnomalies(ctx, payload, allFrames)
+	eventsWritten, err := h.writeBackAnomalies(ctx, payload, allFrames, thresholds)
 	if err != nil {
 		h.logger.Error("failed to write anomalies to clickhouse",
 			zap.String("session_id", payload.SessionID),
@@ -416,12 +453,13 @@ func (h *AIAnalysisHandler) writeBackAnomalies(
 	ctx context.Context,
 	payload AIAnalysisPayload,
 	frames []*inferencepb.FrameAnalysis,
+	thresholds AIAnalysisThresholds,
 ) (int, error) {
 	count := 0
 	now := time.Now().UTC()
 
 	for _, frame := range frames {
-		for _, anomaly := range classifyFrameAnomalies(frame, h.thresholds) {
+		for _, anomaly := range classifyFrameAnomalies(frame, thresholds) {
 			evt := h.buildEvent(payload, now, frame.TimestampSec, anomaly)
 			if err := h.chWriter.Write(ctx, evt); err != nil {
 				h.logger.Warn("failed to write AI anomaly event", zap.Error(err))

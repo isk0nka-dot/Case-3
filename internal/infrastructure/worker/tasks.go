@@ -30,6 +30,13 @@ const (
 	// inference gateway for GPU-accelerated analysis, writes detected anomalies
 	// back to ClickHouse, and fires Telegram alerts for critical fraud.
 	TypeAIAnalysis = "job:ai_analysis"
+
+	// TypeEnrollStudent is the asynq task type for student biometric enrollment.
+	// The worker fetches the reference photo from the provided URL, passes it
+	// through the inference gateway to extract an ArcFace embedding, and stores
+	// the result in student_enrollments. Subsequent AI analysis jobs will load
+	// this embedding to perform identity verification.
+	TypeEnrollStudent = "job:enroll_student"
 )
 
 // ---------------------------------------------------------------------------
@@ -87,6 +94,21 @@ type ForensicReportPayload struct {
 	OrgID string `json:"org_id"`
 }
 
+// EnrollStudentPayload is the JSON payload for TypeEnrollStudent tasks.
+// Triggers reference photo fetch, ArcFace embedding extraction and DB storage.
+type EnrollStudentPayload struct {
+	// StudentID and OrgID identify whose enrollment this is.
+	StudentID string `json:"student_id"`
+	OrgID     string `json:"org_id"`
+
+	// PhotoURL is the publicly reachable URL of the reference photo.
+	// Typically supplied by the LMS when creating the proctoring session.
+	PhotoURL string `json:"photo_url"`
+
+	// EnrolledBy labels the enrollment source: "lms" | "manual" | "api".
+	EnrolledBy string `json:"enrolled_by"`
+}
+
 // AIAnalysisPayload is the JSON payload for TypeAIAnalysis tasks.
 // Triggers a full-session deep scan via the backend inference gateway.
 type AIAnalysisPayload struct {
@@ -109,4 +131,13 @@ type AIAnalysisPayload struct {
 	// ReferenceEmbedding is the optional enrolled ArcFace vector used by the
 	// inference sidecar to compute face similarity during identity checks.
 	ReferenceEmbedding []float32 `json:"reference_embedding,omitempty"`
+
+	// Per-exam threshold overrides. When non-zero, these replace the
+	// server-level defaults from AIAnalysisThresholds for this job only.
+	FaceMismatchThreshold     float32 `json:"face_mismatch_threshold,omitempty"`
+	LivenessThreshold         float32 `json:"liveness_threshold,omitempty"`
+	ObjectConfidenceThreshold float32 `json:"object_confidence_threshold,omitempty"`
+	SpoofConfidenceThreshold  float32 `json:"spoof_confidence_threshold,omitempty"`
+	CleanThreshold            float64 `json:"clean_threshold,omitempty"`
+	WarningThreshold          float64 `json:"warning_threshold,omitempty"`
 }

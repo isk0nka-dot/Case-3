@@ -12,22 +12,29 @@
 //   - Pairing status query & cleanup
 //
 // Endpoints:
-//   POST /api/v1/sidecam/pair/initiate           — Generate QR pairing payload
-//   POST /api/v1/sidecam/pair/complete            — Mobile device completes pairing
-//   POST /api/v1/sidecam/validate-start           — Gate exam start (mandatory mode)
-//   POST /api/v1/sidecam/calibrate                — Process calibration frame
-//   POST /api/v1/sidecam/telemetry                — Device health telemetry
-//   POST /api/v1/sidecam/heartbeat                — Stream health heartbeat
-//   POST /api/v1/sidecam/hands                    — Hands-on-desk detection
-//   GET  /api/v1/sidecam/session/{sessionId}      — Get pairing status
-//   DELETE /api/v1/sidecam/session/{sessionId}     — Cleanup pairing session
+//
+//	POST /api/v1/sidecam/pair/initiate           — Generate QR pairing payload
+//	POST /api/v1/sidecam/pair/complete            — Mobile device completes pairing
+//	POST /api/v1/sidecam/validate-start           — Gate exam start (mandatory mode)
+//	POST /api/v1/sidecam/media-token              — Generate LiveKit token for paired device
+//	POST /api/v1/sidecam/calibrate                — Process calibration frame
+//	POST /api/v1/sidecam/telemetry                — Device health telemetry
+//	POST /api/v1/sidecam/heartbeat                — Stream health heartbeat
+//	POST /api/v1/sidecam/hands                    — Hands-on-desk detection
+//	GET  /api/v1/sidecam/session/{sessionId}      — Get pairing status
+//	DELETE /api/v1/sidecam/session/{sessionId}     — Cleanup pairing session
+//
 // =============================================================================
 package http
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"go.uber.org/zap"
@@ -43,6 +50,10 @@ type SidecamHandler struct {
 
 	jwtSigningKey []byte
 	repo          adminRepo
+
+	livekitAPIKey    string
+	livekitAPISecret string
+	livekitPublicURL string
 }
 
 // NewSidecamHandler creates a new secondary camera API handler.
@@ -52,11 +63,30 @@ func NewSidecamHandler(
 	logger *zap.Logger,
 	jwtSigningKey []byte,
 ) *SidecamHandler {
+	lkAPIKey := os.Getenv("LIVEKIT_API_KEY")
+	if lkAPIKey == "" {
+		lkAPIKey = "argus-dev-api-key"
+	}
+	lkAPISecret := os.Getenv("LIVEKIT_API_SECRET")
+	if lkAPISecret == "" {
+		lkAPISecret = "argus-dev-api-secret-must-be-at-least-32-characters-long"
+	}
+	lkPublicURL := os.Getenv("LIVEKIT_PUBLIC_WS_URL")
+	if lkPublicURL == "" {
+		lkPublicURL = os.Getenv("LIVEKIT_WS_URL")
+		if lkPublicURL == "" {
+			lkPublicURL = "ws://localhost:7880"
+		}
+	}
+
 	return &SidecamHandler{
-		orchestrator:  orchestrator,
-		logger:        logger.Named("sidecam_api"),
-		jwtSigningKey: jwtSigningKey,
-		repo:          repo,
+		orchestrator:     orchestrator,
+		logger:           logger.Named("sidecam_api"),
+		jwtSigningKey:    jwtSigningKey,
+		repo:             repo,
+		livekitAPIKey:    lkAPIKey,
+		livekitAPISecret: lkAPISecret,
+		livekitPublicURL: lkPublicURL,
 	}
 }
 
@@ -66,6 +96,7 @@ func (h *SidecamHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/sidecam/pair/complete", h.handleCompletePairing) // No auth — mobile device uses pairing token
 	mux.HandleFunc("POST /api/v1/sidecam/validate-start", h.requireAuth(h.handleValidateStart))
 	// Fix 4: Device-token auth for mobile endpoints (post-pairing)
+	mux.HandleFunc("POST /api/v1/sidecam/media-token", h.requireDeviceToken(h.handleMediaToken))
 	mux.HandleFunc("POST /api/v1/sidecam/calibrate", h.requireDeviceToken(h.handleCalibrate))
 	mux.HandleFunc("POST /api/v1/sidecam/telemetry", h.requireDeviceToken(h.handleTelemetry))
 	mux.HandleFunc("POST /api/v1/sidecam/heartbeat", h.requireDeviceToken(h.handleHeartbeat))
@@ -79,37 +110,37 @@ func (h *SidecamHandler) RegisterRoutes(mux *http.ServeMux) {
 // ==========================================================================
 
 type initiatePairingRequest struct {
-	SessionID string              `json:"sessionId"`
-	StudentID string              `json:"studentId"`
-	ExamID    string              `json:"examId"`
-	OrgID     string              `json:"orgId"`
+	SessionID string               `json:"sessionId"`
+	StudentID string               `json:"studentId"`
+	ExamID    string               `json:"examId"`
+	OrgID     string               `json:"orgId"`
 	Policy    sidecam.CameraPolicy `json:"policy"`
 }
 
 type initiatePairingResponse struct {
-	Session  *sidecam.PairingSession     `json:"session"`
-	QRData   string                      `json:"qrData"`
-	Payload  *sidecam.PairingCodePayload `json:"payload"`
+	Session *sidecam.PairingSession     `json:"session"`
+	QRData  string                      `json:"qrData"`
+	Payload *sidecam.PairingCodePayload `json:"payload"`
 }
 
 type completePairingRequest struct {
-	SessionID    string                   `json:"sessionId"`
-	PairingToken string                   `json:"pairingToken"`
+	SessionID    string                    `json:"sessionId"`
+	PairingToken string                    `json:"pairingToken"`
 	Device       *sidecam.MobileDeviceInfo `json:"device"`
 }
 
 type validateStartRequest struct {
-	SessionID string              `json:"sessionId"`
+	SessionID string               `json:"sessionId"`
 	Policy    sidecam.CameraPolicy `json:"policy"`
 }
 
 type calibrateRequest struct {
-	SessionID string                   `json:"sessionId"`
+	SessionID string                    `json:"sessionId"`
 	Frame     *sidecam.CalibrationFrame `json:"frame"`
 }
 
 type telemetryRequest struct {
-	SessionID string                   `json:"sessionId"`
+	SessionID string                    `json:"sessionId"`
 	Device    *sidecam.MobileDeviceInfo `json:"device"`
 }
 
@@ -118,6 +149,10 @@ type heartbeatRequest struct {
 	ClientTs      string `json:"clientTs"`
 	FrameRate     int    `json:"frameRate"`
 	DroppedFrames int    `json:"droppedFrames"`
+}
+
+type sidecamMediaTokenRequest struct {
+	SessionID string `json:"sessionId"`
 }
 
 type handsDetectionRequest struct {
@@ -243,6 +278,51 @@ func (h *SidecamHandler) handleValidateStart(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"allowed": true,
+	})
+}
+
+// handleMediaToken returns a LiveKit publisher token for a paired secondary camera.
+func (h *SidecamHandler) handleMediaToken(w http.ResponseWriter, r *http.Request) {
+	var req sidecamMediaTokenRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.SessionID == "" {
+		h.jsonError(w, "sessionId is required", http.StatusBadRequest)
+		return
+	}
+
+	session, err := h.orchestrator.GetPairingSession(req.SessionID)
+	if err != nil {
+		h.jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	roomName := "argus-session-" + req.SessionID
+	identity := "sidecam-" + req.SessionID
+	if session.StudentID != "" {
+		identity = fmt.Sprintf("sidecam-%s", session.StudentID)
+	}
+
+	token, err := h.generateSidecamLiveKitToken(identity, "Argus side camera", roomName)
+	if err != nil {
+		h.logger.Error("sidecam: failed to generate livekit token",
+			zap.String("session_id", req.SessionID),
+			zap.Error(err),
+		)
+		h.jsonError(w, "failed to generate livekit token", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"livekitToken": token,
+		"livekitUrl":   h.livekitPublicURL,
+		"room":         roomName,
+		"identity":     identity,
 	})
 }
 
@@ -412,6 +492,43 @@ func (h *SidecamHandler) requireDeviceToken(next http.HandlerFunc) http.HandlerF
 
 		next.ServeHTTP(w, r)
 	}
+}
+
+func (h *SidecamHandler) generateSidecamLiveKitToken(identity, name, room string) (string, error) {
+	now := time.Now()
+	boolTrue := true
+	boolFalse := false
+
+	claims := livekitTokenClaims{
+		Exp:  now.Add(8 * time.Hour).Unix(),
+		Iss:  h.livekitAPIKey,
+		Nbf:  now.Unix(),
+		Sub:  identity,
+		Name: name,
+		Video: livekitVideoGrant{
+			RoomJoin:       true,
+			Room:           room,
+			CanPublish:     &boolTrue,
+			CanSubscribe:   &boolFalse,
+			CanPublishData: &boolTrue,
+		},
+	}
+
+	header := `{"alg":"HS256","typ":"JWT"}`
+	headerB64 := lkBase64Encode([]byte(header))
+
+	payloadJSON, err := json.Marshal(claims)
+	if err != nil {
+		return "", fmt.Errorf("marshal claims: %w", err)
+	}
+	payloadB64 := lkBase64Encode(payloadJSON)
+
+	signingInput := headerB64 + "." + payloadB64
+	mac := hmac.New(sha256.New, []byte(h.livekitAPISecret))
+	mac.Write([]byte(signingInput))
+	signatureB64 := lkBase64Encode(mac.Sum(nil))
+
+	return headerB64 + "." + payloadB64 + "." + signatureB64, nil
 }
 
 func (h *SidecamHandler) requireAuth(next http.HandlerFunc) http.HandlerFunc {

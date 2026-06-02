@@ -17,6 +17,7 @@ curl -X POST https://argusai.kz/api/v1/external/sessions \
   -H "Content-Type: application/json" \
   -H "X-CLIENT-ID: your_key_id" \
   -H "X-API-KEY: your_secret" \
+  -H "Idempotency-Key: exam-2024-math-101:student-12345" \
   -d '{
     "examId": "exam-2024-math-101",
     "studentId": "student-12345",
@@ -30,15 +31,15 @@ Response:
 {
   "sessionId": "ses_a1b2c3d4e5",
   "argusSessionToken": "eyJhbGciOiJIUzI1NiIs...",
-  "sdkUrl": "https://argusai.kz/sdk/argus-sdk.umd.js",
-  "expiresAt": "2024-01-15T13:30:00Z"
+  "sdkUrl": "https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js",
+  "expiresAt": "2026-06-01T13:30:00Z"
 }
 ```
 
 ### 3. Load the SDK
 
 ```html
-<script src="https://argusai.kz/sdk/argus-sdk.umd.js"></script>
+<script src="https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js"></script>
 <script>
   const proctoring = new ArgusSDK({
     sessionToken: 'eyJhbGciOiJIUzI1NiIs...', // From step 2
@@ -77,6 +78,7 @@ All External API requests require two headers:
 |--------|-------------|
 | `X-CLIENT-ID` | Your API key ID (public identifier) |
 | `X-API-KEY` | Your API secret (keep this secure!) |
+| `Idempotency-Key` | Optional but recommended for create-session retries |
 
 ### Permissions
 
@@ -94,6 +96,25 @@ Wildcard permissions are supported: `*` (all), `sessions:*` (all session ops).
 - Always transmit credentials over HTTPS
 - Rotate API keys periodically
 - Store secrets in environment variables, never in source code
+- Do not expose `X-API-KEY` in a production browser page. Your backend should create Argus sessions and pass only `argusSessionToken` to the student page.
+
+### Idempotency
+
+`POST /sessions` supports `Idempotency-Key` and `X-Idempotency-Key`.
+
+Use a stable key for one intended session creation, for example `<examId>:<studentId>:<attemptNo>`. If the same organization sends the same idempotency key again, Argus returns the original `sessionId`, `argusSessionToken`, `sdkUrl`, and `expiresAt` with HTTP `200` instead of creating a duplicate session.
+
+Important: reusing the same key with a different request body returns the original session. Generate a new key for a new exam attempt.
+
+### SDK URL Configuration
+
+The `sdkUrl` field in create-session responses is controlled by backend environment:
+
+```bash
+ARGUS_SDK_URL=https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js
+```
+
+If `ARGUS_SDK_URL` is not set, the backend falls back to `ARGUS_PUBLIC_SDK_URL`, then to the public CDN URL.
 
 ---
 
@@ -137,10 +158,13 @@ Creates a new proctoring session and returns a JWT token for the SDK.
 {
   "sessionId": "ses_a1b2c3d4e5",
   "argusSessionToken": "eyJ...",
-  "sdkUrl": "https://argusai.kz/sdk/argus-sdk.umd.js",
-  "expiresAt": "2024-01-15T13:30:00Z"
+  "sdkUrl": "https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js",
+  "expiresAt": "2026-06-01T13:30:00Z"
 }
 ```
+
+**Response (200 idempotency replay):**
+Same response shape as above. The existing session is returned when the same `Idempotency-Key` was already used by the same organization.
 
 #### Get Session
 
@@ -164,6 +188,39 @@ Returns session details including status and verdict.
 ```
 
 Session statuses: `created` → `preflight` → `active` → `completed` | `expired` | `cancelled`
+
+#### Get Session Report
+
+```
+GET /sessions/{sessionId}/report
+```
+
+Returns the Phase 1 JSON report for partner systems.
+
+**Response (200):**
+```json
+{
+  "sessionId": "ses_a1b2c3d4e5",
+  "examId": "exam-2024-math-101",
+  "studentId": "student-12345",
+  "status": "completed",
+  "verdict": "clean",
+  "integrityScore": 95.5,
+  "riskScore": 4.5,
+  "violationCount": 2,
+  "reviewStatus": "ready",
+  "timeline": [],
+  "recordings": [],
+  "evidenceIntegrity": {
+    "status": "not_checked"
+  },
+  "reportUrl": "/api/v1/external/sessions/ses_a1b2c3d4e5/report",
+  "generatedAt": "2026-06-01T13:30:00Z"
+}
+```
+
+The timeline is read from ClickHouse when analytics storage is available. Full
+PDF polish remains outside Phase 1.
 
 #### Complete Session
 
@@ -248,7 +305,7 @@ DELETE /webhooks/{webhookId}
 
 **Script tag (recommended for quick integration):**
 ```html
-<script src="https://argusai.kz/sdk/argus-sdk.umd.js"></script>
+<script src="https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js"></script>
 ```
 
 **npm (for build systems):**
@@ -375,7 +432,7 @@ await vision.start(videoElement);
 | `session.started` | Session transitioned to `active` |
 | `session.completed` | Session ended (verdict available) |
 | `violation.detected` | Critical violation detected during session |
-| `verdict.ready` | Final proctoring verdict computed |
+| `verdict.ready` | Final proctoring verdict computed; payload includes `reportUrl` |
 
 ### Delivery
 
@@ -543,3 +600,120 @@ The SDK automatically adapts to network conditions:
 | External API (`/api/v1/external/*`) | 50 req/s per IP | 100 |
 | SDK assets (`/sdk/*`) | Unlimited (static CDN) | N/A |
 | gRPC events (from SDK) | 100 req/s per IP | 200 |
+
+---
+
+## Face Identity Verification (Phase 2)
+
+Argus can verify the student's identity by comparing the live camera feed against a reference photo.
+
+### 1. Enroll a reference photo
+
+Pass `referencePhotoUrl` when creating a session — Argus fetches the photo and extracts a face embedding in the background:
+
+```bash
+curl -X POST https://argusai.kz/api/v1/external/sessions \
+  -H "X-CLIENT-ID: your_key_id" \
+  -H "X-API-KEY: your_secret" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "examId": "exam-001",
+    "studentId": "student-001",
+    "studentName": "Aiman Nurova",
+    "referencePhotoUrl": "https://lms.example.kz/photos/student-001.jpg"
+  }'
+```
+
+Or enroll explicitly (e.g., at account registration):
+
+```bash
+curl -X POST https://argusai.kz/api/v1/external/students/student-001/enroll \
+  -H "X-CLIENT-ID: your_key_id" \
+  -H "X-API-KEY: your_secret" \
+  -H "Content-Type: application/json" \
+  -d '{ "photoUrl": "https://lms.example.kz/photos/student-001.jpg" }'
+```
+
+Check enrollment status:
+
+```bash
+curl https://argusai.kz/api/v1/external/students/student-001/enrollment \
+  -H "X-CLIENT-ID: your_key_id" -H "X-API-KEY: your_secret"
+```
+
+```json
+{
+  "studentId": "student-001",
+  "enrolled": true,
+  "enrolledBy": "api",
+  "enrolledAt": "2026-06-01T12:00:00Z",
+  "modelVersion": "arcface_r50_w600k",
+  "embeddingDim": 512
+}
+```
+
+### 2. Enable liveness challenge in SDK
+
+For strict mode, require the student to demonstrate natural face movement:
+
+```js
+const proctoring = new ArgusSDK({
+  sessionToken: '...',
+  serverUrl: 'https://argusai.kz',
+  preflight: {
+    consentAccepted: true,
+    requireLivenessChallenge: true,   // Detects live person vs static photo
+  },
+});
+```
+
+---
+
+## AI Deep Scan Report
+
+After a session completes, the backend automatically runs an AI deep scan
+(object detection, identity verification, liveness scoring). Results appear
+in the session report within minutes.
+
+```bash
+curl https://argusai.kz/api/v1/external/sessions/ses_abc123/report \
+  -H "X-CLIENT-ID: your_key_id" -H "X-API-KEY: your_secret"
+```
+
+The `aiDetections` section of the response:
+
+```json
+{
+  "aiDetections": {
+    "scanned": true,
+    "identityVerified": true,
+    "avgFaceSimilarity": 0.83,
+    "faceMismatchCount": 0,
+    "livenessFailCount": 0,
+    "avgLivenessScore": 0.91,
+    "objectDetections": [
+      { "objectType": "PHONE_DETECTED", "count": 2, "maxConfidence": 0.94 }
+    ],
+    "backendEventCount": 47
+  }
+}
+```
+
+---
+
+## Student Exam Shell
+
+For partners who need a ready-made student UI without building their own:
+
+```
+https://argusai.kz/exam.html
+  ?token=<argusSessionToken>
+  &serverUrl=https://argusai.kz
+  &locale=ru
+  &examName=Mathematics+Final
+  &examUrl=https://lms.example.kz/exam/123   (optional: iframe)
+  &livekit=true                               (optional: LiveKit recording)
+```
+
+Screens: consent → preflight → active exam → done. Supports RU/KK/EN.
+The file is available at `argus-sdk/examples/student-exam-shell.html`.

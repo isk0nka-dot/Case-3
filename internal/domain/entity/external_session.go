@@ -26,6 +26,9 @@ type ExternalSession struct {
 	CallbackURL string `json:"callbackUrl,omitempty"`
 	Metadata    []byte `json:"metadata,omitempty"` // JSONB
 
+	// Optional partner-provided idempotency key for safe create-session retries.
+	IdempotencyKey string `json:"idempotencyKey,omitempty"`
+
 	// Session token (JWT) — issued at creation.
 	SessionToken   string    `json:"-"` // Never exposed after creation.
 	TokenExpiresAt time.Time `json:"tokenExpiresAt"`

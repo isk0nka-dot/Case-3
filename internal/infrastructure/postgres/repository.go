@@ -235,6 +235,110 @@ func (r *Repository) UpdateRecordingEnded(ctx context.Context, egressID, status,
 	return nil
 }
 
+// RetentionCleanupParams describes a bounded retention cleanup pass for one org.
+type RetentionCleanupParams struct {
+	OrgID              string
+	VideoRetentionDays int
+	AuditRetentionDays int
+	DryRun             bool
+}
+
+// RetentionCleanupResult summarizes what a retention cleanup did or would do.
+type RetentionCleanupResult struct {
+	OrgID              string `json:"orgId"`
+	DryRun             bool   `json:"dryRun"`
+	VideoRetentionDays int    `json:"videoRetentionDays"`
+	AuditRetentionDays int    `json:"auditRetentionDays"`
+	VideoCutoff        string `json:"videoCutoff"`
+	AuditCutoff        string `json:"auditCutoff"`
+	RecordingsMatched  int64  `json:"recordingsMatched"`
+	RecordingsDeleted  int64  `json:"recordingsDeleted"`
+	AuditMatched       int64  `json:"auditMatched"`
+	AuditDeleted       int64  `json:"auditDeleted"`
+}
+
+// ApplyRetentionCleanup removes old PostgreSQL metadata for a single org.
+// It intentionally does not delete S3/MinIO objects; file_url values are
+// metadata only here, and object deletion must be wired through the object store
+// with governance/retention checks.
+func (r *Repository) ApplyRetentionCleanup(ctx context.Context, params RetentionCleanupParams) (*RetentionCleanupResult, error) {
+	if params.OrgID == "" {
+		return nil, fmt.Errorf("postgres: retention cleanup: org_id is required")
+	}
+	if params.VideoRetentionDays <= 0 {
+		params.VideoRetentionDays = 180
+	}
+	if params.AuditRetentionDays <= 0 {
+		params.AuditRetentionDays = 365
+	}
+
+	now := time.Now().UTC()
+	videoCutoff := now.AddDate(0, 0, -params.VideoRetentionDays)
+	auditCutoff := now.AddDate(0, 0, -params.AuditRetentionDays)
+
+	result := &RetentionCleanupResult{
+		OrgID:              params.OrgID,
+		DryRun:             params.DryRun,
+		VideoRetentionDays: params.VideoRetentionDays,
+		AuditRetentionDays: params.AuditRetentionDays,
+		VideoCutoff:        videoCutoff.Format(time.RFC3339),
+		AuditCutoff:        auditCutoff.Format(time.RFC3339),
+	}
+
+	recordingCountQuery := `
+		SELECT COUNT(*)
+		FROM livekit_recordings lr
+		JOIN external_sessions es ON es.session_id = lr.session_id
+		WHERE es.org_id = $1 AND lr.created_at < $2`
+	if err := r.db.QueryRowContext(ctx, recordingCountQuery, params.OrgID, videoCutoff).Scan(&result.RecordingsMatched); err != nil {
+		return nil, fmt.Errorf("postgres: count old livekit recordings: %w", err)
+	}
+
+	auditCountQuery := `SELECT COUNT(*) FROM audit_log WHERE org_id = $1 AND created_at < $2`
+	if err := r.db.QueryRowContext(ctx, auditCountQuery, params.OrgID, auditCutoff).Scan(&result.AuditMatched); err != nil {
+		return nil, fmt.Errorf("postgres: count old audit log: %w", err)
+	}
+
+	if params.DryRun {
+		return result, nil
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: retention cleanup: begin tx: %w", err)
+	}
+	defer func() {
+		if rbErr := tx.Rollback(); rbErr != nil && rbErr != sql.ErrTxDone {
+			r.logger.Error("retention cleanup rollback failed", zap.Error(rbErr))
+		}
+	}()
+
+	recordingDeleteQuery := `
+		DELETE FROM livekit_recordings lr
+		USING external_sessions es
+		WHERE es.session_id = lr.session_id
+			AND es.org_id = $1
+			AND lr.created_at < $2`
+	recordingDelete, err := tx.ExecContext(ctx, recordingDeleteQuery, params.OrgID, videoCutoff)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: delete old livekit recording metadata: %w", err)
+	}
+	result.RecordingsDeleted, _ = recordingDelete.RowsAffected()
+
+	auditDeleteQuery := `DELETE FROM audit_log WHERE org_id = $1 AND created_at < $2`
+	auditDelete, err := tx.ExecContext(ctx, auditDeleteQuery, params.OrgID, auditCutoff)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: delete old audit log: %w", err)
+	}
+	result.AuditDeleted, _ = auditDelete.RowsAffected()
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("postgres: retention cleanup: commit: %w", err)
+	}
+
+	return result, nil
+}
+
 // ==========================================================================
 // Organization Repository Implementation
 // ==========================================================================
@@ -1435,25 +1539,56 @@ func (r *Repository) CreateExternalSession(ctx context.Context, s *entity.Extern
 		INSERT INTO external_sessions (
 			session_id, org_id, exam_id, student_id,
 			student_name, exam_name, callback_url, metadata,
-			session_token, token_expires_at, status
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			idempotency_key, session_token, token_expires_at, status
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, created_at, updated_at`
 
 	var metadata interface{}
 	if len(s.Metadata) > 0 {
 		metadata = s.Metadata
 	}
+	var idempotencyKey interface{}
+	if strings.TrimSpace(s.IdempotencyKey) != "" {
+		idempotencyKey = strings.TrimSpace(s.IdempotencyKey)
+	}
 	return r.db.QueryRowContext(ctx, query,
 		s.SessionID, s.OrgID, s.ExamID, s.StudentID,
 		s.StudentName, s.ExamName, s.CallbackURL, metadata,
-		s.SessionToken, s.TokenExpiresAt, s.Status,
+		idempotencyKey, s.SessionToken, s.TokenExpiresAt, s.Status,
 	).Scan(&s.ID, &s.CreatedAt, &s.UpdatedAt)
+}
+
+func (r *Repository) GetExternalSessionByIdempotencyKey(ctx context.Context, orgID, key string) (*entity.ExternalSession, error) {
+	query := `
+		SELECT id, session_id, org_id, exam_id, student_id,
+			student_name, exam_name, callback_url, metadata, COALESCE(idempotency_key, ''),
+			session_token, token_expires_at, status,
+			verdict, verdict_details, integrity_score, violation_count,
+			started_at, completed_at, created_at, updated_at
+		FROM external_sessions
+		WHERE org_id = $1 AND idempotency_key = $2 AND deleted_at IS NULL`
+
+	s := &entity.ExternalSession{}
+	err := r.db.QueryRowContext(ctx, query, orgID, key).Scan(
+		&s.ID, &s.SessionID, &s.OrgID, &s.ExamID, &s.StudentID,
+		&s.StudentName, &s.ExamName, &s.CallbackURL, &s.Metadata, &s.IdempotencyKey,
+		&s.SessionToken, &s.TokenExpiresAt, &s.Status,
+		&s.Verdict, &s.VerdictDetails, &s.IntegrityScore, &s.ViolationCount,
+		&s.StartedAt, &s.CompletedAt, &s.CreatedAt, &s.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("postgres: get external session by idempotency key: %w", err)
+	}
+	return s, nil
 }
 
 func (r *Repository) GetExternalSessionByID(ctx context.Context, sessionID string) (*entity.ExternalSession, error) {
 	query := `
 		SELECT id, session_id, org_id, exam_id, student_id,
-			student_name, exam_name, callback_url, metadata,
+			student_name, exam_name, callback_url, metadata, COALESCE(idempotency_key, ''),
 			token_expires_at, status,
 			verdict, verdict_details, integrity_score, violation_count,
 			started_at, completed_at, created_at, updated_at
@@ -1463,7 +1598,7 @@ func (r *Repository) GetExternalSessionByID(ctx context.Context, sessionID strin
 	s := &entity.ExternalSession{}
 	err := r.db.QueryRowContext(ctx, query, sessionID).Scan(
 		&s.ID, &s.SessionID, &s.OrgID, &s.ExamID, &s.StudentID,
-		&s.StudentName, &s.ExamName, &s.CallbackURL, &s.Metadata,
+		&s.StudentName, &s.ExamName, &s.CallbackURL, &s.Metadata, &s.IdempotencyKey,
 		&s.TokenExpiresAt, &s.Status,
 		&s.Verdict, &s.VerdictDetails, &s.IntegrityScore, &s.ViolationCount,
 		&s.StartedAt, &s.CompletedAt, &s.CreatedAt, &s.UpdatedAt,
@@ -1719,5 +1854,78 @@ func (r *Repository) MarkWebhookFailed(ctx context.Context, deliveryID int64, ht
 			attempt = attempt + 1
 		WHERE id = $1`
 	_, err := r.db.ExecContext(ctx, query, deliveryID, httpStatus, errorMsg)
+	return err
+}
+
+// ==========================================================================
+// Student Enrollments (ArcFace reference embeddings)
+// ==========================================================================
+
+// StudentEnrollment holds a student's reference face embedding used for
+// identity verification during AI deep scan.
+type StudentEnrollment struct {
+	ID           string
+	StudentID    string
+	OrgID        string
+	Embedding    []float32
+	PhotoURL     string
+	EnrolledBy   string
+	ModelVersion string
+	EnrolledAt   time.Time
+}
+
+// SaveEnrollment inserts or replaces a student's reference embedding.
+// Upserts on (student_id, org_id) so re-enrollment replaces the old record.
+func (r *Repository) SaveEnrollment(ctx context.Context, e *StudentEnrollment) error {
+	embJSON, err := json.Marshal(e.Embedding)
+	if err != nil {
+		return fmt.Errorf("marshal embedding: %w", err)
+	}
+	_, err = r.db.ExecContext(ctx, `
+		INSERT INTO student_enrollments
+			(student_id, org_id, embedding, photo_url, enrolled_by, model_version, enrolled_at)
+		VALUES ($1, $2, $3::jsonb, $4, $5, $6, NOW())
+		ON CONFLICT (student_id, org_id)
+		DO UPDATE SET
+			embedding     = EXCLUDED.embedding,
+			photo_url     = EXCLUDED.photo_url,
+			enrolled_by   = EXCLUDED.enrolled_by,
+			model_version = EXCLUDED.model_version,
+			enrolled_at   = NOW()`,
+		e.StudentID, e.OrgID, string(embJSON), e.PhotoURL, e.EnrolledBy, e.ModelVersion,
+	)
+	return err
+}
+
+// GetEnrollment returns the stored embedding for a student, or nil if not enrolled.
+func (r *Repository) GetEnrollment(ctx context.Context, studentID, orgID string) (*StudentEnrollment, error) {
+	var e StudentEnrollment
+	var embJSON string
+	err := r.db.QueryRowContext(ctx, `
+		SELECT id, student_id, org_id, embedding::text, photo_url,
+		       enrolled_by, model_version, enrolled_at
+		FROM student_enrollments
+		WHERE student_id = $1 AND org_id = $2`,
+		studentID, orgID,
+	).Scan(&e.ID, &e.StudentID, &e.OrgID, &embJSON, &e.PhotoURL,
+		&e.EnrolledBy, &e.ModelVersion, &e.EnrolledAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal([]byte(embJSON), &e.Embedding); err != nil {
+		return nil, fmt.Errorf("unmarshal embedding: %w", err)
+	}
+	return &e, nil
+}
+
+// DeleteEnrollment removes a student's enrollment record.
+func (r *Repository) DeleteEnrollment(ctx context.Context, studentID, orgID string) error {
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM student_enrollments WHERE student_id = $1 AND org_id = $2`,
+		studentID, orgID,
+	)
 	return err
 }

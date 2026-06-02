@@ -66,3 +66,21 @@ func NewAIAnalysisTask(payload AIAnalysisPayload) (*asynq.Task, error) {
 		asynq.TaskID(fmt.Sprintf("ai:%s", payload.SessionID)),
 	), nil
 }
+
+// NewEnrollStudentTask creates an asynq task for student biometric enrollment.
+// Fetches reference photo, extracts ArcFace embedding via inference gateway,
+// and stores it in student_enrollments. Enqueued on the default queue.
+func NewEnrollStudentTask(payload EnrollStudentPayload) (*asynq.Task, error) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal EnrollStudentPayload: %w", err)
+	}
+	return asynq.NewTask(
+		TypeEnrollStudent,
+		data,
+		asynq.MaxRetry(3),
+		asynq.Timeout(2*time.Minute),
+		asynq.Queue(QueueDefault),
+		asynq.TaskID(fmt.Sprintf("enroll:%s:%s", payload.OrgID, payload.StudentID)),
+	), nil
+}

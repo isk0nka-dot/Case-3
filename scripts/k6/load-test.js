@@ -30,6 +30,7 @@ const heartbeatsSent = new Counter('heartbeats_sent')
 // ---------------------------------------------------------------------------
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080'
+const EVENT_COLLECTOR_SERVICE = '/argus.eventcollector.v1.EventCollectorService'
 const MAX_VUS = parseInt(__ENV.VUS) || 5000
 
 export const options = {
@@ -228,7 +229,7 @@ export default function main(data) {
     })
 
     const res = http.post(
-      `${BASE_URL}/argus.proctoring.v1.EventCollectorService/IngestBatch`,
+      `${BASE_URL}${EVENT_COLLECTOR_SERVICE}/IngestBatch`,
       payload,
       {
         headers: headers,
@@ -274,7 +275,7 @@ export default function main(data) {
       })
 
       const replayRes = http.post(
-        `${BASE_URL}/argus.proctoring.v1.EventCollectorService/IngestBatch`,
+        `${BASE_URL}${EVENT_COLLECTOR_SERVICE}/IngestBatch`,
         replayPayload,
         {
           headers: headers,
@@ -308,7 +309,7 @@ export default function main(data) {
       })
 
       const res = http.post(
-        `${BASE_URL}/argus.proctoring.v1.EventCollectorService/Heartbeat`,
+        `${BASE_URL}${EVENT_COLLECTOR_SERVICE}/Heartbeat`,
         payload,
         {
           headers: headers,

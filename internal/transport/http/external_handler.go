@@ -28,12 +28,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/argus-ai/event-collector/internal/application/usecase"
 	"github.com/argus-ai/event-collector/internal/domain/entity"
 	"github.com/argus-ai/event-collector/internal/domain/valueobject"
+	"github.com/argus-ai/event-collector/internal/infrastructure/forensic"
 	"github.com/argus-ai/event-collector/internal/infrastructure/postgres"
+	"github.com/argus-ai/event-collector/internal/infrastructure/worker"
 	"github.com/argus-ai/event-collector/pkg/auth"
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -73,14 +77,23 @@ type ExternalHandler struct {
 	logger           *zap.Logger
 	jwtSigningKey    []byte
 	ingest           *usecase.IngestUseCase
+	chConn           driver.Conn
 	livekitAPIKey    string
 	livekitAPISecret string
 	livekitPublicURL string
+	sdkURL           string
 	egress           ExternalEgressController // nil until SetEgress is called
+	asynqClient      *asynq.Client            // nil if worker not configured
 }
 
 // SetEgress wires in the LiveKit Egress service for auto-recording.
 func (h *ExternalHandler) SetEgress(e ExternalEgressController) { h.egress = e }
+
+// SetAnalyticsConn wires ClickHouse for external JSON reports.
+func (h *ExternalHandler) SetAnalyticsConn(conn driver.Conn) { h.chConn = conn }
+
+// SetAsynqClient wires in the asynq client for background enrollment tasks.
+func (h *ExternalHandler) SetAsynqClient(c *asynq.Client) { h.asynqClient = c }
 
 // NewExternalHandler creates a new external API handler.
 func NewExternalHandler(repo *postgres.Repository, logger *zap.Logger, jwtSigningKey []byte, ingest *usecase.IngestUseCase) *ExternalHandler {
@@ -99,6 +112,13 @@ func NewExternalHandler(repo *postgres.Repository, logger *zap.Logger, jwtSignin
 			lkPublicURL = "ws://localhost:7880"
 		}
 	}
+	sdkURL := os.Getenv("ARGUS_SDK_URL")
+	if sdkURL == "" {
+		sdkURL = os.Getenv("ARGUS_PUBLIC_SDK_URL")
+	}
+	if sdkURL == "" {
+		sdkURL = "https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js"
+	}
 	return &ExternalHandler{
 		repo:             repo,
 		logger:           logger.Named("external_api"),
@@ -107,6 +127,7 @@ func NewExternalHandler(repo *postgres.Repository, logger *zap.Logger, jwtSignin
 		livekitAPIKey:    lkAPIKey,
 		livekitAPISecret: lkAPISecret,
 		livekitPublicURL: lkPublicURL,
+		sdkURL:           sdkURL,
 	}
 }
 
@@ -115,6 +136,8 @@ func (h *ExternalHandler) RegisterRoutes(mux *http.ServeMux) {
 	// Session management (API key auth).
 	mux.HandleFunc("POST /api/v1/external/sessions", h.requireAPIKey("sessions:write", h.handleCreateSession))
 	mux.HandleFunc("GET /api/v1/external/sessions/{sessionId}", h.requireAPIKey("sessions:read", h.handleGetSession))
+	mux.HandleFunc("GET /api/v1/external/sessions/{sessionId}/report", h.requireAPIKey("sessions:read", h.handleSessionReport))
+	mux.HandleFunc("GET /api/v1/external/sessions/{sessionId}/report.pdf", h.requireAPIKey("sessions:read", h.handleSessionReportPDF))
 	mux.HandleFunc("POST /api/v1/external/sessions/{sessionId}/complete", h.requireAPIKey("sessions:write", h.handleCompleteSession))
 	mux.HandleFunc("POST /api/v1/external/sessions/{sessionId}/cancel", h.requireAPIKey("sessions:write", h.handleCancelSession))
 
@@ -228,13 +251,14 @@ func hasPermission(perms []string, required string) bool {
 // ==========================================================================
 
 type createSessionRequest struct {
-	ExamID      string          `json:"examId"`
-	StudentID   string          `json:"studentId"`
-	StudentName string          `json:"studentName,omitempty"`
-	ExamName    string          `json:"examName,omitempty"`
-	CallbackURL string          `json:"callbackUrl,omitempty"`
-	Metadata    json.RawMessage `json:"metadata,omitempty"`
-	DurationMin int             `json:"durationMin,omitempty"` // Session duration in minutes (default: 240).
+	ExamID            string          `json:"examId"`
+	StudentID         string          `json:"studentId"`
+	StudentName       string          `json:"studentName,omitempty"`
+	ExamName          string          `json:"examName,omitempty"`
+	CallbackURL       string          `json:"callbackUrl,omitempty"`
+	Metadata          json.RawMessage `json:"metadata,omitempty"`
+	DurationMin       int             `json:"durationMin,omitempty"`       // Session duration in minutes (default: 240).
+	ReferencePhotoURL string          `json:"referencePhotoUrl,omitempty"` // LMS-provided student photo for face enrollment.
 }
 
 type createSessionResponse struct {
@@ -265,6 +289,41 @@ func (h *ExternalHandler) handleCreateSession(w http.ResponseWriter, r *http.Req
 	if strings.TrimSpace(req.StudentID) == "" {
 		h.jsonError(w, "studentId is required", http.StatusBadRequest)
 		return
+	}
+
+	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if idempotencyKey == "" {
+		idempotencyKey = strings.TrimSpace(r.Header.Get("X-Idempotency-Key"))
+	}
+	if len(idempotencyKey) > 128 {
+		h.jsonError(w, "Idempotency-Key is too long (max 128 characters)", http.StatusBadRequest)
+		return
+	}
+	if idempotencyKey != "" {
+		existing, err := h.repo.GetExternalSessionByIdempotencyKey(r.Context(), apiCtx.OrgID, idempotencyKey)
+		if err != nil {
+			h.logger.Error("Failed to look up idempotent external session",
+				zap.Error(err),
+				zap.String("org_id", apiCtx.OrgID),
+				zap.String("idempotency_key", idempotencyKey),
+			)
+			h.jsonError(w, "Failed to create session", http.StatusInternalServerError)
+			return
+		}
+		if existing != nil {
+			h.logger.Info("External session idempotency replay",
+				zap.String("session_id", existing.SessionID),
+				zap.String("org_id", apiCtx.OrgID),
+				zap.String("idempotency_key", idempotencyKey),
+			)
+			h.jsonResponse(w, createSessionResponse{
+				SessionID:         existing.SessionID,
+				ArgusSessionToken: existing.SessionToken,
+				SDKUrl:            h.sdkURL,
+				ExpiresAt:         existing.TokenExpiresAt.UTC().Format(time.RFC3339),
+			}, http.StatusOK)
+			return
+		}
 	}
 
 	// Generate unique session ID.
@@ -309,12 +368,37 @@ func (h *ExternalHandler) handleCreateSession(w http.ResponseWriter, r *http.Req
 		ExamName:       req.ExamName,
 		CallbackURL:    req.CallbackURL,
 		Metadata:       req.Metadata,
+		IdempotencyKey: idempotencyKey,
 		SessionToken:   sessionToken,
 		TokenExpiresAt: tokenExpiry,
 		Status:         "created",
 	}
 
 	if err := h.repo.CreateExternalSession(r.Context(), session); err != nil {
+		if idempotencyKey != "" {
+			existing, lookupErr := h.repo.GetExternalSessionByIdempotencyKey(r.Context(), apiCtx.OrgID, idempotencyKey)
+			if lookupErr == nil && existing != nil {
+				h.logger.Info("External session idempotency replay after create conflict",
+					zap.String("session_id", existing.SessionID),
+					zap.String("org_id", apiCtx.OrgID),
+					zap.String("idempotency_key", idempotencyKey),
+				)
+				h.jsonResponse(w, createSessionResponse{
+					SessionID:         existing.SessionID,
+					ArgusSessionToken: existing.SessionToken,
+					SDKUrl:            h.sdkURL,
+					ExpiresAt:         existing.TokenExpiresAt.UTC().Format(time.RFC3339),
+				}, http.StatusOK)
+				return
+			}
+			if lookupErr != nil {
+				h.logger.Warn("Failed to look up idempotent external session after create error",
+					zap.Error(lookupErr),
+					zap.String("org_id", apiCtx.OrgID),
+					zap.String("idempotency_key", idempotencyKey),
+				)
+			}
+		}
 		h.logger.Error("Failed to create external session",
 			zap.Error(err),
 			zap.String("org_id", apiCtx.OrgID),
@@ -330,12 +414,32 @@ func (h *ExternalHandler) handleCreateSession(w http.ResponseWriter, r *http.Req
 		zap.String("exam_id", req.ExamID),
 		zap.String("student_id", req.StudentID),
 		zap.String("api_key", apiCtx.KeyID),
+		zap.String("idempotency_key", idempotencyKey),
 	)
+
+	// If a reference photo was provided, kick off background enrollment so the
+	// AI deep scan can perform face identity verification.
+	if req.ReferencePhotoURL != "" && h.asynqClient != nil {
+		enrollTask, err := worker.NewEnrollStudentTask(worker.EnrollStudentPayload{
+			StudentID:  req.StudentID,
+			OrgID:      apiCtx.OrgID,
+			PhotoURL:   req.ReferencePhotoURL,
+			EnrolledBy: "lms",
+		})
+		if err == nil {
+			if _, err := h.asynqClient.Enqueue(enrollTask); err != nil {
+				h.logger.Warn("failed to enqueue enrollment task",
+					zap.String("student_id", req.StudentID),
+					zap.Error(err),
+				)
+			}
+		}
+	}
 
 	h.jsonResponse(w, createSessionResponse{
 		SessionID:         sessionID,
 		ArgusSessionToken: sessionToken,
-		SDKUrl:            "https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js",
+		SDKUrl:            h.sdkURL,
 		ExpiresAt:         tokenExpiry.UTC().Format(time.RFC3339),
 	}, http.StatusCreated)
 }
@@ -363,6 +467,295 @@ func (h *ExternalHandler) handleGetSession(w http.ResponseWriter, r *http.Reques
 	}
 
 	h.jsonResponse(w, session, http.StatusOK)
+}
+
+type externalReportResponse struct {
+	SessionID         string                    `json:"sessionId"`
+	ExamID            string                    `json:"examId"`
+	StudentID         string                    `json:"studentId"`
+	StudentName       string                    `json:"studentName,omitempty"`
+	ExamName          string                    `json:"examName,omitempty"`
+	OrgID             string                    `json:"orgId"`
+	Status            string                    `json:"status"`
+	Verdict           *string                   `json:"verdict,omitempty"`
+	IntegrityScore    *float64                  `json:"integrityScore,omitempty"`
+	RiskScore         *float64                  `json:"riskScore,omitempty"`
+	ViolationCount    int                       `json:"violationCount"`
+	ReviewStatus      string                    `json:"reviewStatus"`
+	Timeline          []externalReportEvent     `json:"timeline"`
+	Recordings        []externalReportRecording `json:"recordings"`
+	AIDetections      *aiDetectionsSummary      `json:"aiDetections,omitempty"`
+	EvidenceIntegrity externalEvidenceIntegrity `json:"evidenceIntegrity"`
+	ReportURL         string                    `json:"reportUrl"`
+	GeneratedAt       string                    `json:"generatedAt"`
+}
+
+// aiDetectionsSummary holds the backend AI deep scan summary for a session.
+type aiDetectionsSummary struct {
+	Scanned               bool                `json:"scanned"`
+	IdentityVerified      *bool               `json:"identityVerified,omitempty"`
+	AvgFaceSimilarity     *float64            `json:"avgFaceSimilarity,omitempty"`
+	FaceMismatchCount     int                 `json:"faceMismatchCount"`
+	LivenessFailCount     int                 `json:"livenessFailCount"`
+	DeepfakeCount         int                 `json:"deepfakeCount"`
+	ScreenReflectionCount int                 `json:"screenReflectionCount"`
+	VoiceSynthCount       int                 `json:"voiceSynthCount"`
+	AvgLivenessScore      *float64            `json:"avgLivenessScore,omitempty"`
+	ObjectDetections      []aiObjectDetection `json:"objectDetections"`
+	BackendEventCount     int                 `json:"backendEventCount"`
+}
+
+type aiObjectDetection struct {
+	ObjectType string  `json:"objectType"`
+	Count      int     `json:"count"`
+	MaxConf    float64 `json:"maxConfidence"`
+}
+
+func upsertAIObjectDetection(items map[string]*aiObjectDetection, objectType string, count int, maxConf float64) {
+	if existing, ok := items[objectType]; ok {
+		existing.Count += count
+		if maxConf > existing.MaxConf {
+			existing.MaxConf = maxConf
+		}
+		return
+	}
+	items[objectType] = &aiObjectDetection{
+		ObjectType: objectType,
+		Count:      count,
+		MaxConf:    maxConf,
+	}
+}
+
+type externalReportEvent struct {
+	EventID        string  `json:"eventId"`
+	EventType      string  `json:"eventType"`
+	Severity       string  `json:"severity"`
+	Source         string  `json:"source"`
+	Label          string  `json:"label"`
+	Confidence     float64 `json:"confidence"`
+	Timestamp      string  `json:"timestamp"`
+	VideoTimestamp int64   `json:"videoTimestamp"`
+}
+
+type externalReportRecording struct {
+	EgressID     string  `json:"egressId"`
+	Status       string  `json:"status"`
+	RoomName     string  `json:"roomName"`
+	FileURL      string  `json:"fileUrl,omitempty"`
+	ErrorMessage string  `json:"errorMessage,omitempty"`
+	StartedAt    string  `json:"startedAt"`
+	EndedAt      *string `json:"endedAt,omitempty"`
+}
+
+type externalEvidenceIntegrity struct {
+	Status     string `json:"status"`
+	ChainValid *bool  `json:"chainValid,omitempty"`
+	Message    string `json:"message,omitempty"`
+}
+
+func (h *ExternalHandler) handleSessionReport(w http.ResponseWriter, r *http.Request) {
+	apiCtx := getAPIKeyFromContext(r.Context())
+	if apiCtx == nil {
+		h.jsonError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID := r.PathValue("sessionId")
+	session, err := h.repo.GetExternalSessionByID(r.Context(), sessionID)
+	if err != nil || session == nil || session.OrgID != apiCtx.OrgID {
+		h.jsonError(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	timeline, err := h.queryExternalReportTimeline(r.Context(), sessionID)
+	if err != nil {
+		h.logger.Warn("external report timeline unavailable",
+			zap.String("session_id", sessionID),
+			zap.Error(err),
+		)
+		timeline = []externalReportEvent{}
+	}
+
+	recordings, err := h.queryExternalReportRecordings(r.Context(), sessionID)
+	if err != nil {
+		h.logger.Warn("external report recordings unavailable",
+			zap.String("session_id", sessionID),
+			zap.Error(err),
+		)
+		recordings = []externalReportRecording{}
+	}
+
+	aiDetections, err := h.queryAIDetections(r.Context(), sessionID)
+	if err != nil {
+		h.logger.Warn("ai detections unavailable",
+			zap.String("session_id", sessionID),
+			zap.Error(err),
+		)
+	}
+
+	integrityScore := session.IntegrityScore
+	var riskScore *float64
+	if integrityScore != nil {
+		score := 100 - *integrityScore
+		if score < 0 {
+			score = 0
+		}
+		if score > 100 {
+			score = 100
+		}
+		riskScore = &score
+	}
+
+	reviewStatus := "pending"
+	if session.Verdict != nil && *session.Verdict != "" {
+		reviewStatus = "ready"
+	}
+	if session.Status == "cancelled" || session.Status == "expired" {
+		reviewStatus = session.Status
+	}
+
+	resp := externalReportResponse{
+		SessionID:      session.SessionID,
+		ExamID:         session.ExamID,
+		StudentID:      session.StudentID,
+		StudentName:    session.StudentName,
+		ExamName:       session.ExamName,
+		OrgID:          session.OrgID,
+		Status:         session.Status,
+		Verdict:        session.Verdict,
+		IntegrityScore: integrityScore,
+		RiskScore:      riskScore,
+		ViolationCount: session.ViolationCount,
+		ReviewStatus:   reviewStatus,
+		Timeline:       timeline,
+		Recordings:     recordings,
+		AIDetections:   aiDetections,
+		EvidenceIntegrity: externalEvidenceIntegrity{
+			Status:  "not_checked",
+			Message: "Forensic integrity verification runs asynchronously after session completion",
+		},
+		ReportURL:   fmt.Sprintf("/api/v1/external/sessions/%s/report", session.SessionID),
+		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	h.jsonResponse(w, resp, http.StatusOK)
+}
+
+// handleSessionReportPDF generates a bilingual (RU/KZ) PDF report for a session.
+//
+//	GET /api/v1/external/sessions/{sessionId}/report.pdf
+func (h *ExternalHandler) handleSessionReportPDF(w http.ResponseWriter, r *http.Request) {
+	apiCtx := getAPIKeyFromContext(r.Context())
+	if apiCtx == nil {
+		h.jsonError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID := r.PathValue("sessionId")
+	session, err := h.repo.GetExternalSessionByID(r.Context(), sessionID)
+	if err != nil || session == nil || session.OrgID != apiCtx.OrgID {
+		h.jsonError(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	// Collect timeline violations from ClickHouse.
+	timeline, _ := h.queryExternalReportTimeline(r.Context(), sessionID)
+	violations := make([]forensic.ExternalViolation, 0, len(timeline))
+	for _, e := range timeline {
+		if e.Severity == "critical" || e.Severity == "warning" {
+			violations = append(violations, forensic.ExternalViolation{
+				EventType:  e.EventType,
+				Severity:   e.Severity,
+				Label:      e.Label,
+				Confidence: e.Confidence,
+				Timestamp:  e.Timestamp,
+			})
+		}
+	}
+
+	// Collect AI detections summary.
+	aiDetections, _ := h.queryAIDetections(r.Context(), sessionID)
+
+	var (
+		aiScanned         bool
+		identityVerified  *bool
+		faceMismatchCount int
+		livenessFailCount int
+		objDetections     []forensic.ExternalObjectDetection
+	)
+	if aiDetections != nil {
+		aiScanned = aiDetections.Scanned
+		identityVerified = aiDetections.IdentityVerified
+		faceMismatchCount = aiDetections.FaceMismatchCount
+		livenessFailCount = aiDetections.LivenessFailCount
+		for _, obj := range aiDetections.ObjectDetections {
+			objDetections = append(objDetections, forensic.ExternalObjectDetection{
+				ObjectType: obj.ObjectType,
+				Count:      obj.Count,
+				MaxConf:    obj.MaxConf,
+			})
+		}
+	}
+
+	// Collect recordings.
+	recordings, _ := h.queryExternalReportRecordings(r.Context(), sessionID)
+	recs := make([]forensic.ExternalRecordingRef, 0, len(recordings))
+	for _, rec := range recordings {
+		recs = append(recs, forensic.ExternalRecordingRef{
+			EgressID:  rec.EgressID,
+			Status:    rec.Status,
+			StartedAt: rec.StartedAt,
+		})
+	}
+
+	verdict := ""
+	if session.Verdict != nil {
+		verdict = *session.Verdict
+	}
+	integrityScore := 0.0
+	if session.IntegrityScore != nil {
+		integrityScore = *session.IntegrityScore
+	}
+
+	data := &forensic.ExternalReportData{
+		SessionID:         sessionID,
+		ExamID:            session.ExamID,
+		ExamName:          session.ExamName,
+		StudentID:         session.StudentID,
+		StudentName:       session.StudentName,
+		OrgID:             session.OrgID,
+		Status:            session.Status,
+		Verdict:           verdict,
+		IntegrityScore:    integrityScore,
+		ViolationCount:    session.ViolationCount,
+		ReviewStatus:      "pending",
+		GeneratedAt:       time.Now().UTC().Format(time.RFC3339),
+		Violations:        violations,
+		AIScanned:         aiScanned,
+		IdentityVerified:  identityVerified,
+		FaceMismatchCount: faceMismatchCount,
+		LivenessFailCount: livenessFailCount,
+		ObjectDetections:  objDetections,
+		Recordings:        recs,
+	}
+
+	pdfBytes, hash, err := forensic.GenerateExternalPDF(data)
+	if err != nil {
+		h.logger.Error("failed to generate external PDF report",
+			zap.String("session_id", sessionID),
+			zap.Error(err),
+		)
+		h.jsonError(w, "Failed to generate PDF report", http.StatusInternalServerError)
+		return
+	}
+
+	filename := fmt.Sprintf("argus-report-%s.pdf", sessionID)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Header().Set("X-Report-Hash", hash)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(pdfBytes)))
+	w.WriteHeader(http.StatusOK)
+	w.Write(pdfBytes) //nolint:errcheck
 }
 
 type completeSessionRequest struct {
@@ -421,9 +814,51 @@ func (h *ExternalHandler) handleCompleteSession(w http.ResponseWriter, r *http.R
 		"verdict":        req.Verdict,
 		"integrityScore": req.IntegrityScore,
 		"violationCount": req.ViolationCount,
+		"reportUrl":      fmt.Sprintf("/api/v1/external/sessions/%s/report", sessionID),
 	})
 
+	// Auto-trigger AI deep scan so backend inference runs asynchronously after
+	// every session completion. Load per-exam settings for threshold overrides.
+	if h.asynqClient != nil {
+		aiPayload := worker.AIAnalysisPayload{
+			SessionID:    sessionID,
+			OrgID:        session.OrgID,
+			ExamID:       session.ExamID,
+			StudentID:    session.StudentID,
+			AnalysisType: "full_scan",
+		}
+		if settings, err := h.repo.GetExamProctoringSettings(r.Context(), session.OrgID, session.ExamID); err == nil && settings != nil {
+			aiPayload.CleanThreshold = settings.CleanThreshold
+			aiPayload.WarningThreshold = settings.WarningThreshold
+		}
+		if aiTask, err := worker.NewAIAnalysisTask(aiPayload); err == nil {
+			if _, err := h.asynqClient.Enqueue(aiTask); err != nil && !isErrAlreadyQueued(err) {
+				h.logger.Warn("failed to auto-enqueue AI analysis",
+					zap.String("session_id", sessionID),
+					zap.Error(err),
+				)
+			}
+		}
+	}
+
 	h.jsonResponse(w, map[string]string{"status": "completed", "verdict": req.Verdict}, http.StatusOK)
+}
+
+func isErrAlreadyQueued(err error) bool {
+	return err != nil && len(err.Error()) > 0 &&
+		(contains(err.Error(), "already exists") || contains(err.Error(), "duplicate"))
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr ||
+		func() bool {
+			for i := 0; i <= len(s)-len(substr); i++ {
+				if s[i:i+len(substr)] == substr {
+					return true
+				}
+			}
+			return false
+		}())
 }
 
 func (h *ExternalHandler) handleCancelSession(w http.ResponseWriter, r *http.Request) {
@@ -703,7 +1138,7 @@ func (h *ExternalHandler) requireSessionToken(next http.HandlerFunc) http.Handle
 
 		verifier, err := auth.NewVerifier(auth.VerifierConfig{
 			Algorithm:  "HS256",
-			SigningKey:  h.jwtSigningKey,
+			SigningKey: h.jwtSigningKey,
 			Issuer:     "argus-external-api",
 			Audience:   "argus-event-collector",
 			ClockSkew:  30 * time.Second,
@@ -991,4 +1426,226 @@ func (h *ExternalHandler) handleListSessionsByResult(w http.ResponseWriter, r *h
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(sessions)
+}
+
+func (h *ExternalHandler) queryExternalReportTimeline(ctx context.Context, sessionID string) ([]externalReportEvent, error) {
+	if h.chConn == nil {
+		return []externalReportEvent{}, nil
+	}
+
+	qctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	rows, err := h.chConn.Query(qctx, `
+		SELECT
+			event_id,
+			event_type,
+			severity,
+			source,
+			label,
+			confidence,
+			server_timestamp,
+			video_timestamp_sec
+		FROM proctoring_events
+		WHERE session_id = ?
+		ORDER BY server_timestamp ASC
+		LIMIT 1000`, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := make([]externalReportEvent, 0)
+	for rows.Next() {
+		var event externalReportEvent
+		var ts time.Time
+		var confidence float32
+		var videoTs float64
+		if err := rows.Scan(
+			&event.EventID,
+			&event.EventType,
+			&event.Severity,
+			&event.Source,
+			&event.Label,
+			&confidence,
+			&ts,
+			&videoTs,
+		); err != nil {
+			return nil, err
+		}
+		event.Confidence = float64(confidence)
+		event.Timestamp = ts.UTC().Format(time.RFC3339)
+		event.VideoTimestamp = int64(videoTs)
+		events = append(events, event)
+	}
+	return events, rows.Err()
+}
+
+// queryAIDetections fetches the backend AI deep-scan summary for a session.
+// Returns nil (not an error) if ClickHouse is unavailable or the session was
+// never scanned — the caller omits the field from the JSON response.
+func (h *ExternalHandler) queryAIDetections(ctx context.Context, sessionID string) (*aiDetectionsSummary, error) {
+	if h.chConn == nil {
+		return nil, nil
+	}
+
+	qctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+
+	// Count current BACKEND_AI event types and aggregate only populated AI scores.
+	type aiRow struct {
+		eventType     string
+		severity      string
+		payloadType   string
+		objectType    string
+		count         uint64
+		avgSimilarity float64
+		simCount      uint64
+		avgLiveness   float64
+		liveCount     uint64
+		maxConf       float64
+	}
+
+	rows, err := h.chConn.Query(qctx, `
+		SELECT
+			event_type,
+			severity,
+			payload_type,
+			if(payload_type = 'object_detection', JSONExtractString(payload, 'object_type'), '') AS object_type,
+			count()                                           AS cnt,
+			avgIf(face_similarity, face_similarity >= 0)      AS avg_sim,
+			countIf(face_similarity >= 0)                     AS sim_count,
+			avgIf(liveness_score, liveness_score >= 0)        AS avg_live,
+			countIf(liveness_score >= 0)                      AS live_count,
+			max(confidence)                                   AS max_conf
+		FROM proctoring_events
+		WHERE session_id = ? AND source = 'BACKEND_AI'
+		GROUP BY event_type, severity, payload_type, object_type
+		ORDER BY cnt DESC
+		LIMIT 50`, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	summary := &aiDetectionsSummary{
+		ObjectDetections: []aiObjectDetection{},
+	}
+
+	var totalBackend int
+	var simSum, simCount, liveSum, liveCount float64
+	objectMap := map[string]*aiObjectDetection{}
+
+	for rows.Next() {
+		var r aiRow
+		if err := rows.Scan(
+			&r.eventType,
+			&r.severity,
+			&r.payloadType,
+			&r.objectType,
+			&r.count,
+			&r.avgSimilarity,
+			&r.simCount,
+			&r.avgLiveness,
+			&r.liveCount,
+			&r.maxConf,
+		); err != nil {
+			continue
+		}
+		totalBackend += int(r.count)
+
+		switch r.eventType {
+		case "BACKEND_AI_FACE_MISMATCH":
+			if r.payloadType == "liveness" {
+				summary.LivenessFailCount += int(r.count)
+			} else {
+				summary.FaceMismatchCount += int(r.count)
+			}
+		case "BACKEND_AI_DEEPFAKE_DETECTED":
+			summary.DeepfakeCount += int(r.count)
+			summary.LivenessFailCount += int(r.count)
+		case "BACKEND_AI_HIDDEN_OBJECT", "BACKEND_AI_SCREEN_REFLECTION":
+			if r.eventType == "BACKEND_AI_SCREEN_REFLECTION" {
+				summary.ScreenReflectionCount += int(r.count)
+			}
+			objectType := r.objectType
+			if objectType == "" {
+				objectType = r.eventType
+			}
+			upsertAIObjectDetection(objectMap, objectType, int(r.count), r.maxConf)
+		case "BACKEND_AI_VOICE_SYNTH":
+			summary.VoiceSynthCount += int(r.count)
+		}
+
+		if r.simCount > 0 {
+			simSum += r.avgSimilarity * float64(r.simCount)
+			simCount += float64(r.simCount)
+		}
+		if r.liveCount > 0 {
+			liveSum += r.avgLiveness * float64(r.liveCount)
+			liveCount += float64(r.liveCount)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	summary.BackendEventCount = totalBackend
+	summary.Scanned = totalBackend > 0
+
+	if simCount > 0 {
+		avg := simSum / simCount
+		summary.AvgFaceSimilarity = &avg
+		verified := avg >= 0.4 && summary.FaceMismatchCount == 0
+		summary.IdentityVerified = &verified
+	}
+	if liveCount > 0 {
+		avg := liveSum / liveCount
+		summary.AvgLivenessScore = &avg
+	}
+	for _, obj := range objectMap {
+		summary.ObjectDetections = append(summary.ObjectDetections, *obj)
+	}
+
+	if !summary.Scanned {
+		return nil, nil
+	}
+	return summary, nil
+}
+
+func (h *ExternalHandler) queryExternalReportRecordings(ctx context.Context, sessionID string) ([]externalReportRecording, error) {
+	rows, err := h.repo.DB().QueryContext(ctx, `
+		SELECT egress_id, status, room_name, file_url, error_message, started_at, ended_at
+		FROM livekit_recordings
+		WHERE session_id = $1
+		ORDER BY created_at DESC`, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	recordings := make([]externalReportRecording, 0)
+	for rows.Next() {
+		var rec externalReportRecording
+		var startedAt time.Time
+		var endedAt *time.Time
+		if err := rows.Scan(
+			&rec.EgressID,
+			&rec.Status,
+			&rec.RoomName,
+			&rec.FileURL,
+			&rec.ErrorMessage,
+			&startedAt,
+			&endedAt,
+		); err != nil {
+			return nil, err
+		}
+		rec.StartedAt = startedAt.UTC().Format(time.RFC3339)
+		if endedAt != nil {
+			formatted := endedAt.UTC().Format(time.RFC3339)
+			rec.EndedAt = &formatted
+		}
+		recordings = append(recordings, rec)
+	}
+	return recordings, rows.Err()
 }

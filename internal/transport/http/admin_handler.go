@@ -18,6 +18,7 @@
 //	GET    /api/v1/admin/organizations/:orgId       — Get organization details
 //	PUT    /api/v1/admin/organizations/:orgId       — Update organization
 //	DELETE /api/v1/admin/organizations/:orgId       — Soft-delete organization
+//	POST   /api/v1/admin/organizations/:orgId/retention/apply — Apply retention policy
 //	GET    /api/v1/admin/organizations/:orgId/users — List users for org
 //	POST   /api/v1/admin/organizations/:orgId/users — Create user
 //	GET    /api/v1/admin/organizations/:orgId/keys     — List API keys
@@ -83,6 +84,7 @@ func (h *AdminHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/admin/organizations/{orgId}", h.requireAuth(h.handleGetOrg))
 	mux.HandleFunc("PUT /api/v1/admin/organizations/{orgId}", h.requireAuth(h.requireRole(entity.RoleSuperAdmin, h.handleUpdateOrg)))
 	mux.HandleFunc("DELETE /api/v1/admin/organizations/{orgId}", h.requireAuth(h.requireRole(entity.RoleSuperAdmin, h.handleDeleteOrg)))
+	mux.HandleFunc("POST /api/v1/admin/organizations/{orgId}/retention/apply", h.requireAuth(h.requireOrgAdmin(h.handleApplyRetention)))
 
 	// User management.
 	mux.HandleFunc("GET /api/v1/admin/organizations/{orgId}/users", h.requireAuth(h.handleListUsers))
@@ -254,22 +256,29 @@ func (h *AdminHandler) handleListOrgs(w http.ResponseWriter, r *http.Request) {
 }
 
 type createOrgRequest struct {
-	OrgID        string `json:"orgId"`
-	Name         string `json:"name"`
-	Slug         string `json:"slug"`
-	OrgType      string `json:"orgType"`
-	ContactEmail string `json:"contactEmail"`
-	ContactPhone string `json:"contactPhone"`
-	City         string `json:"city"`
-	Region       string `json:"region"`
-	Plan         string `json:"plan"`
-	MaxSessions  int    `json:"maxSessions"`
-	MaxEventsRPS int    `json:"maxEventsRps"`
+	OrgID         string `json:"orgId"`
+	Name          string `json:"name"`
+	Slug          string `json:"slug"`
+	OrgType       string `json:"orgType"`
+	ContactEmail  string `json:"contactEmail"`
+	ContactPhone  string `json:"contactPhone"`
+	City          string `json:"city"`
+	Region        string `json:"region"`
+	Plan          string `json:"plan"`
+	MaxSessions   int    `json:"maxSessions"`
+	MaxEventsRPS  int    `json:"maxEventsRps"`
+	RetentionDays int    `json:"retentionDays"`
 
 	// Feature Toggles & Quotas.
 	AllowedFeatures map[string]bool `json:"allowedFeatures,omitempty"`
 	SessionLimit    int             `json:"sessionLimit"`
 	TrialEndsAt     *time.Time      `json:"trialEndsAt,omitempty"`
+}
+
+type retentionApplyRequest struct {
+	DryRun             *bool `json:"dryRun"`
+	VideoRetentionDays int   `json:"videoRetentionDays"`
+	AuditRetentionDays int   `json:"auditRetentionDays"`
 }
 
 func (h *AdminHandler) handleCreateOrg(w http.ResponseWriter, r *http.Request) {
@@ -618,6 +627,7 @@ func (h *AdminHandler) handleUpdateOrg(w http.ResponseWriter, r *http.Request) {
 	beforeState := map[string]interface{}{
 		"name": org.Name, "plan": string(org.Plan),
 		"maxSessions": org.MaxSessions, "maxEventsRps": org.MaxEventsRPS,
+		"retentionDays":   org.RetentionDays,
 		"allowedFeatures": org.AllowedFeatures, "sessionLimit": org.SessionLimit,
 	}
 
@@ -646,6 +656,9 @@ func (h *AdminHandler) handleUpdateOrg(w http.ResponseWriter, r *http.Request) {
 	if req.MaxEventsRPS > 0 {
 		org.MaxEventsRPS = req.MaxEventsRPS
 	}
+	if req.RetentionDays > 0 {
+		org.RetentionDays = req.RetentionDays
+	}
 
 	// Apply feature toggles & quotas.
 	// When AllowedFeatures is non-nil, the features tab is being saved —
@@ -669,6 +682,7 @@ func (h *AdminHandler) handleUpdateOrg(w http.ResponseWriter, r *http.Request) {
 	afterState := map[string]interface{}{
 		"name": org.Name, "plan": string(org.Plan),
 		"maxSessions": org.MaxSessions, "maxEventsRps": org.MaxEventsRPS,
+		"retentionDays":   org.RetentionDays,
 		"allowedFeatures": org.AllowedFeatures, "sessionLimit": org.SessionLimit,
 	}
 	h.audit(r, "update_org", "organization", orgID, map[string]interface{}{
@@ -695,6 +709,55 @@ func (h *AdminHandler) handleDeleteOrg(w http.ResponseWriter, r *http.Request) {
 	h.audit(r, "delete_org", "organization", orgID, map[string]string{"orgId": orgID})
 
 	h.jsonResponse(w, map[string]string{"status": "deleted"}, http.StatusOK)
+}
+
+func (h *AdminHandler) handleApplyRetention(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("orgId")
+	caller := getUserFromContext(r.Context())
+	if caller == nil {
+		h.jsonError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !caller.IsSuperAdmin() && caller.OrgID != orgID {
+		h.jsonError(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	var req retentionApplyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	dryRun := true
+	if req.DryRun != nil {
+		dryRun = *req.DryRun
+	}
+
+	org, err := h.repo.GetOrgByOrgID(r.Context(), orgID)
+	if err != nil || org == nil {
+		h.jsonError(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	result, err := h.repo.ApplyRetentionCleanup(r.Context(), postgres.RetentionCleanupParams{
+		OrgID:              orgID,
+		VideoRetentionDays: req.VideoRetentionDays,
+		AuditRetentionDays: req.AuditRetentionDays,
+		DryRun:             dryRun,
+	})
+	if err != nil {
+		h.logger.Error("Retention cleanup failed",
+			zap.String("org_id", orgID),
+			zap.Bool("dry_run", dryRun),
+			zap.Error(err),
+		)
+		h.jsonError(w, "Failed to apply retention policy", http.StatusInternalServerError)
+		return
+	}
+
+	h.audit(r, "apply_retention", "organization", orgID, result)
+	h.jsonResponse(w, result, http.StatusOK)
 }
 
 // ==========================================================================

@@ -82,6 +82,15 @@ func (h *AIAnalysisHandler) handleTriggerAnalysis(w http.ResponseWriter, r *http
 		AnalysisType: req.AnalysisType,
 	}
 
+	// Load per-exam proctoring settings and inject threshold overrides so the
+	// worker respects exam-specific sensitivity levels instead of global defaults.
+	if orgID != "" && examID != "" {
+		if settings, err := h.pgRepo.GetExamProctoringSettings(r.Context(), orgID, examID); err == nil && settings != nil {
+			payload.CleanThreshold = settings.CleanThreshold
+			payload.WarningThreshold = settings.WarningThreshold
+		}
+	}
+
 	task, err := worker.NewAIAnalysisTask(payload)
 	if err != nil {
 		h.logger.Error("failed to create AI analysis task",

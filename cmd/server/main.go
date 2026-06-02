@@ -705,7 +705,41 @@ func run() error {
 		// Powers the plug-and-play SDK: session creation, webhooks.
 		// =============================================================
 		externalHandler := adminHTTP.NewExternalHandler(pgRepo, logger, adminJWTKey, ingestUC)
+		if chWriter != nil {
+			externalHandler.SetAnalyticsConn(chWriter.Conn())
+		}
+		if asynqClient != nil {
+			externalHandler.SetAsynqClient(asynqClient)
+		}
 		externalHandler.RegisterRoutes(httpMux)
+
+		// Student biometric enrollment (face embedding for identity checks).
+		if asynqClient != nil {
+			enrollmentHandler := adminHTTP.NewEnrollmentHandler(pgRepo, asynqClient, logger, adminJWTKey)
+			enrollmentHandler.RegisterRoutes(httpMux)
+			logger.Info("enrollment api registered",
+				zap.String("base_path", "/api/v1/external/students/*/enroll"),
+			)
+		}
+
+		// Desktop agent telemetry — receives heartbeats from argus-desktop-agent.
+		agentHTTPHandler := adminHTTP.NewAgentHandler(logger, adminJWTKey)
+		agentHTTPHandler.RegisterRoutes(httpMux)
+		logger.Info("desktop agent api registered",
+			zap.String("base_path", "/api/v1/agent"),
+		)
+
+		// LTI 1.3 integration (Moodle/Canvas/Blackboard).
+		sdkURLForLTI := os.Getenv("ARGUS_SDK_URL")
+		serverPublicURL := os.Getenv("ARGUS_PUBLIC_URL")
+		if serverPublicURL == "" {
+			serverPublicURL = os.Getenv("ARGUS_SERVER_URL")
+		}
+		ltiHandler := adminHTTP.NewLTIHandler(pgRepo, asynqClient, adminJWTKey, sdkURLForLTI, serverPublicURL, logger)
+		ltiHandler.RegisterRoutes(httpMux)
+		logger.Info("lti 1.3 handler registered",
+			zap.String("base_path", "/api/v1/lti"),
+		)
 
 		logger.Info("external api registered",
 			zap.String("base_path", "/api/v1/external"),
@@ -994,7 +1028,7 @@ func run() error {
 
 		logger.Info("sidecam api registered",
 			zap.String("base_path", "/api/v1/sidecam"),
-			zap.Int("endpoints", 9),
+			zap.Int("endpoints", 10),
 		)
 
 		// =============================================================
