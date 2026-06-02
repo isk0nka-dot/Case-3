@@ -136,6 +136,9 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
   private _security: BrowserIntegrityMonitor | null = null;
   private _widget: CameraWidget | null = null;
   private _preflight: PreflightChecker | null = null;
+  private _aiSnapshotTimer: ReturnType<typeof setInterval> | null = null;
+  private _aiSnapshotInFlight = false;
+  private _sessionStartedAtMs = 0;
 
   // State.
   private _status: SessionStatus = 'idle';
@@ -360,6 +363,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
 
       // Start everything.
       this._session!.start();
+      this._sessionStartedAtMs = Date.now();
       this._governor.start();
       this._security.start();
 
@@ -370,6 +374,8 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
       if (this._preflight?.audioStream) {
         await this._audio.start(this._preflight.audioStream);
       }
+
+      this._startAISnapshotSampling();
 
       this._widget.setStatus('active');
       this._setStatus('active');
@@ -397,6 +403,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
     if (this._status !== 'active' && this._status !== 'paused') return;
 
     // Stop monitoring.
+    this._stopAISnapshotSampling();
     this._vision?.stop();
     this._audio?.stop();
     this._liveKit?.stop();
@@ -421,6 +428,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
   destroy(): void {
     // Stop all modules.
     this._vision?.destroy();
+    this._stopAISnapshotSampling();
     this._audio?.destroy();
     this._liveKit?.destroy();
     this._security?.destroy();
@@ -473,6 +481,85 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
       if (this._config.liveKit?.required) {
         throw err;
       }
+    }
+  }
+
+  private _startAISnapshotSampling(): void {
+    const cfg = this._config.aiSnapshots;
+    if (cfg?.enabled === false || !this._session || !this._widget?.videoElement) return;
+
+    const intervalMs = Math.max(5000, cfg?.intervalMs ?? 15000);
+    this._captureAndSendAIFrame().catch(() => {/* best-effort */});
+    this._aiSnapshotTimer = setInterval(() => {
+      this._captureAndSendAIFrame().catch(() => {/* best-effort */});
+    }, intervalMs);
+  }
+
+  private _stopAISnapshotSampling(): void {
+    if (this._aiSnapshotTimer) {
+      clearInterval(this._aiSnapshotTimer);
+      this._aiSnapshotTimer = null;
+    }
+    this._aiSnapshotInFlight = false;
+  }
+
+  private async _captureAndSendAIFrame(): Promise<void> {
+    if (this._aiSnapshotInFlight || !this._session || !this._widget?.videoElement) return;
+    const video = this._widget.videoElement;
+    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth <= 0 || video.videoHeight <= 0) {
+      return;
+    }
+
+    this._aiSnapshotInFlight = true;
+    try {
+      const cfg = this._config.aiSnapshots;
+      const maxWidth = Math.max(160, cfg?.maxWidth ?? 640);
+      const scale = Math.min(1, maxWidth / video.videoWidth);
+      const width = Math.max(1, Math.round(video.videoWidth * scale));
+      const height = Math.max(1, Math.round(video.videoHeight * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(video, 0, 0, width, height);
+
+      const quality = Math.max(0.4, Math.min(0.92, cfg?.quality ?? 0.72));
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+      if (!blob) return;
+
+      const form = new FormData();
+      form.append('frame', blob, `argus-${this._session.sessionId}-${Date.now()}.jpg`);
+      form.append('contentType', 'image/jpeg');
+      const ts = this._sessionStartedAtMs > 0 ? (Date.now() - this._sessionStartedAtMs) / 1000 : 0;
+      form.append('videoTimestampSec', ts.toFixed(3));
+
+      const base = this._config.serverUrl.replace(/\/+$/, '');
+      const response = await fetch(`${base}/api/v1/external/sessions/${encodeURIComponent(this._session.sessionId)}/ai-frame`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this._config.sessionToken}`,
+        },
+        body: form,
+        keepalive: false,
+      });
+
+      if (!response.ok && response.status >= 500) {
+        this.emit('error', {
+          code: 'AI_FRAME_UPLOAD_FAILED',
+          message: `Backend AI frame upload failed: HTTP ${response.status}`,
+          recoverable: true,
+        });
+      }
+    } catch (err) {
+      this.emit('error', {
+        code: 'AI_FRAME_UPLOAD_FAILED',
+        message: err instanceof Error ? err.message : 'Backend AI frame upload failed',
+        recoverable: true,
+      });
+    } finally {
+      this._aiSnapshotInFlight = false;
     }
   }
 

@@ -177,6 +177,18 @@ export interface ArgusSDKConfig {
 
   /** Optional LiveKit publishing for session recording. */
   liveKit?: LiveKitPublishingConfig;
+
+  /** Optional backend AI snapshot sampling. */
+  aiSnapshots?: {
+    /** Enable webcam snapshot uploads for backend inference. Default: true. */
+    enabled?: boolean;
+    /** Sampling interval in milliseconds. Default: 15000. */
+    intervalMs?: number;
+    /** JPEG quality 0..1. Default: 0.72. */
+    quality?: number;
+    /** Max width before encoding. Default: 640. */
+    maxWidth?: number;
+  };
 }
 
 // ---------------------------------------------------------------------------
