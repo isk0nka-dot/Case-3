@@ -173,6 +173,13 @@ export interface ArgusSDKConfig {
      * Port where the desktop agent's local health server listens. Default: 7373.
      */
     desktopAgentPort?: number;
+    /**
+     * Require the Argus browser extension to be installed and active.
+     * When true, startSession() is blocked if the extension never announced
+     * itself, and a missing extension heartbeat mid-exam raises a tamper event.
+     * Default: false. Enable for strict proctoring modes.
+     */
+    requireExtension?: boolean;
   };
 
   /** Optional LiveKit publishing for session recording. */

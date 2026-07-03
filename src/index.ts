@@ -123,6 +123,25 @@ interface SDKEvents {
  * </script>
  * ```
  */
+/**
+ * Maps integrity events reported by the Argus browser extension (see
+ * `argus-sdk/extension`) to proctoring EventTypes. The extension relays these
+ * via `window.postMessage({ argusExt: { type, payload, severity } })`.
+ */
+const EXTENSION_EVENT_MAP: Record<string, { eventType: EventType; severity: Severity; label: string }> = {
+  TAB_SWITCH: { eventType: EventType.TAB_SWITCH, severity: Severity.WARNING, label: 'Switched away from exam tab' },
+  TAB_OPENED: { eventType: EventType.TAB_SWITCH, severity: Severity.WARNING, label: 'New tab opened during exam' },
+  WINDOW_BLUR: { eventType: EventType.FOCUS_LOSS_DETECTED, severity: Severity.WARNING, label: 'Browser window lost focus' },
+  NAVIGATION_AWAY: { eventType: EventType.TAB_SWITCH, severity: Severity.CRITICAL, label: 'Navigated away from exam origin' },
+  EXTERNAL_DISPLAY_DETECTED: { eventType: EventType.EXTERNAL_DISPLAY_DETECTED, severity: Severity.CRITICAL, label: 'Second monitor detected' },
+};
+
+const EXTENSION_SEVERITY_MAP: Record<string, Severity> = {
+  INFO: Severity.INFO,
+  WARNING: Severity.WARNING,
+  CRITICAL: Severity.CRITICAL,
+};
+
 export class ArgusSDK extends EventEmitter<SDKEvents> {
   private readonly _config: ArgusSDKConfig;
 
@@ -145,6 +164,12 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
   private _videoStream: MediaStream | null = null;
   private _lastPreflightResult: PreflightResult | null = null;
 
+  // Browser-extension bridge state.
+  private _extensionPresent = false;
+  private _extLastBeatMs = 0;
+  private _extWatchdog: ReturnType<typeof setInterval> | null = null;
+  private _extMessageHandler: ((e: MessageEvent) => void) | null = null;
+
   constructor(config: ArgusSDKConfig) {
     super();
     this._config = config;
@@ -159,6 +184,10 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
     if (config.onPreflightComplete) this.on('preflightComplete', config.onPreflightComplete);
     if (config.onDeliveryUpdate) this.on('deliveryUpdate', config.onDeliveryUpdate);
     if (config.onLiveKitStateChange) this.on('liveKitStateChange', config.onLiveKitStateChange);
+
+    // Listen for the Argus browser extension and probe for its presence early,
+    // so a strict `requireExtension` gate can be evaluated before session start.
+    this._setupExtensionBridge();
   }
 
   // ---------------------------------------------------------------------------
@@ -191,6 +220,9 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
 
   /** Last structured preflight result (null before startPreflight()). */
   get lastPreflightResult(): PreflightResult | null { return this._lastPreflightResult; }
+
+  /** Whether the Argus browser extension has announced itself. */
+  get extensionPresent(): boolean { return this._extensionPresent; }
 
   /**
    * Run preflight checks.
@@ -272,6 +304,14 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
   async startSession(): Promise<void> {
     if (this._status !== 'ready') {
       throw new Error('Cannot start session: preflight not completed. Call startPreflight() first.');
+    }
+
+    // Strict mode: the browser extension must be installed and active.
+    if (this._config.preflight?.requireExtension && !this._extensionPresent) {
+      this._setStatus('error');
+      const message = 'Argus proctoring extension is required but was not detected. Please install/enable it and retry.';
+      this.emit('error', { code: 'EXTENSION_REQUIRED', message, recoverable: false });
+      throw new Error(message);
     }
 
     this._setStatus('initializing');
@@ -383,6 +423,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
 
       // Notify browser extension (if installed) to start monitoring this tab.
       this._notifyExtensionStart();
+      this._startExtensionWatchdog();
     } catch (err) {
       this._setStatus('error');
       this.emit('error', {
@@ -437,6 +478,13 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
     this._widget?.destroy();
     this._transport?.destroy();
     this._preflight?.destroy();
+
+    // Tear down the extension bridge.
+    this._stopExtensionWatchdog();
+    if (this._extMessageHandler && typeof window !== 'undefined') {
+      window.removeEventListener('message', this._extMessageHandler);
+      this._extMessageHandler = null;
+    }
 
     // Stop video stream.
     if (this._videoStream) {
@@ -644,11 +692,96 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
 
   /** Notify Argus browser extension that the session has ended. */
   private _notifyExtensionStop(): void {
+    this._stopExtensionWatchdog();
     try {
       if (typeof window !== 'undefined') {
         window.postMessage({ argus: { type: 'SESSION_END' } }, '*');
       }
     } catch { /* non-fatal */ }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Browser-extension bridge
+  // ---------------------------------------------------------------------------
+
+  /** Start listening for the extension and probe for its presence. */
+  private _setupExtensionBridge(): void {
+    if (typeof window === 'undefined') return;
+
+    const handler = (event: MessageEvent): void => {
+      if (event.source !== window) return;
+      const data = event.data as { argusExt?: { type?: string; payload?: Record<string, unknown>; severity?: string } } | null;
+      const msg = data?.argusExt;
+      if (!msg || typeof msg.type !== 'string') return;
+      this._handleExtensionMessage(msg.type, msg.payload ?? {}, msg.severity ?? 'WARNING');
+    };
+    this._extMessageHandler = handler;
+    window.addEventListener('message', handler);
+
+    // Ask any installed extension to announce itself before the session starts.
+    try {
+      window.postMessage({ argus: { type: 'PING' } }, '*');
+    } catch { /* non-fatal */ }
+  }
+
+  /** Handle a single message relayed by the extension. */
+  private _handleExtensionMessage(type: string, payload: Record<string, unknown>, severityStr: string): void {
+    if (type === 'EXTENSION_PRESENT') {
+      this._extensionPresent = true;
+      this._extLastBeatMs = Date.now();
+      return;
+    }
+    if (type === 'EXTENSION_HEARTBEAT') {
+      this._extLastBeatMs = Date.now();
+      return;
+    }
+
+    // Ingest integrity events only while a session is active.
+    const mapped = EXTENSION_EVENT_MAP[type];
+    if (!mapped || !this._session) return;
+
+    const severity = EXTENSION_SEVERITY_MAP[severityStr.toUpperCase()] ?? mapped.severity;
+    const confidence = typeof payload.confidence === 'number' ? payload.confidence : 0.95;
+    this._session.sendEvent(
+      mapped.eventType,
+      severity,
+      EventSource.SYSTEM,
+      mapped.label,
+      confidence,
+      { type: 'system', data: { source: 'extension', extType: type, ...payload } },
+    );
+  }
+
+  /**
+   * In strict mode, watch the extension heartbeat. A gap longer than 10s while
+   * the exam is running is treated as the extension being disabled/removed
+   * (a tamper signal) and raised as a CRITICAL event.
+   */
+  private _startExtensionWatchdog(): void {
+    if (!this._config.preflight?.requireExtension) return;
+    this._stopExtensionWatchdog();
+    this._extWatchdog = setInterval(() => {
+      if (!this._session || this._extLastBeatMs === 0) return;
+      if (Date.now() - this._extLastBeatMs > 10000) {
+        this._session.sendLifecycleEvent(
+          EventType.TAB_SWITCH,
+          Severity.CRITICAL,
+          EventSource.SYSTEM,
+          'Argus extension stopped responding (possible tamper)',
+          0.99,
+          { type: 'system', data: { category: 'extension_tamper' } },
+        );
+        // Reset so the alert fires again only after another sustained gap.
+        this._extLastBeatMs = Date.now();
+      }
+    }, 5000);
+  }
+
+  private _stopExtensionWatchdog(): void {
+    if (this._extWatchdog) {
+      clearInterval(this._extWatchdog);
+      this._extWatchdog = null;
+    }
   }
 
   private _formatPreflightFailure(result: PreflightResult): string {

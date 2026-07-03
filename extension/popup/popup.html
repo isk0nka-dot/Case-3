@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Argus Proctoring</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      width: 260px; margin: 0; padding: 14px 16px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #0f1419; color: #e6edf3;
+    }
+    .row { display: flex; align-items: center; gap: 8px; }
+    h1 { font-size: 14px; margin: 0 0 10px; font-weight: 600; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #6b7280; }
+    .dot.active { background: #22c55e; }
+    .muted { color: #9aa4af; font-size: 12px; }
+    .k { color: #9aa4af; }
+    .v { color: #e6edf3; font-variant-numeric: tabular-nums; }
+    dl { margin: 10px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Argus Proctoring</h1>
+  <div class="row">
+    <span id="dot" class="dot"></span>
+    <span id="status" class="muted">Idle — no active exam</span>
+  </div>
+  <dl>
+    <dt class="k">Version</dt><dd class="v" id="version">—</dd>
+    <dt class="k">Extension ID</dt><dd class="v" id="extid" style="word-break:break-all;">—</dd>
+  </dl>
+  <script src="popup.js"></script>
+</body>
+</html>
