@@ -33,6 +33,11 @@ type Config struct {
 	// ForbiddenProcesses is the list of process name substrings to detect.
 	// Populated from defaults + policy override from server.
 	ForbiddenProcesses []string
+
+	// EnforceBlockRemoteAccess, when true (strict exams), makes the agent set
+	// shouldBlock=true in its /health response once an active remote-control
+	// session is detected, so the SDK can hard-block the exam.
+	EnforceBlockRemoteAccess bool
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -44,12 +49,13 @@ func DefaultConfig() Config {
 		}
 	}
 	return Config{
-		SessionToken:         os.Getenv("ARGUS_SESSION_TOKEN"),
-		ServerURL:            os.Getenv("ARGUS_SERVER_URL"),
-		LocalPort:            port,
-		ScanIntervalSec:      30,
-		HeartbeatIntervalSec: 60,
-		ForbiddenProcesses:   DefaultForbiddenProcesses(),
+		SessionToken:             os.Getenv("ARGUS_SESSION_TOKEN"),
+		ServerURL:                os.Getenv("ARGUS_SERVER_URL"),
+		LocalPort:                port,
+		ScanIntervalSec:          30,
+		HeartbeatIntervalSec:     60,
+		ForbiddenProcesses:       DefaultForbiddenProcesses(),
+		EnforceBlockRemoteAccess: os.Getenv("ARGUS_ENFORCE_REMOTE_BLOCK") == "1" || os.Getenv("ARGUS_ENFORCE_REMOTE_BLOCK") == "true",
 	}
 }
 

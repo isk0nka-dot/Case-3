@@ -42,12 +42,20 @@ type Agent struct {
 }
 
 type scanResult struct {
-	At              time.Time
-	ForbiddenProcs  []scanner.ProcessInfo
-	TotalProcesses  int
-	MonitorCount    int
-	IsVM            bool
-	VMProduct       string
+	At             time.Time
+	ForbiddenProcs []scanner.ProcessInfo
+	TotalProcesses int
+	MonitorCount   int
+	IsVM           bool
+	VMProduct      string
+
+	// RemoteAccess holds detected remote-control tools (AnyDesk, RustDesk, …).
+	RemoteAccess []scanner.RemoteAccessTool
+	// RemoteActive is true when a live remote session is detected.
+	RemoteActive bool
+	// Blocked is true when the exam should be hard-blocked (strict enforcement
+	// + an active remote session). The SDK reads this from /health.
+	Blocked bool
 }
 
 // New creates a new Agent with the given configuration.
@@ -139,6 +147,23 @@ func (a *Agent) runScan(ctx context.Context) {
 	forbidden := scanner.FindForbiddenProcesses(procs, a.cfg.ForbiddenProcesses)
 	monCount := scanner.CollectSystemInfo().MonitorCount
 
+	// Remote-access detection: process signatures + active network sessions.
+	remote := scanner.ClassifyRemoteAccessProcesses(procs)
+	if conns, err := scanner.ScanConnections(); err == nil {
+		remote = scanner.MergeRemoteAccess(remote, scanner.DetectRemoteAccessPorts(conns))
+	}
+	remoteActive := scanner.AnyActiveRemoteAccess(remote)
+	blocked := a.cfg.EnforceBlockRemoteAccess && remoteActive
+
+	// Report remote-access tools separately (stronger, specific signal) and
+	// exclude them from the generic forbidden report to avoid duplicates.
+	otherForbidden := make([]scanner.ProcessInfo, 0, len(forbidden))
+	for _, p := range forbidden {
+		if !scanner.IsRemoteAccessProcess(p) {
+			otherForbidden = append(otherForbidden, p)
+		}
+	}
+
 	a.mu.Lock()
 	a.lastScan = scanResult{
 		At:             time.Now(),
@@ -147,12 +172,20 @@ func (a *Agent) runScan(ctx context.Context) {
 		MonitorCount:   monCount,
 		IsVM:           a.sysInfo.IsVM,
 		VMProduct:      a.sysInfo.VMProduct,
+		RemoteAccess:   remote,
+		RemoteActive:   remoteActive,
+		Blocked:        blocked,
 	}
 	a.mu.Unlock()
 
-	if len(forbidden) > 0 {
-		log.Printf("[argus-agent] forbidden processes detected: %d", len(forbidden))
-		a.reportForbiddenProcesses(ctx, forbidden)
+	if len(remote) > 0 {
+		log.Printf("[argus-agent] remote-access tools detected: %d (active=%v, blocked=%v)", len(remote), remoteActive, blocked)
+		a.reportRemoteAccess(ctx, remote)
+	}
+
+	if len(otherForbidden) > 0 {
+		log.Printf("[argus-agent] forbidden processes detected: %d", len(otherForbidden))
+		a.reportForbiddenProcesses(ctx, otherForbidden)
 	}
 
 	// USB device change detection (new device added during exam = suspicious)
@@ -196,6 +229,32 @@ func (a *Agent) reportForbiddenProcesses(ctx context.Context, procs []scanner.Pr
 	}
 	if err := a.client.SendEvents(ctx, events); err != nil {
 		log.Printf("[argus-agent] failed to report forbidden processes: %v", err)
+	}
+}
+
+func (a *Agent) reportRemoteAccess(ctx context.Context, tools []scanner.RemoteAccessTool) {
+	events := make([]reporter.AgentEvent, 0, len(tools))
+	for _, t := range tools {
+		label := fmt.Sprintf("Средство удалённого доступа: %s", t.Name)
+		if t.Active {
+			label = fmt.Sprintf("Активная удалённая сессия: %s", t.Name)
+		}
+		confidence := 0.9
+		if t.Active {
+			confidence = 0.99
+		}
+		events = append(events, reporter.AgentEvent{
+			EventType:  "REMOTE_ACCESS_DETECTED",
+			Severity:   "critical",
+			Source:     "KERNEL_AGENT",
+			Label:      label,
+			Confidence: confidence,
+			Details:    fmt.Sprintf("tool=%s via=%s active=%v %s", t.Name, t.Via, t.Active, t.Detail),
+			Timestamp:  time.Now().UTC().Format(time.RFC3339),
+		})
+	}
+	if err := a.client.SendEvents(ctx, events); err != nil {
+		log.Printf("[argus-agent] failed to report remote access: %v", err)
 	}
 }
 
@@ -297,6 +356,11 @@ func (a *Agent) buildLocalServer() *http.Server {
 			forbiddenNames = append(forbiddenNames, p.Name)
 		}
 
+		remoteTools := make([]string, 0, len(scan.RemoteAccess))
+		for _, t := range scan.RemoteAccess {
+			remoteTools = append(remoteTools, t.Name)
+		}
+
 		resp := map[string]interface{}{
 			"status":         "ok",
 			"version":        agentVersion,
@@ -306,7 +370,15 @@ func (a *Agent) buildLocalServer() *http.Server {
 			"isVm":           scan.IsVM,
 			"vmProduct":      scan.VMProduct,
 			"forbiddenProcs": forbiddenNames,
-			"lastScanAt":     scan.At.Format(time.RFC3339),
+			"remoteAccess": map[string]interface{}{
+				"detected": len(scan.RemoteAccess) > 0,
+				"active":   scan.RemoteActive,
+				"tools":    remoteTools,
+			},
+			// shouldBlock tells the SDK to hard-block the exam (strict mode +
+			// active remote session).
+			"shouldBlock": scan.Blocked,
+			"lastScanAt":  scan.At.Format(time.RFC3339),
 		}
 
 		w.Header().Set("Content-Type", "application/json")

@@ -31,6 +31,7 @@ func main() {
 		scanInterval = flag.Int("scan-interval", 30, "Process scan interval in seconds")
 		studentID    = flag.String("student-id", "", "Student ID for event context")
 		examID       = flag.String("exam-id", "", "Exam ID for event context")
+		enforceBlock = flag.Bool("enforce-remote-block", false, "Strict mode: signal the SDK to hard-block the exam when an active remote-access session is detected")
 	)
 	flag.Parse()
 
@@ -54,6 +55,9 @@ func main() {
 	}
 	if *examID != "" {
 		cfg.ExamID = *examID
+	}
+	if *enforceBlock {
+		cfg.EnforceBlockRemoteAccess = true
 	}
 
 	if cfg.SessionToken == "" {

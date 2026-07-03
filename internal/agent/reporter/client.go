@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -55,8 +56,48 @@ type AgentHeartbeat struct {
 	Timestamp     string      `json:"timestamp"`
 }
 
+// wireEvent is the on-the-wire shape expected by POST /api/v1/external/events
+// (numeric proto enum codes, snake_case keys). The agent works with the
+// human-readable AgentEvent internally and converts here so the backend
+// contract stays stable and partner-facing.
+type wireEvent struct {
+	EventType  int32   `json:"event_type"`
+	Severity   int32   `json:"severity"`
+	Source     int32   `json:"source"`
+	Confidence float32 `json:"confidence"`
+	Label      string  `json:"label"`
+}
+
 type ingestBatchRequest struct {
-	Events []AgentEvent `json:"events"`
+	Events []wireEvent `json:"events"`
+}
+
+// Proto enum codes (mirror api/proto/v1/event_collector.proto). Kept as a small
+// local table so the agent has no dependency on the generated proto package.
+var eventTypeCodes = map[string]int32{
+	"FORBIDDEN_PROCESS_DETECTED": 62,
+	"HARDWARE_DEVICE_ANOMALY":    63,
+	"REMOTE_ACCESS_DETECTED":     64,
+	"VIRTUAL_MONITOR_DETECTED":   66,
+	"VIRTUAL_MACHINE_DETECTED":   67,
+}
+
+var severityCodes = map[string]int32{"info": 1, "warning": 2, "critical": 3}
+
+var sourceCodes = map[string]int32{"KERNEL_AGENT": 5, "NETWORK_PROBE": 6}
+
+func toWireEvent(e AgentEvent) wireEvent {
+	label := e.Label
+	if e.Details != "" {
+		label = label + " (" + e.Details + ")"
+	}
+	return wireEvent{
+		EventType:  eventTypeCodes[e.EventType],
+		Severity:   severityCodes[strings.ToLower(e.Severity)],
+		Source:     sourceCodes[e.Source],
+		Confidence: float32(e.Confidence),
+		Label:      label,
+	}
 }
 
 // SendEvents pushes a batch of agent events to the backend.
@@ -65,7 +106,12 @@ func (c *Client) SendEvents(ctx context.Context, events []AgentEvent) error {
 		return nil
 	}
 
-	body, err := json.Marshal(ingestBatchRequest{Events: events})
+	wire := make([]wireEvent, 0, len(events))
+	for _, e := range events {
+		wire = append(wire, toWireEvent(e))
+	}
+
+	body, err := json.Marshal(ingestBatchRequest{Events: wire})
 	if err != nil {
 		return fmt.Errorf("marshal events: %w", err)
 	}
