@@ -24,6 +24,11 @@ onMounted(() => {
   }
 })
 
+// Load real KPI data from the analytics API (falls back to demo values on failure).
+onMounted(() => {
+  store.fetchOverview()
+})
+
 // --- Exam Selector ---
 const examSelectorOpen = ref(false)
 const examSearchTerm = ref('')

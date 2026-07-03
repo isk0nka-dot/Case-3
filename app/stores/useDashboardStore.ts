@@ -445,6 +445,12 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const systemHealth = ref<'operational' | 'degraded' | 'down'>('operational')
   const systemHealthUptime = ref(99.97)
 
+  // Overview real-data loading (KPI cards). Demo values above are preserved on
+  // failure so the dashboard never renders empty.
+  const overviewLoading = ref(false)
+  const overviewError = ref<string | null>(null)
+  const overviewUsingRealData = ref(false)
+
   const systemHealthLabel = computed(() => {
     const map = { operational: 'В норме', degraded: 'Снижение', down: 'Недоступно' }
     return map[systemHealth.value]
@@ -1351,6 +1357,39 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
+  /**
+   * Load the dashboard KPI cards from the analytics API. On any failure the
+   * existing demo values are preserved (graceful fallback) so the dashboard
+   * never renders empty.
+   */
+  async function fetchOverview(orgId?: string) {
+    overviewLoading.value = true
+    overviewError.value = null
+    try {
+      const { useAdminAPI } = await import('~/composables/useAdminAPI')
+      const api = useAdminAPI()
+
+      const [overview, sessions] = await Promise.all([
+        api.getAnalyticsOverview(orgId),
+        api.getActiveSessions(orgId)
+      ])
+
+      activeSessions.value = sessions.totalActive
+      criticalViolations.value = overview.health.criticalEvents
+      const integrity = Math.round(100 - sessions.avgRiskScore)
+      avgIntegrityScore.value = Math.min(100, Math.max(0, integrity))
+      systemHealth.value = overview.health.flushErrors > 0 ? 'degraded' : 'operational'
+
+      overviewUsingRealData.value = true
+    } catch (err) {
+      console.error('[Store] Failed to fetch dashboard overview:', err)
+      overviewError.value = String(err)
+      overviewUsingRealData.value = false // keep demo values
+    } finally {
+      overviewLoading.value = false
+    }
+  }
+
   // Fetch events for a specific session (on-demand when modal opens)
   async function fetchSessionEvents(sessionId: string): Promise<ArchiveEvent[]> {
     try {
@@ -1619,6 +1658,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
     systemHealth,
     systemHealthLabel,
     systemHealthUptime,
+    overviewLoading,
+    overviewError,
+    overviewUsingRealData,
+    fetchOverview,
     // Filtered KPI
     filteredActiveSessions,
     filteredTotalParticipants,
