@@ -763,10 +763,12 @@ async function submitCreateKey() {
 }
 
 // --- Revoke API Key ---
-async function revokeKey(keyId: string) {
-  revokeLoadingId.value = keyId
+// The backend revokes by key_id (the `argus_live_...` string), not the internal
+// UUID. Track loading by the row's UUID (`id`) but call the API with `keyId`.
+async function revokeKey(key: { id: string; keyId: string }) {
+  revokeLoadingId.value = key.id
   try {
-    await adminAPI.revokeAPIKey(keyId)
+    await adminAPI.revokeAPIKey(key.keyId)
     toast.add({ title: 'API ключ отозван', icon: 'i-lucide-check-circle', color: 'warning' })
     if (selectedOrg.value) {
       orgApiKeys.value = (await adminAPI.listAPIKeys(selectedOrg.value.orgId)) ?? []
@@ -2814,7 +2816,7 @@ onMounted(() => {
                         opacity: revokeLoadingId === k.id ? 0.7 : 1
                       }"
                       :disabled="revokeLoadingId === k.id"
-                      @click="revokeKey(k.id)"
+                      @click="revokeKey(k)"
                     >
                       <UIcon
                         v-if="revokeLoadingId === k.id"
