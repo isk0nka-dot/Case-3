@@ -765,7 +765,7 @@ async function submitCreateKey() {
 // --- Revoke API Key ---
 // The backend revokes by key_id (the `argus_live_...` string), not the internal
 // UUID. Track loading by the row's UUID (`id`) but call the API with `keyId`.
-async function revokeKey(key: { id: string; keyId: string }) {
+async function revokeKey(key: { id: string, keyId: string }) {
   revokeLoadingId.value = key.id
   try {
     await adminAPI.revokeAPIKey(key.keyId)

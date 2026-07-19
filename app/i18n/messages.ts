@@ -8,10 +8,10 @@
 export type Locale = 'kk' | 'ru' | 'en'
 
 /** Locales offered in the UI switcher, in display order. */
-export const LOCALES: { code: Locale; label: string; name: string }[] = [
+export const LOCALES: { code: Locale, label: string, name: string }[] = [
   { code: 'kk', label: 'KZ', name: 'Қазақша' },
   { code: 'ru', label: 'RU', name: 'Русский' },
-  { code: 'en', label: 'EN', name: 'English' },
+  { code: 'en', label: 'EN', name: 'English' }
 ]
 
 export const DEFAULT_LOCALE: Locale = 'ru'
@@ -45,7 +45,7 @@ export const messages: Record<Locale, Catalog> = {
     'common.logout': 'Выйти',
     'common.collapse': 'Свернуть',
     'common.expand': 'Развернуть',
-    'common.language': 'Язык',
+    'common.language': 'Язык'
   },
   kk: {
     'nav.dashboard': 'Дашборд',
@@ -73,7 +73,7 @@ export const messages: Record<Locale, Catalog> = {
     'common.logout': 'Шығу',
     'common.collapse': 'Жию',
     'common.expand': 'Жаю',
-    'common.language': 'Тіл',
+    'common.language': 'Тіл'
   },
   en: {
     'nav.dashboard': 'Dashboard',
@@ -101,6 +101,6 @@ export const messages: Record<Locale, Catalog> = {
     'common.logout': 'Log out',
     'common.collapse': 'Collapse',
     'common.expand': 'Expand',
-    'common.language': 'Language',
-  },
+    'common.language': 'Language'
+  }
 }
