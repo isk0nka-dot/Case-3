@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { useDashboardStore } from '~/stores/useDashboardStore'
 import { useAuthStore } from '~/stores/useAuthStore'
+import { LOCALES } from '~/i18n/messages'
+
+const { t, locale, setLocale } = useArgusI18n()
+
+const currentLocaleLabel = computed(
+  () => LOCALES.find(l => l.code === locale.value)?.label ?? 'RU'
+)
+function cycleLocale() {
+  const idx = LOCALES.findIndex(l => l.code === locale.value)
+  setLocale(LOCALES[(idx + 1) % LOCALES.length]!.code)
+}
 
 useHead({
   meta: [
@@ -11,7 +22,7 @@ useHead({
     { rel: 'icon', href: '/favicon.ico' }
   ],
   htmlAttrs: {
-    lang: 'ru'
+    lang: locale
   }
 })
 
@@ -33,14 +44,14 @@ function toggleTheme() {
 // Dashboard sub-pages (visible to all roles)
 const dashboardChildren = computed(() => {
   const items = [
-    { label: 'Обзор', icon: 'i-lucide-gauge', to: '/dashboard' },
-    { label: 'Регионы', icon: 'i-lucide-map-pin', to: '/dashboard/regions' },
-    { label: 'Нарушения', icon: 'i-heroicons-exclamation-triangle', to: '/dashboard/violations' }
+    { label: t('nav.overview'), icon: 'i-lucide-gauge', to: '/dashboard' },
+    { label: t('nav.regions'), icon: 'i-lucide-map-pin', to: '/dashboard/regions' },
+    { label: t('nav.violations'), icon: 'i-heroicons-exclamation-triangle', to: '/dashboard/violations' }
   ]
   // Infrastructure and Executive are global/system pages — Super Admin only
   if (authStore.isSuperAdmin) {
-    items.splice(1, 0, { label: 'Инфраструктура', icon: 'i-lucide-server', to: '/dashboard/infrastructure' })
-    items.splice(2, 0, { label: 'Executive', icon: 'i-lucide-shield-check', to: '/dashboard/executive' })
+    items.splice(1, 0, { label: t('nav.infrastructure'), icon: 'i-lucide-server', to: '/dashboard/infrastructure' })
+    items.splice(2, 0, { label: t('nav.executive'), icon: 'i-lucide-shield-check', to: '/dashboard/executive' })
   }
   return items
 })
@@ -48,35 +59,35 @@ const dashboardChildren = computed(() => {
 // Other top-level navigation items (visible to all roles)
 const topNavigation = computed(() => {
   const items = [
-    { label: 'Экзамены', icon: 'i-lucide-graduation-cap', to: '/dashboard/exams' },
-    { label: 'Тесты', icon: 'i-lucide-file-text', to: '/dashboard/tests' },
-    { label: 'Комплексные тесты', icon: 'i-lucide-layers', to: '/dashboard/complex-tests' },
-    { label: 'Мониторинг', icon: 'i-lucide-video', to: '/monitoring' },
-    { label: 'Архив сессий', icon: 'i-lucide-archive', to: '/archive' },
-    { label: 'Форензик', icon: 'i-lucide-file-search', to: '/forensic' },
-    { label: 'Апелляции', icon: 'i-lucide-scale', to: '/appeals' },
-    { label: 'Экспорт', icon: 'i-lucide-hard-drive-download', to: '/dashboard/exports' },
-    { label: 'Аналитика', icon: 'i-lucide-bar-chart-3', to: '/analytics' }
+    { label: t('nav.exams'), icon: 'i-lucide-graduation-cap', to: '/dashboard/exams' },
+    { label: t('nav.tests'), icon: 'i-lucide-file-text', to: '/dashboard/tests' },
+    { label: t('nav.complexTests'), icon: 'i-lucide-layers', to: '/dashboard/complex-tests' },
+    { label: t('nav.monitoring'), icon: 'i-lucide-video', to: '/monitoring' },
+    { label: t('nav.archive'), icon: 'i-lucide-archive', to: '/archive' },
+    { label: t('nav.forensic'), icon: 'i-lucide-file-search', to: '/forensic' },
+    { label: t('nav.appeals'), icon: 'i-lucide-scale', to: '/appeals' },
+    { label: t('nav.exports'), icon: 'i-lucide-hard-drive-download', to: '/dashboard/exports' },
+    { label: t('nav.analytics'), icon: 'i-lucide-bar-chart-3', to: '/analytics' }
   ]
   // Integrations page — visible to org_admin + super_admin
   if (authStore.isSuperAdmin || authStore.isOrgAdmin) {
-    items.push({ label: 'Интеграции', icon: 'i-lucide-blocks', to: '/integrations' })
+    items.push({ label: t('nav.integrations'), icon: 'i-lucide-blocks', to: '/integrations' })
   }
   // API & Integrations is a system page — Super Admin only
   if (authStore.isSuperAdmin) {
-    items.push({ label: 'API и Интеграции', icon: 'i-lucide-plug', to: '/api' })
+    items.push({ label: t('nav.apiIntegrations'), icon: 'i-lucide-plug', to: '/api' })
   }
   // Privacy & Data Retention — org_admin + super_admin
   if (authStore.isSuperAdmin || authStore.isOrgAdmin) {
-    items.push({ label: 'Приватность', icon: 'i-lucide-shield', to: '/privacy' })
+    items.push({ label: t('nav.privacy'), icon: 'i-lucide-shield', to: '/privacy' })
   }
   return items
 })
 
 // Super Admin-only navigation items
-const adminNavigation = [
-  { label: 'Организации', icon: 'i-lucide-building-2', to: '/organizations' }
-]
+const adminNavigation = computed(() => [
+  { label: t('nav.organizations'), icon: 'i-lucide-building-2', to: '/organizations' }
+])
 
 const route = useRoute()
 
@@ -172,7 +183,7 @@ onUnmounted(() => {
             v-if="store.leftSidebarOpen"
             class="ml-auto flex items-center justify-center size-7 rounded-md transition-colors"
             style="color: var(--argus-text-dimmed);"
-            title="Свернуть"
+            :title="t('common.collapse')"
             @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--argus-bg-hover)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
             @click="store.toggleLeftSidebar()"
@@ -191,7 +202,7 @@ onUnmounted(() => {
               borderColor: 'var(--argus-border)',
               color: 'var(--argus-text-dimmed)'
             }"
-            title="Развернуть"
+            :title="t('common.expand')"
             @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--argus-bg-hover)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.background = 'var(--argus-bg-card)'"
             @click="store.toggleLeftSidebar()"
@@ -230,7 +241,7 @@ onUnmounted(() => {
                 class="sidebar-label flex-1 text-left"
                 :class="store.leftSidebarOpen ? 'sidebar-label-visible' : 'sidebar-label-hidden'"
               >
-                Дашборд
+                {{ t('nav.dashboard') }}
               </span>
               <!-- Chevron indicator -->
               <UIcon
@@ -251,7 +262,7 @@ onUnmounted(() => {
                   boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
                 }"
               >
-                Дашборд
+                {{ t('nav.dashboard') }}
               </div>
             </button>
 
@@ -301,7 +312,7 @@ onUnmounted(() => {
                 class="text-[10px] font-semibold uppercase tracking-widest"
                 style="color: var(--argus-text-muted);"
               >
-                Администрирование
+                {{ t('common.administration') }}
               </span>
             </div>
             <NuxtLink
@@ -397,11 +408,43 @@ onUnmounted(() => {
           </NuxtLink>
         </nav>
 
-        <!-- Bottom: Theme Toggle + User -->
+        <!-- Bottom: Language + Theme Toggle + User -->
         <div
           class="px-2 py-3 border-t space-y-2"
           style="border-color: var(--argus-border);"
         >
+          <!-- Language switcher (KZ / RU / EN) -->
+          <div
+            v-if="store.leftSidebarOpen"
+            class="flex items-center gap-1 px-1"
+          >
+            <button
+              v-for="l in LOCALES"
+              :key="l.code"
+              class="flex-1 text-[11px] font-semibold py-1.5 rounded-md transition-colors"
+              :style="locale === l.code
+                ? 'background: var(--argus-accent); color: #fff;'
+                : 'color: var(--argus-text-dimmed);'"
+              :title="l.name"
+              @mouseenter="($event.currentTarget as HTMLElement).style.background = locale === l.code ? 'var(--argus-accent)' : 'var(--argus-bg-hover)'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background = locale === l.code ? 'var(--argus-accent)' : 'transparent'"
+              @click="setLocale(l.code)"
+            >
+              {{ l.label }}
+            </button>
+          </div>
+          <button
+            v-else
+            class="flex items-center justify-center w-full py-2 rounded-lg text-[11px] font-semibold transition-colors"
+            style="color: var(--argus-text-dimmed);"
+            :title="t('common.language')"
+            @mouseenter="($event.currentTarget as HTMLElement).style.background = 'var(--argus-bg-hover)'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.background = 'transparent'"
+            @click="cycleLocale()"
+          >
+            {{ currentLocaleLabel }}
+          </button>
+
           <!-- Theme Toggle -->
           <button
             class="flex items-center w-full rounded-lg transition-all duration-200"
@@ -428,7 +471,7 @@ onUnmounted(() => {
               class="text-sm font-medium sidebar-label"
               :class="store.leftSidebarOpen ? 'sidebar-label-visible' : 'sidebar-label-hidden'"
             >
-              {{ isDark ? 'Светлая тема' : 'Тёмная тема' }}
+              {{ isDark ? t('common.lightTheme') : t('common.darkTheme') }}
             </span>
           </button>
 
@@ -479,7 +522,7 @@ onUnmounted(() => {
               class="text-sm font-medium sidebar-label"
               :class="store.leftSidebarOpen ? 'sidebar-label-visible' : 'sidebar-label-hidden'"
             >
-              Выйти
+              {{ t('common.logout') }}
             </span>
 
             <!-- Tooltip when collapsed -->
@@ -493,7 +536,7 @@ onUnmounted(() => {
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
               }"
             >
-              Выйти
+              {{ t('common.logout') }}
             </div>
           </button>
         </div>
