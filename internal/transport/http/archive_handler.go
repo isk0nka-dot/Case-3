@@ -467,7 +467,7 @@ func (h *ArchiveHandler) queryArchivedSessionByID(ctx context.Context, sessionID
 		}
 
 		if totalEvents > 0 {
-			s.IntegrityScore = math.Round((100.0-float64(criticalCount)/float64(totalEvents)*100.0)*10) / 10
+			s.IntegrityScore = math.Round(math.Max(0, math.Min(100, 100.0-(float64(criticalCount)*10.0+float64(warningCount)*4.0)))*10) / 10
 		} else {
 			s.IntegrityScore = 100.0
 		}
@@ -599,9 +599,9 @@ func (h *ArchiveHandler) queryArchivedSessions(ctx context.Context, orgID, examI
 			s.Duration = fmt.Sprintf("%dм", minutes)
 		}
 
-		// Integrity score: 100 - (critical_events / total_events * 100)
+		// Magnitude-based integrity: 100 − (critical×10 + warning×4), clamped.
 		if totalEvents > 0 {
-			s.IntegrityScore = math.Round((100.0-float64(criticalCount)/float64(totalEvents)*100.0)*10) / 10
+			s.IntegrityScore = math.Round(math.Max(0, math.Min(100, 100.0-(float64(criticalCount)*10.0+float64(warningCount)*4.0)))*10) / 10
 		} else {
 			s.IntegrityScore = 100.0
 		}
@@ -749,9 +749,9 @@ func (h *ArchiveHandler) queryExamSummaries(ctx context.Context, orgID string) (
 		e.FirstEventTime = firstTime.Format(time.RFC3339)
 		e.LastEventTime = lastTime.Format(time.RFC3339)
 
-		// Average integrity across sessions: 100 - (critical_ratio * 100)
+		// Average integrity across sessions: mean per-session penalty (critical×10 + warning×4).
 		if totalEvents > 0 {
-			e.AvgIntegrity = math.Round((100.0-float64(totalCritical)/float64(totalEvents)*100.0)*10) / 10
+			e.AvgIntegrity = math.Round(math.Max(0, math.Min(100, 100.0-(float64(totalCritical)*10.0+float64(totalWarning)*4.0)/float64(sessionCount)))*10) / 10
 		} else {
 			e.AvgIntegrity = 100.0
 		}
