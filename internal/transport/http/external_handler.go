@@ -339,6 +339,36 @@ func (h *ExternalHandler) handleCreateSession(w http.ResponseWriter, r *http.Req
 		}
 	}
 
+	// Reload-safe resume: when the caller did not send a stable Idempotency-Key
+	// (or it did not match), a page reload would otherwise create a brand-new
+	// session and reset the student's violation history. Reuse the most recent
+	// still-active session for this org+exam+student so a reload continues it.
+	if resumable, err := h.repo.GetActiveExternalSessionByStudent(r.Context(), apiCtx.OrgID, req.ExamID, req.StudentID); err != nil {
+		h.logger.Warn("Failed to look up resumable external session",
+			zap.Error(err),
+			zap.String("org_id", apiCtx.OrgID),
+			zap.String("exam_id", req.ExamID),
+			zap.String("student_id", req.StudentID),
+		)
+	} else if resumable != nil {
+		enrollmentStatus := h.resolveEnrollmentStatus(r.Context(), apiCtx.OrgID, resumable.StudentID, "")
+		h.logger.Info("External session resumed for student (reload-safe)",
+			zap.String("session_id", resumable.SessionID),
+			zap.String("org_id", apiCtx.OrgID),
+			zap.String("exam_id", req.ExamID),
+			zap.String("student_id", req.StudentID),
+		)
+		h.jsonResponse(w, createSessionResponse{
+			SessionID:          resumable.SessionID,
+			ArgusSessionToken:  resumable.SessionToken,
+			SDKUrl:             h.sdkURL,
+			ExpiresAt:          resumable.TokenExpiresAt.UTC().Format(time.RFC3339),
+			EnrollmentRequired: enrollmentStatus != "ready",
+			EnrollmentStatus:   enrollmentStatus,
+		}, http.StatusOK)
+		return
+	}
+
 	// Generate unique session ID.
 	sessionID := generateSessionID()
 

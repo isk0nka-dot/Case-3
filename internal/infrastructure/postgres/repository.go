@@ -1589,6 +1589,44 @@ func (r *Repository) GetExternalSessionByIdempotencyKey(ctx context.Context, org
 	return s, nil
 }
 
+// GetActiveExternalSessionByStudent returns the most recent still-active
+// (non-terminal, unexpired) session for the given org+exam+student, or nil if
+// none exists. It makes session creation reload-safe: when the caller does not
+// send a stable Idempotency-Key, a page reload would otherwise mint a brand-new
+// session and reset the student's violation history. Callers reuse the returned
+// session so a reload continues the same one.
+func (r *Repository) GetActiveExternalSessionByStudent(ctx context.Context, orgID, examID, studentID string) (*entity.ExternalSession, error) {
+	query := `
+		SELECT id, session_id, org_id, exam_id, student_id,
+			student_name, exam_name, callback_url, metadata, COALESCE(idempotency_key, ''),
+			session_token, token_expires_at, status,
+			verdict, verdict_details, integrity_score, violation_count,
+			started_at, completed_at, created_at, updated_at
+		FROM external_sessions
+		WHERE org_id = $1 AND exam_id = $2 AND student_id = $3
+			AND deleted_at IS NULL
+			AND status NOT IN ('completed', 'cancelled', 'expired', 'terminated')
+			AND token_expires_at > NOW()
+		ORDER BY created_at DESC
+		LIMIT 1`
+
+	s := &entity.ExternalSession{}
+	err := r.db.QueryRowContext(ctx, query, orgID, examID, studentID).Scan(
+		&s.ID, &s.SessionID, &s.OrgID, &s.ExamID, &s.StudentID,
+		&s.StudentName, &s.ExamName, &s.CallbackURL, &s.Metadata, &s.IdempotencyKey,
+		&s.SessionToken, &s.TokenExpiresAt, &s.Status,
+		&s.Verdict, &s.VerdictDetails, &s.IntegrityScore, &s.ViolationCount,
+		&s.StartedAt, &s.CompletedAt, &s.CreatedAt, &s.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("postgres: get active external session by student: %w", err)
+	}
+	return s, nil
+}
+
 func (r *Repository) GetExternalSessionByID(ctx context.Context, sessionID string) (*entity.ExternalSession, error) {
 	query := `
 		SELECT id, session_id, org_id, exam_id, student_id,
