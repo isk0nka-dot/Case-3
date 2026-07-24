@@ -664,37 +664,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     violationAlerts.value.filter(a => a.severity === 'critical')
   )
 
-  // --- Simulated real-time updates ---
-  function simulateNewViolation() {
-    const names = ['Ной Браун', 'Исла Дэвис', 'Лукас Мартинес', 'Мия Джонсон', 'Этан Ли']
-    const types = ['Телефон обнаружен', 'Отклонение взгляда', 'Посторонние лица', 'Смена вкладки', 'Аудио аномалия']
-    const severities: ViolationAlert['severity'][] = ['critical', 'warning', 'info']
-    const exams = activeExams.value
-
-    const randomExam = exams[Math.floor(Math.random() * exams.length)]
-    const newAlert: ViolationAlert = {
-      id: `alert-${Date.now()}`,
-      orgId: randomExam?.orgId ?? 'org-eduser',
-      studentName: names[Math.floor(Math.random() * names.length)] ?? 'Неизвестно',
-      violationType: types[Math.floor(Math.random() * types.length)] ?? 'Неизвестно',
-      timestamp: new Date().toISOString(),
-      severity: severities[Math.floor(Math.random() * severities.length)] ?? 'info',
-      examName: randomExam?.examName ?? 'Неизвестно'
-    }
-
-    violationAlerts.value.unshift(newAlert)
-
-    if (violationAlerts.value.length > 50) {
-      violationAlerts.value.pop()
-    }
-
-    if (newAlert.severity === 'critical') {
-      criticalViolations.value++
-    }
-
-    activeSessions.value += Math.floor(Math.random() * 3) - 1
-  }
-
   // ============================================
   //  LIVE MONITORING DATA
   // ============================================
@@ -1131,7 +1100,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     violationTrends,
     totalParticipants,
     criticalAlerts,
-    simulateNewViolation,
     // Infrastructure Health
     serverNodes,
     latencyHistory,
