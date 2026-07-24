@@ -118,17 +118,10 @@ function handleLogout() {
   navigateTo('/')
 }
 
-// Simulate real-time data
-let interval: ReturnType<typeof setInterval> | null = null
-
 // Performance Debugger (Ctrl+Shift+D)
 const showDebugger = ref(false)
 
 onMounted(() => {
-  interval = setInterval(() => {
-    store.simulateNewViolation()
-  }, 8000)
-
   // Ctrl+Shift+D toggles PerformanceDebugger overlay
   window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.ctrlKey && e.shiftKey && e.key === 'D') {
@@ -136,9 +129,6 @@ onMounted(() => {
       showDebugger.value = !showDebugger.value
     }
   })
-})
-onUnmounted(() => {
-  if (interval) clearInterval(interval)
 })
 </script>
 
@@ -167,7 +157,10 @@ onUnmounted(() => {
           :class="store.leftSidebarOpen ? 'px-5 gap-2.5' : 'px-0 justify-center'"
           style="border-color: var(--argus-border);"
         >
-          <NuxtLink to="/" class="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity">
+          <NuxtLink
+            to="/"
+            class="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity"
+          >
             <ArgusLogo :size="30" />
 
             <span
