@@ -283,6 +283,61 @@ func (r *Recorder) capture(ctx context.Context, event *entity.ProctoringEvent) e
 }
 
 // ActiveSessions returns the number of sessions with active ring buffers.
+// CaptureSnapshot stores a caller-supplied evidence blob (e.g. a webcam frame
+// grabbed the instant a violation fired) as a standalone evidence fragment:
+// upload to object storage, then record chain of custody. Unlike the ring
+// buffer path it does not need buffered media, so it works even when the
+// LiveKit egress video pipeline is unavailable. Returns the fragment ID.
+func (r *Recorder) CaptureSnapshot(ctx context.Context, sessionID, eventID, orgID, examID, studentID, contentType string, data []byte) (string, error) {
+	if len(data) == 0 {
+		return "", fmt.Errorf("empty snapshot")
+	}
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+	now := time.Now()
+	if eventID == "" {
+		eventID = fmt.Sprintf("snap-%d", now.UnixMilli())
+	}
+	fragment := &entity.EvidenceFragment{
+		FragmentID:  fmt.Sprintf("snap-%d", now.UnixNano()),
+		SessionID:   sessionID,
+		EventID:     eventID,
+		OrgID:       orgID,
+		ExamID:      examID,
+		StudentID:   studentID,
+		ContentType: contentType,
+		DurationSec: 0,
+		StartTime:   now,
+		EndTime:     now,
+		CreatedAt:   now,
+	}
+
+	sha256Hash, uri, sizeBytes, err := r.store.Upload(ctx, fragment, bytes.NewReader(data))
+	if err != nil {
+		return "", fmt.Errorf("snapshot upload failed: %w", err)
+	}
+	fragment.SHA256Hash = sha256Hash
+	fragment.URI = uri
+	fragment.SizeBytes = sizeBytes
+
+	if err := r.chain.RecordEvidence(ctx, fragment); err != nil {
+		// Non-fatal: the blob is safely in object storage even if the ledger
+		// entry failed; log and still return the fragment ID.
+		r.logger.Error("snapshot chain record failed (uploaded but unlinked)",
+			zap.String("fragment_id", fragment.FragmentID),
+			zap.Error(err),
+		)
+	}
+
+	r.logger.Info("evidence snapshot captured",
+		zap.String("session_id", sessionID),
+		zap.String("fragment_id", fragment.FragmentID),
+		zap.Int("size_bytes", len(data)),
+	)
+	return fragment.FragmentID, nil
+}
+
 func (r *Recorder) ActiveSessions() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

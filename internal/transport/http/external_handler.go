@@ -74,6 +74,12 @@ type ExternalEgressController interface {
 	StartParticipantRecording(ctx context.Context, roomName, identity, sessionID, userID string) (string, error)
 }
 
+// snapshotRecorder stores a caller-supplied evidence blob (a violation
+// snapshot captured by the SDK). Satisfied by *recorder.Recorder.
+type snapshotRecorder interface {
+	CaptureSnapshot(ctx context.Context, sessionID, eventID, orgID, examID, studentID, contentType string, data []byte) (string, error)
+}
+
 // ExternalHandler serves the REST API for external/SaaS partner integrations.
 type ExternalHandler struct {
 	repo             *postgres.Repository
@@ -87,10 +93,15 @@ type ExternalHandler struct {
 	sdkURL           string
 	egress           ExternalEgressController // nil until SetEgress is called
 	asynqClient      *asynq.Client            // nil if worker not configured
+	snapshots        snapshotRecorder         // nil until SetSnapshotRecorder is called
 }
 
 // SetEgress wires in the LiveKit Egress service for auto-recording.
 func (h *ExternalHandler) SetEgress(e ExternalEgressController) { h.egress = e }
+
+// SetSnapshotRecorder wires the evidence recorder so violation snapshots
+// uploaded by the SDK can be persisted as evidence fragments.
+func (h *ExternalHandler) SetSnapshotRecorder(r snapshotRecorder) { h.snapshots = r }
 
 // SetAnalyticsConn wires ClickHouse for external JSON reports.
 func (h *ExternalHandler) SetAnalyticsConn(conn driver.Conn) { h.chConn = conn }
@@ -164,6 +175,10 @@ func (h *ExternalHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/external/sessions/{sessionId}/recording-ready", h.requireSessionToken(h.handleRecordingReady))
 	// Near-real-time AI frame snapshots — SDK samples webcam frames for backend inference.
 	mux.HandleFunc("POST /api/v1/external/sessions/{sessionId}/ai-frame", h.requireSessionToken(h.handleAIFrame))
+	// Violation evidence snapshots — the SDK grabs a webcam frame the instant a
+	// violation fires and uploads it to be stored as an evidence fragment
+	// (independent of the LiveKit egress video path).
+	mux.HandleFunc("POST /api/v1/external/sessions/{sessionId}/evidence-snapshot", h.requireSessionToken(h.handleEvidenceSnapshot))
 }
 
 // ==========================================================================
@@ -1589,6 +1604,89 @@ func (h *ExternalHandler) persistStartedRecording(ctx context.Context, egressID,
 }
 
 const maxAIFrameUploadBytes = 768 * 1024
+
+// handleEvidenceSnapshot stores a webcam snapshot captured by the SDK at the
+// moment of a violation as an evidence fragment (MinIO + forensic ledger), so
+// it appears under "Видеодоказательства" in the archive. Independent of the
+// LiveKit egress video pipeline.
+//
+//	POST /api/v1/external/sessions/{sessionId}/evidence-snapshot
+//	multipart: frame=<image>, eventType=<string>, contentType=<string>
+func (h *ExternalHandler) handleEvidenceSnapshot(w http.ResponseWriter, r *http.Request) {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		h.jsonError(w, "missing session claims", http.StatusUnauthorized)
+		return
+	}
+
+	sessionID := r.PathValue("sessionId")
+	if sessionID == "" {
+		sessionID = claims.SessionID
+	}
+	if sessionID != claims.SessionID {
+		h.jsonError(w, "session mismatch", http.StatusForbidden)
+		return
+	}
+
+	if h.snapshots == nil {
+		h.jsonResponse(w, map[string]string{"status": "evidence_disabled"}, http.StatusAccepted)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxAIFrameUploadBytes+64*1024)
+	if err := r.ParseMultipartForm(maxAIFrameUploadBytes + 64*1024); err != nil {
+		h.jsonError(w, "invalid multipart snapshot upload", http.StatusBadRequest)
+		return
+	}
+
+	contentType := strings.TrimSpace(r.FormValue("contentType"))
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+	if !isAllowedAIFrameContentType(contentType) {
+		h.jsonError(w, "unsupported snapshot content type", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	eventType := strings.TrimSpace(r.FormValue("eventType"))
+	if eventType == "" {
+		eventType = "VIOLATION"
+	}
+	eventID := eventType + "-" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+
+	file, _, err := r.FormFile("frame")
+	if err != nil {
+		h.jsonError(w, "missing frame file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(io.LimitReader(file, maxAIFrameUploadBytes+1))
+	if err != nil || len(data) == 0 {
+		h.jsonError(w, "failed to read snapshot", http.StatusBadRequest)
+		return
+	}
+	if len(data) > maxAIFrameUploadBytes {
+		h.jsonError(w, "snapshot is too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	fragmentID, err := h.snapshots.CaptureSnapshot(r.Context(), sessionID, eventID,
+		claims.OrgID, claims.ExamID, claims.StudentID, contentType, data)
+	if err != nil {
+		h.logger.Error("evidence snapshot failed",
+			zap.Error(err), zap.String("session_id", sessionID))
+		h.jsonError(w, "failed to store snapshot", http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info("evidence snapshot stored",
+		zap.String("session_id", sessionID),
+		zap.String("fragment_id", fragmentID),
+		zap.String("event_type", eventType),
+	)
+	h.jsonResponse(w, map[string]string{"status": "stored", "fragmentId": fragmentID}, http.StatusCreated)
+}
 
 // handleAIFrame accepts a sampled webcam frame from the browser SDK and queues
 // it for backend inference. It intentionally does not block the exam flow:

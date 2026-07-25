@@ -711,6 +711,9 @@ func run() error {
 		if asynqClient != nil {
 			externalHandler.SetAsynqClient(asynqClient)
 		}
+		if evidenceRecorder != nil {
+			externalHandler.SetSnapshotRecorder(evidenceRecorder)
+		}
 		externalHandler.RegisterRoutes(httpMux)
 
 		// Student biometric enrollment (face embedding for identity checks).
