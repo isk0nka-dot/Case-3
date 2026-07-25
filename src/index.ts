@@ -158,6 +158,7 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
   private _aiSnapshotTimer: ReturnType<typeof setInterval> | null = null;
   private _aiSnapshotInFlight = false;
   private _sessionStartedAtMs = 0;
+  private _lastEvidenceSnapshotMs = 0;
 
   // State.
   private _status: SessionStatus = 'idle';
@@ -399,6 +400,10 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
         if (this._session) {
           this._session.sendEvent(v.eventType, v.severity, v.source, v.label, v.confidence);
         }
+        // Capture a webcam snapshot as visual evidence of the violation
+        // (throttled internally). Works even when server-side video recording
+        // (LiveKit egress) is unavailable.
+        void this._captureAndSendEvidenceSnapshot(v.label || String(v.eventType));
       });
 
       // Start everything.
@@ -608,6 +613,55 @@ export class ArgusSDK extends EventEmitter<SDKEvents> {
       });
     } finally {
       this._aiSnapshotInFlight = false;
+    }
+  }
+
+  // Capture a single webcam frame at the moment of a violation and upload it as
+  // an evidence fragment (stored in MinIO + forensic ledger by the backend).
+  // Throttled to at most one snapshot per 3s so rapid-fire violations do not
+  // flood the backend. Best-effort: failures are swallowed.
+  private async _captureAndSendEvidenceSnapshot(eventType: string): Promise<void> {
+    if (!this._session || !this._widget?.videoElement) return;
+    const now = Date.now();
+    if (now - this._lastEvidenceSnapshotMs < 3000) return;
+    const video = this._widget.videoElement;
+    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth <= 0 || video.videoHeight <= 0) {
+      return;
+    }
+    this._lastEvidenceSnapshotMs = now;
+
+    try {
+      const maxWidth = 640;
+      const scale = Math.min(1, maxWidth / video.videoWidth);
+      const width = Math.max(1, Math.round(video.videoWidth * scale));
+      const height = Math.max(1, Math.round(video.videoHeight * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(video, 0, 0, width, height);
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.75));
+      if (!blob) return;
+
+      const form = new FormData();
+      form.append('frame', blob, `evidence-${this._session.sessionId}-${now}.jpg`);
+      form.append('contentType', 'image/jpeg');
+      form.append('eventType', eventType.slice(0, 120));
+
+      const base = this._config.serverUrl.replace(/\/+$/, '');
+      await fetch(`${base}/api/v1/external/sessions/${encodeURIComponent(this._session.sessionId)}/evidence-snapshot`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this._config.sessionToken}`,
+        },
+        body: form,
+        keepalive: false,
+      });
+    } catch {
+      // Best-effort — evidence snapshot upload failures are non-fatal.
     }
   }
 
