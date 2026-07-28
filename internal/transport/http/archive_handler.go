@@ -473,13 +473,18 @@ func (h *ArchiveHandler) queryArchivedSessionByID(ctx context.Context, sessionID
 		}
 
 		// Status derivation (updated for mandatory human review):
-		// - "voided"   = terminated by a proctor (overrides everything)
-		// - "reviewed" = a human review decision exists (confirmed/dismissed/escalated)
+		// - "voided"   = terminated by a proctor, OR a review that confirmed the
+		//                violations (exam result annulled)
+		// - "reviewed" = a review that dismissed/escalated the session
 		// - "pending"  = no review decision yet (regardless of integrity score)
 		if terminatedSet[s.SessionID] {
 			s.Status = "voided"
-		} else if _, hasReview := reviewedSet[s.SessionID]; hasReview {
-			s.Status = "reviewed"
+		} else if decision, hasReview := reviewedSet[s.SessionID]; hasReview {
+			if decision == "confirmed" {
+				s.Status = "voided"
+			} else {
+				s.Status = "reviewed"
+			}
 		} else {
 			s.Status = "pending"
 		}
@@ -607,13 +612,18 @@ func (h *ArchiveHandler) queryArchivedSessions(ctx context.Context, orgID, examI
 		}
 
 		// Status derivation (updated for mandatory human review):
-		// - "voided"   = terminated by a proctor (overrides everything)
-		// - "reviewed" = a human review decision exists (confirmed/dismissed/escalated)
+		// - "voided"   = terminated by a proctor, OR a review that confirmed the
+		//                violations (exam result annulled)
+		// - "reviewed" = a review that dismissed/escalated the session
 		// - "pending"  = no review decision yet (regardless of integrity score)
 		if terminatedSet[s.SessionID] {
 			s.Status = "voided"
-		} else if _, hasReview := reviewedSet[s.SessionID]; hasReview {
-			s.Status = "reviewed"
+		} else if decision, hasReview := reviewedSet[s.SessionID]; hasReview {
+			if decision == "confirmed" {
+				s.Status = "voided"
+			} else {
+				s.Status = "reviewed"
+			}
 		} else {
 			s.Status = "pending"
 		}
