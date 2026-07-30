@@ -5,7 +5,6 @@
   "version": "0.1.0",
   "description": "Argus AI exam proctoring — environment isolation, tab/monitor control and presence verification.",
   "minimum_chrome_version": "116",
-  "default_locale": "en",
 
   "//key": "Set a fixed 'key' here before Web Store publish to pin a stable extension_id that the backend can verify. Generate with: openssl genrsa 2048 | openssl rsa -pubout -outform DER | base64 -w0",
 
@@ -22,6 +21,8 @@
   "host_permissions": [
     "https://argusai.kz/*",
     "https://*.argusai.kz/*",
+    "https://ustaz.media/*",
+    "https://*.ustaz.media/*",
     "https://webizon.net/*",
     "https://*.webizon.net/*"
   ],
@@ -36,6 +37,8 @@
       "matches": [
         "https://argusai.kz/*",
         "https://*.argusai.kz/*",
+        "https://ustaz.media/*",
+        "https://*.ustaz.media/*",
         "https://webizon.net/*",
         "https://*.webizon.net/*"
       ],
