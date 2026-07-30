@@ -135,9 +135,10 @@ func DetectRemoteAccessPorts(conns []NetConnection) []RemoteAccessTool {
 		if name == "" {
 			continue
 		}
-		if c.State == "ESTABLISHED" {
+		switch c.State {
+		case "ESTABLISHED":
 			active[name] = true
-		} else if c.State == "LISTEN" {
+		case "LISTEN":
 			listen[name] = true
 		}
 	}
