@@ -54,22 +54,22 @@ import (
 
 // IntegrityScore is the computed score for a session.
 type IntegrityScore struct {
-	SessionID     string            `json:"sessionId"`
-	StudentID     string            `json:"studentId"`
-	ExamID        string            `json:"examId"`
-	OrgID         string            `json:"orgId"`
-	Score         float64           `json:"score"`         // 0-100
-	Verdict       string            `json:"verdict"`       // clean | warning | fraud
-	VerdictLabel  string            `json:"verdictLabel"`  // Russian label
-	Justification string            `json:"justification"` // Human-readable explanation
-	Penalties     []PenaltyEntry    `json:"penalties"`
-	EventSummary  map[string]int    `json:"eventSummary"`  // eventType -> count
-	TopFactors    []string          `json:"topFactors"`    // Top 5 contributing factors
-	DurationSec   int64             `json:"durationSec"`
-	TotalEvents   int               `json:"totalEvents"`
-	CriticalCount int               `json:"criticalCount"`
-	WarningCount  int               `json:"warningCount"`
-	ComputedAt    string            `json:"computedAt"`
+	SessionID     string         `json:"sessionId"`
+	StudentID     string         `json:"studentId"`
+	ExamID        string         `json:"examId"`
+	OrgID         string         `json:"orgId"`
+	Score         float64        `json:"score"`         // 0-100
+	Verdict       string         `json:"verdict"`       // clean | warning | fraud
+	VerdictLabel  string         `json:"verdictLabel"`  // Russian label
+	Justification string         `json:"justification"` // Human-readable explanation
+	Penalties     []PenaltyEntry `json:"penalties"`
+	EventSummary  map[string]int `json:"eventSummary"` // eventType -> count
+	TopFactors    []string       `json:"topFactors"`   // Top 5 contributing factors
+	DurationSec   int64          `json:"durationSec"`
+	TotalEvents   int            `json:"totalEvents"`
+	CriticalCount int            `json:"criticalCount"`
+	WarningCount  int            `json:"warningCount"`
+	ComputedAt    string         `json:"computedAt"`
 }
 
 // PenaltyEntry records a single penalty applied to the integrity score.
@@ -94,7 +94,7 @@ type VoiceBiometricResult struct {
 	TotalSegments       int     `json:"totalSegments"`
 	MatchedSegments     int     `json:"matchedSegments"`
 	MismatchedSegments  int     `json:"mismatchedSegments"`
-	ConsistencyScore    float64 `json:"consistencyScore"`    // 0-1
+	ConsistencyScore    float64 `json:"consistencyScore"` // 0-1
 	SpeakerChangeCount  int     `json:"speakerChangeCount"`
 	PrimarySpeakerRatio float64 `json:"primarySpeakerRatio"` // 0-1
 	Verdict             string  `json:"verdict"`             // consistent | suspicious | anomalous
@@ -103,54 +103,54 @@ type VoiceBiometricResult struct {
 // ForensicReport is the complete forensic report for a session.
 type ForensicReport struct {
 	// Report metadata
-	ReportID     string    `json:"reportId"`
-	GeneratedAt  string    `json:"generatedAt"`
-	ReportHash   string    `json:"reportHash"` // SHA-256 of JSON content
+	ReportID    string `json:"reportId"`
+	GeneratedAt string `json:"generatedAt"`
+	ReportHash  string `json:"reportHash"` // SHA-256 of JSON content
 
 	// Session identity
-	SessionID    string    `json:"sessionId"`
-	StudentID    string    `json:"studentId"`
-	ExamID       string    `json:"examId"`
-	OrgID        string    `json:"orgId"`
+	SessionID string `json:"sessionId"`
+	StudentID string `json:"studentId"`
+	ExamID    string `json:"examId"`
+	OrgID     string `json:"orgId"`
 
 	// Scores and verdict
-	Integrity    IntegrityScore        `json:"integrity"`
-	Voice        VoiceBiometricResult  `json:"voiceBiometric"`
+	Integrity IntegrityScore       `json:"integrity"`
+	Voice     VoiceBiometricResult `json:"voiceBiometric"`
 
 	// Violation timeline
-	Timeline     []TimelineEntry       `json:"timeline"`
+	Timeline []TimelineEntry `json:"timeline"`
 
 	// Device fingerprint
-	DeviceInfo   DeviceInfo            `json:"deviceInfo"`
+	DeviceInfo DeviceInfo `json:"deviceInfo"`
 
 	// Gaze heatmap data
-	GazeData     []GazePoint           `json:"gazeData"`
+	GazeData []GazePoint `json:"gazeData"`
 
 	// Forensic ledger
-	LedgerSummary LedgerSummary        `json:"ledgerSummary"`
+	LedgerSummary LedgerSummary `json:"ledgerSummary"`
 
 	// Secondary camera (Fix 9)
-	Sidecam      SidecamSummary        `json:"sidecam"`
+	Sidecam SidecamSummary `json:"sidecam"`
 }
 
 // TimelineEntry is a violation in the timeline.
 type TimelineEntry struct {
-	Timestamp     string  `json:"timestamp"`
-	VideoSec      int64   `json:"videoSec"`
-	EventType     string  `json:"eventType"`
-	Severity      string  `json:"severity"`
-	Label         string  `json:"label"`
-	Confidence    float64 `json:"confidence"`
-	Source        string  `json:"source"`
+	Timestamp  string  `json:"timestamp"`
+	VideoSec   int64   `json:"videoSec"`
+	EventType  string  `json:"eventType"`
+	Severity   string  `json:"severity"`
+	Label      string  `json:"label"`
+	Confidence float64 `json:"confidence"`
+	Source     string  `json:"source"`
 }
 
 // DeviceInfo is device metadata from the session.
 type DeviceInfo struct {
-	UserAgent    string `json:"userAgent"`
-	Resolution   string `json:"resolution"`
-	IPAddress    string `json:"ipAddress"`
-	Region       string `json:"region"`
-	Timezone     int32  `json:"timezone"`
+	UserAgent  string `json:"userAgent"`
+	Resolution string `json:"resolution"`
+	IPAddress  string `json:"ipAddress"`
+	Region     string `json:"region"`
+	Timezone   int32  `json:"timezone"`
 }
 
 // SidecamSummary holds secondary camera forensic data for the report (Fix 9).
@@ -170,11 +170,11 @@ type SidecamSummary struct {
 
 // LedgerSummary is a summary of the forensic ledger state.
 type LedgerSummary struct {
-	TotalFragments int    `json:"totalFragments"`
-	VerifiedOK     int    `json:"verifiedOk"`
-	ChainValid     bool   `json:"chainValid"`
-	S3Verified     int    `json:"s3Verified"`
-	S3Mismatches   int    `json:"s3Mismatches"`
+	TotalFragments int  `json:"totalFragments"`
+	VerifiedOK     int  `json:"verifiedOk"`
+	ChainValid     bool `json:"chainValid"`
+	S3Verified     int  `json:"s3Verified"`
+	S3Mismatches   int  `json:"s3Mismatches"`
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@ func GetDefaultPenaltyRules() []PenaltyRuleInfo {
 		rules[i] = PenaltyRuleInfo{
 			EventType:   r.eventType,
 			PenaltyPer:  r.penaltyPer,
-			MaxPenalty:   r.maxPenalty,
+			MaxPenalty:  r.maxPenalty,
 			Description: r.description,
 		}
 	}
@@ -384,12 +384,17 @@ func (s *Scorer) ComputeScore(ctx context.Context, sessionID string) (*Integrity
 		durationSec = int64(lastTime.Sub(firstTime).Seconds())
 	}
 
-	// Apply penalty rules
+	// Apply penalty rules. ClickHouse stores event_type lowercase (EventType.String());
+	// penalty rules are keyed uppercase — normalize so the lookup matches.
+	normCounts := make(map[string]int, len(eventCounts))
+	for k, v := range eventCounts {
+		normCounts[strings.ToUpper(k)] = v
+	}
 	score := 100.0
 	var penalties []PenaltyEntry
 
 	for _, rule := range defaultPenaltyRules {
-		count := eventCounts[rule.eventType]
+		count := normCounts[rule.eventType]
 		if count == 0 {
 			continue
 		}
@@ -405,8 +410,8 @@ func (s *Scorer) ComputeScore(ctx context.Context, sessionID string) (*Integrity
 			EventType:   rule.eventType,
 			Count:       count,
 			PenaltyPer:  rule.penaltyPer,
-			MaxPenalty:   rule.maxPenalty,
-			Applied:      rawPenalty,
+			MaxPenalty:  rule.maxPenalty,
+			Applied:     rawPenalty,
 			Description: rule.description,
 		})
 	}
@@ -659,12 +664,17 @@ func (s *Scorer) computeScoreInternal(
 		durationSec = int64(lastTime.Sub(firstTime).Seconds())
 	}
 
-	// Apply penalty rules
+	// Apply penalty rules. ClickHouse stores event_type lowercase (EventType.String());
+	// penalty rules are keyed uppercase — normalize so the lookup matches.
+	normCounts := make(map[string]int, len(eventCounts))
+	for k, v := range eventCounts {
+		normCounts[strings.ToUpper(k)] = v
+	}
 	score := 100.0
 	var penalties []PenaltyEntry
 
 	for _, rule := range rules {
-		count := eventCounts[rule.eventType]
+		count := normCounts[rule.eventType]
 		if count == 0 {
 			continue
 		}
@@ -680,8 +690,8 @@ func (s *Scorer) computeScoreInternal(
 			EventType:   rule.eventType,
 			Count:       count,
 			PenaltyPer:  rule.penaltyPer,
-			MaxPenalty:   rule.maxPenalty,
-			Applied:      rawPenalty,
+			MaxPenalty:  rule.maxPenalty,
+			Applied:     rawPenalty,
 			Description: rule.description,
 		})
 	}
