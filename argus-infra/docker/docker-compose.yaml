@@ -1,0 +1,746 @@
+# =============================================================================
+#  Argus AI — Enterprise HA Orchestration Stack
+#
+#  High-Availability production topology:
+#    - 3-broker Kafka cluster (KRaft mode, replication-factor 3)
+#    - 3-node ClickHouse cluster with ClickHouse Keeper
+#    - Durable Redis (AOF + RDB, noeviction)
+#    - PostgreSQL 16 (transactional outbox + SaaS admin)
+#
+#  Zero Data Loss guarantee: any single node can fail without data loss.
+#
+#  Image sources:
+#    argus-backend  → built locally from ../backend/Dockerfile
+#    argus-frontend → built locally from ../frontend/Dockerfile
+#    Infrastructure → public images (kafka, clickhouse, postgres, etc.)
+#
+#  Usage:
+#    # Start the full HA stack
+#    docker compose up -d
+#
+#    # Start only infrastructure (for local backend/frontend dev)
+#    docker compose up -d kafka-1 kafka-2 kafka-3 clickhouse-1 clickhouse-2 clickhouse-3 clickhouse-keeper-1 clickhouse-keeper-2 clickhouse-keeper-3 postgres redis minio minio-init livekit
+#
+#    # Override image tags for a specific deployment
+#    BACKEND_TAG=v2.1.0 FRONTEND_TAG=v2.1.0 docker compose up -d
+#
+#  Environment:
+#    Copy .env.example to .env and fill in all required values.
+# =============================================================================
+
+services:
+
+  # ── argus-backend ────────────────────────────────────────────────────────────
+  # Go event-collection service. Handles gRPC ingestion, REST admin API,
+  # analytics, monitoring, evidence storage, and organization management.
+  backend:
+    build:
+      context: ../../argus-backend
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${BACKEND_TAG:-dev}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: argus/backend:${BACKEND_TAG:-latest}
+    container_name: argus-backend
+    entrypoint: [ "/app/event-collector", "-config", "/app/config/config.yaml" ]
+    ports:
+      - "${BACKEND_GRPC_PORT:-50051}:50051" # gRPC event ingestion
+      - "${BACKEND_HTTP_PORT:-8080}:8080" # HTTP admin API + health
+    user: "0:0" # Root required for Docker socket access (infra monitoring)
+    volumes:
+      - ./config.yaml:/app/config/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - badger-data:/app/data/dlq
+      - ./keys:/app/keys:ro
+    environment:
+      # ── CORS: allow the frontend origin ──────────────────────────────────
+      - EVENT_COLLECTOR_CORS_ORIGINS=${FRONTEND_ORIGIN:-http://localhost:3000}
+      # ── Kafka (3-broker cluster) ─────────────────────────────────────────
+      - EVENT_COLLECTOR_KAFKA_BROKERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
+      # ── ClickHouse (3-node cluster) ──────────────────────────────────────
+      - EVENT_COLLECTOR_CH_ADDRS=clickhouse-1:9000,clickhouse-2:9000,clickhouse-3:9000
+      - EVENT_COLLECTOR_CH_DATABASE=${CH_DATABASE:-argus_analytics}
+      - EVENT_COLLECTOR_CH_USERNAME=${CH_USERNAME:-default}
+      - EVENT_COLLECTOR_CH_PASSWORD=${CH_PASSWORD:-}
+      # ── PostgreSQL ────────────────────────────────────────────────────────
+      - EVENT_COLLECTOR_PG_HOST=postgres
+      - EVENT_COLLECTOR_PG_PORT=5432
+      - EVENT_COLLECTOR_PG_DATABASE=${POSTGRES_DB:-argus}
+      - EVENT_COLLECTOR_PG_USERNAME=${POSTGRES_USER:-argus}
+      - EVENT_COLLECTOR_PG_PASSWORD=${POSTGRES_PASSWORD:-argus_secret}
+      # ── JWT HMAC-SHA256 (shared secret) ──────────────────────────────────
+      - EVENT_COLLECTOR_JWT_SIGNING_KEY=${JWT_SIGNING_KEY:?JWT_SIGNING_KEY is required}
+      # ── Service config ────────────────────────────────────────────────────
+      - EVENT_COLLECTOR_GRPC_PORT=50051
+      - EVENT_COLLECTOR_HTTP_PORT=8080
+      - EVENT_COLLECTOR_LOG_LEVEL=${LOG_LEVEL:-info}
+      # ── LiveKit ───────────────────────────────────────────────────────────
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-argus-dev-api-key}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET is required}
+      - LIVEKIT_WS_URL=${LIVEKIT_WS_URL:-ws://livekit:7880}
+      # ── MinIO ─────────────────────────────────────────────────────────────
+      - EVENT_COLLECTOR_MINIO_ENDPOINT=minio:9000
+      - EVENT_COLLECTOR_MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-argus-minio-admin}
+      - EVENT_COLLECTOR_MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      - EVENT_COLLECTOR_MINIO_BUCKET=${MINIO_BUCKET:-argus-evidence}
+      # ── Redis ─────────────────────────────────────────────────────────────
+      - EVENT_COLLECTOR_REDIS_ADDR=redis:6379
+      # ── AI inference bridge ───────────────────────────────────────────────
+      - EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL=http://ai-sidecar:8091
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
+      clickhouse-1:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - argus-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── AI Sidecar ───────────────────────────────────────────────────────────────
+  # Python ONNX Runtime service. Loads real YOLO/ArcFace model weights from
+  # ../../argus-backend/models and fails fast when required models are missing.
+  ai-sidecar:
+    build:
+      context: ../../argus-backend/ai-sidecar
+      dockerfile: Dockerfile
+    image: argus/ai-sidecar:${BACKEND_TAG:-latest}
+    container_name: argus-ai-sidecar
+    volumes:
+      - ../../argus-backend/models:/models:ro
+    environment:
+      - ONNX_MODELS_PATH=/models
+      - MODEL_FAIL_FAST=${MODEL_FAIL_FAST:-true}
+      - YOLO_MODEL_FILE=${YOLO_MODEL_FILE:-yolov8n.onnx}
+      - ARCFACE_MODEL_FILE=${ARCFACE_MODEL_FILE:-arcface.onnx}
+    networks:
+      - argus-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8091/healthz')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Inference Gateway ────────────────────────────────────────────────────────
+  # Lightweight Go gRPC gateway around the Python sidecar. Heavy model execution
+  # remains isolated from latency-sensitive student HTTP/gRPC traffic.
+  inference:
+    build:
+      context: ../../argus-backend
+      dockerfile: Dockerfile.inference
+      args:
+        VERSION: ${BACKEND_TAG:-dev}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: argus/inference:${BACKEND_TAG:-latest}
+    container_name: argus-inference
+    volumes:
+      - ./config.yaml:/app/deployments/config.yaml:ro
+    environment:
+      - EVENT_COLLECTOR_INFERENCE_GRPC_HOST=0.0.0.0
+      - EVENT_COLLECTOR_INFERENCE_GRPC_PORT=50061
+      - EVENT_COLLECTOR_INFERENCE_ENGINE_TYPE=python_bridge
+      - EVENT_COLLECTOR_INFERENCE_ALLOW_STUB=false
+      - EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL=http://ai-sidecar:8091
+      - EVENT_COLLECTOR_LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      ai-sidecar:
+        condition: service_healthy
+    networks:
+      - argus-network
+    restart: unless-stopped
+
+  # ── AI Worker ────────────────────────────────────────────────────────────────
+  # Async processing for evidence fragments and derived ClickHouse anomaly rows.
+  worker:
+    build:
+      context: ../../argus-backend
+      dockerfile: Dockerfile.worker
+      args:
+        VERSION: ${BACKEND_TAG:-dev}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: argus/worker:${BACKEND_TAG:-latest}
+    container_name: argus-worker
+    user: "0:0"
+    volumes:
+      - ./config.yaml:/app/deployments/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - badger-data:/app/data/dlq
+    environment:
+      - EVENT_COLLECTOR_KAFKA_BROKERS=kafka-1:9092,kafka-2:9092,kafka-3:9092
+      - EVENT_COLLECTOR_CH_ADDRS=clickhouse-1:9000,clickhouse-2:9000,clickhouse-3:9000
+      - EVENT_COLLECTOR_CH_DATABASE=${CH_DATABASE:-argus_analytics}
+      - EVENT_COLLECTOR_CH_USERNAME=${CH_USERNAME:-default}
+      - EVENT_COLLECTOR_CH_PASSWORD=${CH_PASSWORD:-}
+      - EVENT_COLLECTOR_PG_HOST=postgres
+      - EVENT_COLLECTOR_PG_PORT=5432
+      - EVENT_COLLECTOR_PG_DATABASE=${POSTGRES_DB:-argus}
+      - EVENT_COLLECTOR_PG_USERNAME=${POSTGRES_USER:-argus}
+      - EVENT_COLLECTOR_PG_PASSWORD=${POSTGRES_PASSWORD:-argus_secret}
+      - EVENT_COLLECTOR_REDIS_ADDR=redis:6379
+      - EVENT_COLLECTOR_INFERENCE_GRPC_HOST=inference
+      - EVENT_COLLECTOR_INFERENCE_GRPC_PORT=50061
+      - EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC=4
+      - EVENT_COLLECTOR_MINIO_ENDPOINT=minio:9000
+      - EVENT_COLLECTOR_MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-argus-minio-admin}
+      - EVENT_COLLECTOR_MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      - EVENT_COLLECTOR_MINIO_BUCKET=${MINIO_BUCKET:-argus-evidence}
+      - EVENT_COLLECTOR_DLQ_ENABLED=true
+      - EVENT_COLLECTOR_DLQ_DATA_DIR=/app/data/dlq
+      - EVENT_COLLECTOR_LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
+      clickhouse-1:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      inference:
+        condition: service_started
+    networks:
+      - argus-network
+    restart: unless-stopped
+
+  # ── argus-frontend ────────────────────────────────────────────────────────────
+  # Nuxt 4 (Vue 3) admin dashboard SPA.
+  frontend:
+    build:
+      context: ../../argus-frontend
+      dockerfile: Dockerfile
+      args:
+        NUXT_PUBLIC_API_BASE_URL: ${BACKEND_PUBLIC_URL:-http://localhost:8080}
+    image: argus/frontend:${FRONTEND_TAG:-latest}
+    container_name: argus-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NUXT_PUBLIC_API_BASE_URL=${BACKEND_PUBLIC_URL:-http://localhost:8080}
+      - NODE_ENV=production
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - argus-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ || exit 0" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  KAFKA — 3-Broker KRaft Cluster (Zero Data Loss)
+  #
+  #  Replication factor 3 + min.insync.replicas 2 guarantees that a message
+  #  acknowledged by the producer is on at least 2 brokers before a response.
+  #  Any single broker can fail without data loss or service interruption.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  kafka-1:
+    image: apache/kafka:latest
+    container_name: argus-kafka-1
+    ports:
+      - "9094:9094"
+    environment:
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka-1:9092,EXTERNAL://localhost:9094
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_NUM_PARTITIONS=6
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=3
+      - KAFKA_MIN_INSYNC_REPLICAS=2
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=2
+      - KAFKA_LOG_RETENTION_HOURS=168
+      - KAFKA_LOG_RETENTION_BYTES=10737418240
+      - KAFKA_MESSAGE_MAX_BYTES=1048576
+      - KAFKA_REPLICA_FETCH_MAX_BYTES=1048576
+      - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka-1-data:/tmp/kraft-combined-logs
+    networks:
+      - argus-network
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  kafka-2:
+    image: apache/kafka:latest
+    container_name: argus-kafka-2
+    ports:
+      - "9095:9094"
+    environment:
+      - KAFKA_NODE_ID=2
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka-2:9092,EXTERNAL://localhost:9095
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_NUM_PARTITIONS=6
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=3
+      - KAFKA_MIN_INSYNC_REPLICAS=2
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=2
+      - KAFKA_LOG_RETENTION_HOURS=168
+      - KAFKA_LOG_RETENTION_BYTES=10737418240
+      - KAFKA_MESSAGE_MAX_BYTES=1048576
+      - KAFKA_REPLICA_FETCH_MAX_BYTES=1048576
+      - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka-2-data:/tmp/kraft-combined-logs
+    networks:
+      - argus-network
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  kafka-3:
+    image: apache/kafka:latest
+    container_name: argus-kafka-3
+    ports:
+      - "9096:9094"
+    environment:
+      - KAFKA_NODE_ID=3
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka-3:9092,EXTERNAL://localhost:9096
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_NUM_PARTITIONS=6
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=3
+      - KAFKA_MIN_INSYNC_REPLICAS=2
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=2
+      - KAFKA_LOG_RETENTION_HOURS=168
+      - KAFKA_LOG_RETENTION_BYTES=10737418240
+      - KAFKA_MESSAGE_MAX_BYTES=1048576
+      - KAFKA_REPLICA_FETCH_MAX_BYTES=1048576
+      - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka-3-data:/tmp/kraft-combined-logs
+    networks:
+      - argus-network
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  CLICKHOUSE — 3-Node Replicated Cluster + ClickHouse Keeper
+  #
+  #  Uses ReplicatedMergeTree engine with 3 ClickHouse Keeper nodes for
+  #  consensus. Any single node can fail without data loss — queries
+  #  automatically route to surviving replicas.
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  clickhouse-keeper-1:
+    image: clickhouse/clickhouse-keeper:latest
+    container_name: argus-clickhouse-keeper-1
+    volumes:
+      - clickhouse-keeper-1-data:/var/lib/clickhouse-keeper
+      - ./clickhouse/keeper-1.xml:/etc/clickhouse-keeper/config.xml:ro
+    networks:
+      - argus-network
+    restart: unless-stopped
+
+  clickhouse-keeper-2:
+    image: clickhouse/clickhouse-keeper:latest
+    container_name: argus-clickhouse-keeper-2
+    volumes:
+      - clickhouse-keeper-2-data:/var/lib/clickhouse-keeper
+      - ./clickhouse/keeper-2.xml:/etc/clickhouse-keeper/config.xml:ro
+    networks:
+      - argus-network
+    restart: unless-stopped
+
+  clickhouse-keeper-3:
+    image: clickhouse/clickhouse-keeper:latest
+    container_name: argus-clickhouse-keeper-3
+    volumes:
+      - clickhouse-keeper-3-data:/var/lib/clickhouse-keeper
+      - ./clickhouse/keeper-3.xml:/etc/clickhouse-keeper/config.xml:ro
+    networks:
+      - argus-network
+    restart: unless-stopped
+
+  clickhouse-1:
+    image: clickhouse/clickhouse-server:latest
+    container_name: argus-clickhouse-1
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      - CLICKHOUSE_DB=${CH_DATABASE:-argus_analytics}
+      - CLICKHOUSE_USER=${CH_USERNAME:-default}
+      - CLICKHOUSE_PASSWORD=${CH_PASSWORD:-}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse-1-data:/var/lib/clickhouse
+      - clickhouse-1-logs:/var/log/clickhouse-server
+      - ./clickhouse/node-1.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./clickhouse/macros-1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+      - ../migrations/clickhouse/init.sql:/docker-entrypoint-initdb.d/02_init.sql:ro
+      - ../migrations/clickhouse/000004_reliability_hardening.up.sql:/docker-entrypoint-initdb.d/03_reliability.sql:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    depends_on:
+      - clickhouse-keeper-1
+      - clickhouse-keeper-2
+      - clickhouse-keeper-3
+    networks:
+      - argus-network
+    healthcheck:
+      test: [ "CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  clickhouse-2:
+    image: clickhouse/clickhouse-server:latest
+    container_name: argus-clickhouse-2
+    ports:
+      - "8124:8123"
+      - "9001:9000"
+    environment:
+      - CLICKHOUSE_DB=${CH_DATABASE:-argus_analytics}
+      - CLICKHOUSE_USER=${CH_USERNAME:-default}
+      - CLICKHOUSE_PASSWORD=${CH_PASSWORD:-}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse-2-data:/var/lib/clickhouse
+      - clickhouse-2-logs:/var/log/clickhouse-server
+      - ./clickhouse/node-2.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./clickhouse/macros-2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+      - ../migrations/clickhouse/init.sql:/docker-entrypoint-initdb.d/02_init.sql:ro
+      - ../migrations/clickhouse/000004_reliability_hardening.up.sql:/docker-entrypoint-initdb.d/03_reliability.sql:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    depends_on:
+      - clickhouse-keeper-1
+      - clickhouse-keeper-2
+      - clickhouse-keeper-3
+    networks:
+      - argus-network
+    healthcheck:
+      test: [ "CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  clickhouse-3:
+    image: clickhouse/clickhouse-server:latest
+    container_name: argus-clickhouse-3
+    ports:
+      - "8125:8123"
+      - "9003:9000"
+    environment:
+      - CLICKHOUSE_DB=${CH_DATABASE:-argus_analytics}
+      - CLICKHOUSE_USER=${CH_USERNAME:-default}
+      - CLICKHOUSE_PASSWORD=${CH_PASSWORD:-}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse-3-data:/var/lib/clickhouse
+      - clickhouse-3-logs:/var/log/clickhouse-server
+      - ./clickhouse/node-3.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./clickhouse/macros-3.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+      - ../migrations/clickhouse/init.sql:/docker-entrypoint-initdb.d/02_init.sql:ro
+      - ../migrations/clickhouse/000004_reliability_hardening.up.sql:/docker-entrypoint-initdb.d/03_reliability.sql:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    depends_on:
+      - clickhouse-keeper-1
+      - clickhouse-keeper-2
+      - clickhouse-keeper-3
+    networks:
+      - argus-network
+    healthcheck:
+      test: [ "CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: argus-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-argus}
+      - POSTGRES_USER=${POSTGRES_USER:-argus}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-argus_secret}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../migrations/postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    networks:
+      - argus-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-argus} -d ${POSTGRES_DB:-argus}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ── Redis ─────────────────────────────────────────────────────────────────────
+  # Durable job queue for asynq workers. NOT a cache — noeviction policy
+  # ensures job data is never silently dropped. AOF + RDB dual persistence.
+  redis:
+    image: redis:7-alpine
+    container_name: argus-redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - argus-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ── LiveKit ───────────────────────────────────────────────────────────────────
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: argus-livekit
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    environment:
+      LIVEKIT_API_KEY: "${LIVEKIT_API_KEY:-argus-dev-api-key}"
+      LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET:-argus-dev-secret-must-be-at-least-32-chars}"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cat >/tmp/livekit.yaml <<EOF
+        port: 7880
+        redis:
+          address: redis:6379
+        rtc:
+          tcp_port: 7881
+          port_range_start: 7882
+          port_range_end: 7882
+          use_external_ip: false
+          node_ip: 0.0.0.0
+        keys:
+          $${LIVEKIT_API_KEY}: $${LIVEKIT_API_SECRET}
+        webhook:
+          api_key: $${LIVEKIT_API_KEY}
+          urls:
+            - http://backend:8080/api/v1/livekit/webhook
+        EOF
+        exec livekit-server --config /tmp/livekit.yaml
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - argus-network
+    restart: unless-stopped
+
+  # ── LiveKit Egress ────────────────────────────────────────────────────────────
+  livekit-egress:
+    image: livekit/egress:latest
+    container_name: argus-livekit-egress
+    environment:
+      LIVEKIT_API_KEY: "${LIVEKIT_API_KEY:-argus-dev-api-key}"
+      LIVEKIT_API_SECRET: "${LIVEKIT_API_SECRET:-argus-dev-secret-must-be-at-least-32-chars}"
+      LIVEKIT_WS_URL: "ws://livekit:7880"
+      EGRESS_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY:-argus-dev-api-key}
+        api_secret: ${LIVEKIT_API_SECRET:-argus-dev-secret-must-be-at-least-32-chars}
+        ws_url: ws://livekit:7880
+        insecure: true
+        redis:
+          address: redis:6379
+        logging:
+          level: info
+        storage:
+          s3:
+            endpoint: http://minio:9000
+            access_key: ${MINIO_ROOT_USER:-argus-minio-admin}
+            secret: ${MINIO_ROOT_PASSWORD:-argus-minio-secret-change-in-production}
+            bucket: ${MINIO_BUCKET:-argus-evidence}
+            region: us-east-1
+    depends_on:
+      livekit:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - argus-network
+    restart: unless-stopped
+
+  # ── MinIO ─────────────────────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: argus-minio
+    ports:
+      - "9010:9001"
+      - "9002:9000"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-argus-minio-admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - argus-network
+    healthcheck:
+      test: [ "CMD", "mc", "ready", "local" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  # ── MinIO Init ────────────────────────────────────────────────────────────────
+  minio-init:
+    image: minio/mc:latest
+    container_name: argus-minio-init
+    entrypoint: /bin/sh
+    command: /init/init.sh
+    volumes:
+      - ../scripts/minio-init.sh:/init/init.sh:ro
+    environment:
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-argus-minio-admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      - BUCKET_NAME=${MINIO_BUCKET:-argus-evidence}
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - argus-network
+    restart: "no"
+
+# =============================================================================
+#  Networks
+# =============================================================================
+networks:
+  argus-network:
+    driver: bridge
+    name: argus-network
+
+# =============================================================================
+#  Volumes
+# =============================================================================
+volumes:
+  # Kafka (3 brokers)
+  kafka-1-data:
+    driver: local
+    name: argus-kafka-1-data
+  kafka-2-data:
+    driver: local
+    name: argus-kafka-2-data
+  kafka-3-data:
+    driver: local
+    name: argus-kafka-3-data
+  # ClickHouse (3 nodes + 3 keepers)
+  clickhouse-1-data:
+    driver: local
+    name: argus-clickhouse-1-data
+  clickhouse-1-logs:
+    driver: local
+    name: argus-clickhouse-1-logs
+  clickhouse-2-data:
+    driver: local
+    name: argus-clickhouse-2-data
+  clickhouse-2-logs:
+    driver: local
+    name: argus-clickhouse-2-logs
+  clickhouse-3-data:
+    driver: local
+    name: argus-clickhouse-3-data
+  clickhouse-3-logs:
+    driver: local
+    name: argus-clickhouse-3-logs
+  clickhouse-keeper-1-data:
+    driver: local
+    name: argus-clickhouse-keeper-1-data
+  clickhouse-keeper-2-data:
+    driver: local
+    name: argus-clickhouse-keeper-2-data
+  clickhouse-keeper-3-data:
+    driver: local
+    name: argus-clickhouse-keeper-3-data
+  # Other services
+  postgres-data:
+    driver: local
+    name: argus-postgres-data
+  redis-data:
+    driver: local
+    name: argus-redis-data
+  badger-data:
+    driver: local
+    name: argus-badger-data
+  minio-data:
+    driver: local
+    name: argus-minio-data

@@ -1,0 +1,316 @@
+# =============================================================================
+#  Argus AI — DEV Docker Compose (облегчённый стек)
+#
+#  Отличия от production docker-compose.yaml:
+#    - 1x Kafka   вместо 3-узлового кластера   (~400 MB vs ~1.2 GB)
+#    - 1x ClickHouse вместо 3 нод + 3 Keeper   (~600 MB vs ~3 GB)
+#    - Нет Nginx / Certbot
+#
+#  Требования к памяти: ~3-4 GB (vs ~14 GB в prod)
+#
+#  Запуск:
+#    cd argus-infra/docker
+#    docker compose -f docker-compose.dev.yml up -d
+#
+#  Сборка образов (если ещё не собраны):
+#    docker build -t argus/backend:latest ../../argus-backend
+#    docker build -t argus/frontend:latest ../../argus-frontend
+# =============================================================================
+
+networks:
+  argus-dev:
+    driver: bridge
+    name: argus-dev-network
+
+volumes:
+  kafka-dev-data:
+  clickhouse-dev-data:
+  postgres-dev-data:
+  redis-dev-data:
+  minio-dev-data:
+  badger-dev-data:
+
+services:
+
+  # ── Kafka — одиночный брокер (KRaft, без ZooKeeper) ──────────────────────────
+  kafka:
+    image: apache/kafka:latest
+    container_name: argus-dev-kafka
+    ports:
+      - "9094:9094"
+    environment:
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_NUM_PARTITIONS=3
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=1
+      - KAFKA_MIN_INSYNC_REPLICAS=1
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_LOG_RETENTION_HOURS=168
+      - KAFKA_LOG_DIRS=/var/lib/kafka/data
+      - CLUSTER_ID=argus-dev-cluster-id-001
+    volumes:
+      - kafka-dev-data:/var/lib/kafka/data
+    networks:
+      - argus-dev
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── ClickHouse — одиночный инстанс (без кластера и Keeper) ───────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: argus-dev-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      - CLICKHOUSE_DB=${CH_DATABASE:-argus_analytics}
+      - CLICKHOUSE_USER=${CH_USERNAME:-default}
+      - CLICKHOUSE_PASSWORD=${CH_PASSWORD:-}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse-dev-data:/var/lib/clickhouse
+      - "../migrations/clickhouse/init_full.sql:/docker-entrypoint-initdb.d/01_init_full.sql:ro"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    networks:
+      - argus-dev
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: argus-dev-postgres
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-argus}
+      - POSTGRES_USER=${POSTGRES_USER:-argus}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-argus_secret}
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+      - "../migrations/postgres/init_full.sql:/docker-entrypoint-initdb.d/01_init_full.sql:ro"
+    networks:
+      - argus-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-argus} -d ${POSTGRES_DB:-argus}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  # ── Redis ─────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: argus-dev-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    networks:
+      - argus-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ── MinIO ─────────────────────────────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: argus-dev-minio
+    ports:
+      - "9010:9001"
+      - "9002:9000"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-argus-minio-admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-argus-minio-secret}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-dev-data:/data
+    networks:
+      - argus-dev
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: argus-dev-minio-init
+    entrypoint: /bin/sh
+    command: /init/init.sh
+    volumes:
+      - ../scripts/minio-init.sh:/init/init.sh:ro
+    environment:
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-argus-minio-admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-argus-minio-secret}
+      - BUCKET_NAME=${MINIO_BUCKET:-argus-evidence}
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - argus-dev
+    restart: "no"
+
+  # ── LiveKit ───────────────────────────────────────────────────────────────────
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: argus-dev-livekit
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-argus-dev-api-key}: ${LIVEKIT_API_SECRET:-argus-dev-secret-must-be-at-least-32-chars}"
+      REDIS_HOST: "redis:6379"
+    command: --dev --bind 0.0.0.0 --node-ip 0.0.0.0
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - argus-dev
+    restart: unless-stopped
+
+  # ── LiveKit Egress — автозапись студентов в MinIO ────────────────────────────
+  livekit-egress:
+    image: livekit/egress:latest
+    container_name: argus-dev-egress
+    environment:
+      - EGRESS_CONFIG_FILE=/etc/egress/config.yaml
+    volumes:
+      - ./egress-config.yaml:/etc/egress/config.yaml:ro
+    depends_on:
+      livekit:
+        condition: service_started
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - argus-dev
+    restart: unless-stopped
+
+  # ── Backend (Go) ──────────────────────────────────────────────────────────────
+  backend:
+    image: argus/backend:${BACKEND_TAG:-latest}
+    build:
+      context: ../../argus-backend
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${BACKEND_TAG:-dev}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    container_name: argus-dev-backend
+    entrypoint: ["/app/event-collector", "-config", "/app/config/config.yaml"]
+    ports:
+      - "${BACKEND_GRPC_PORT:-50051}:50051"
+      - "${BACKEND_HTTP_PORT:-8080}:8080"
+    user: "0:0"
+    volumes:
+      - ./config.yaml:/app/config/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - badger-dev-data:/app/data/dlq
+    environment:
+      - EVENT_COLLECTOR_CORS_ORIGINS=${FRONTEND_ORIGIN:-*}
+      # ── Kafka (одиночный брокер) ──────────────────────────────────────────
+      - EVENT_COLLECTOR_KAFKA_BROKERS=kafka:9092
+      # ── ClickHouse (одиночный инстанс) ───────────────────────────────────
+      - EVENT_COLLECTOR_CH_ADDRS=clickhouse:9000
+      - EVENT_COLLECTOR_CH_DATABASE=${CH_DATABASE:-argus_analytics}
+      - EVENT_COLLECTOR_CH_USERNAME=${CH_USERNAME:-default}
+      - EVENT_COLLECTOR_CH_PASSWORD=${CH_PASSWORD:-}
+      # ── PostgreSQL ────────────────────────────────────────────────────────
+      - EVENT_COLLECTOR_PG_HOST=postgres
+      - EVENT_COLLECTOR_PG_PORT=5432
+      - EVENT_COLLECTOR_PG_DATABASE=${POSTGRES_DB:-argus}
+      - EVENT_COLLECTOR_PG_USERNAME=${POSTGRES_USER:-argus}
+      - EVENT_COLLECTOR_PG_PASSWORD=${POSTGRES_PASSWORD:-argus_secret}
+      # ── JWT (HS256, dev режим — auth.enabled=false в config.yaml) ────────
+      - EVENT_COLLECTOR_JWT_SIGNING_KEY=2xp8vaqUMGpY3uYRHGpMWLUqin9rfqy154qIaWPtay8=
+      # ── Сервис ───────────────────────────────────────────────────────────
+      - EVENT_COLLECTOR_GRPC_PORT=50051
+      - EVENT_COLLECTOR_HTTP_PORT=8080
+      - EVENT_COLLECTOR_LOG_LEVEL=${LOG_LEVEL:-info}
+      - ARGUS_SDK_URL=${ARGUS_SDK_URL:-http://localhost:3000/sdk/argus-sdk.umd.js}
+      # ── LiveKit ───────────────────────────────────────────────────────────
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-argus-dev-api-key}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-argus-dev-secret-must-be-at-least-32-chars}
+      - LIVEKIT_WS_URL=${LIVEKIT_WS_URL:-ws://livekit:7880}
+      - LIVEKIT_PUBLIC_WS_URL=${LIVEKIT_PUBLIC_WS_URL:-ws://localhost:7880}
+      # ── MinIO ─────────────────────────────────────────────────────────────
+      - EVENT_COLLECTOR_MINIO_ENDPOINT=minio:9000
+      - EVENT_COLLECTOR_MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-argus-minio-admin}
+      - EVENT_COLLECTOR_MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-argus-minio-secret}
+      - EVENT_COLLECTOR_MINIO_BUCKET=${MINIO_BUCKET:-argus-evidence}
+      # ── Redis ─────────────────────────────────────────────────────────────
+      - EVENT_COLLECTOR_REDIS_ADDR=redis:6379
+    depends_on:
+      kafka:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - argus-dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── Frontend (Nuxt) ───────────────────────────────────────────────────────────
+  frontend:
+    image: argus/frontend:${FRONTEND_TAG:-latest}
+    build:
+      context: ../../argus-frontend
+      dockerfile: Dockerfile
+      args:
+        NUXT_PUBLIC_API_BASE_URL: ${BACKEND_PUBLIC_URL:-http://localhost:8080}
+    container_name: argus-dev-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NUXT_PUBLIC_API_BASE_URL=${BACKEND_PUBLIC_URL:-http://localhost:8080}
+      - NODE_ENV=production
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - argus-dev
+    restart: unless-stopped

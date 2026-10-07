@@ -1,0 +1,7 @@
+api_key: argus-dev-api-key
+api_secret: argus-dev-secret-must-be-at-least-32-chars
+ws_url: ws://livekit:7880
+insecure: true
+log_level: info
+redis:
+  address: redis:6379

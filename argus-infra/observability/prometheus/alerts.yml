@@ -1,0 +1,152 @@
+groups:
+  # ── Argus Backend ─────────────────────────────────────────────────────────
+  - name: argus.backend
+    rules:
+
+      - alert: ArgusBackendDown
+        expr: up{job="argus-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: argus
+        annotations:
+          summary: "Argus backend is down"
+          description: "Argus backend has been unreachable for more than 1 minute."
+
+      - alert: ArgusHighErrorRate
+        expr: >
+          rate(http_requests_total{job="argus-backend",status=~"5.."}[5m])
+          / rate(http_requests_total{job="argus-backend"}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          team: argus
+        annotations:
+          summary: "High HTTP error rate on Argus backend"
+          description: "Error rate is {{ humanizePercentage $value }} over the last 5 minutes."
+
+      - alert: ArgusHighLatency
+        expr: >
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket{job="argus-backend"}[5m])
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: argus
+        annotations:
+          summary: "High p95 latency on Argus backend"
+          description: "p95 latency is {{ $value | humanizeDuration }} (threshold 2s)."
+
+  # ── Event Ingestion ───────────────────────────────────────────────────────
+  - name: argus.ingestion
+    rules:
+
+      - alert: ArgusIngestionDrop
+        expr: >
+          rate(argus_events_dropped_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          team: argus
+        annotations:
+          summary: "Argus event ingestion is dropping events"
+          description: "{{ $value }} events/s are being dropped."
+
+      - alert: ArgusKafkaLag
+        expr: kafka_consumer_group_lag > 100000
+        for: 5m
+        labels:
+          severity: warning
+          team: argus
+        annotations:
+          summary: "High Kafka consumer lag"
+          description: "Consumer group {{ $labels.consumergroup }} has lag {{ $value }}."
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  - name: argus.postgres
+    rules:
+
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+
+      - alert: PostgresHighConnections
+        expr: pg_stat_database_numbackends > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL connection count is high ({{ $value }})"
+
+  # ── ClickHouse ────────────────────────────────────────────────────────────
+  - name: argus.clickhouse
+    rules:
+
+      - alert: ClickHouseDown
+        expr: up{job="clickhouse"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ClickHouse is down"
+
+      - alert: ClickHouseHighMergeCount
+        expr: ClickHouseMetrics_Merge > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ClickHouse has too many active merges ({{ $value }})"
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  - name: argus.redis
+    rules:
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage is high ({{ humanizePercentage $value }})"
+
+  # ── Infrastructure ────────────────────────────────────────────────────────
+  - name: argus.infra
+    rules:
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}: {{ $value }}%"
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk usage above 85% on {{ $labels.instance }} ({{ $labels.mountpoint }})"
+
+      - alert: HighMemoryUsage
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Memory usage above 90% on {{ $labels.instance }}"

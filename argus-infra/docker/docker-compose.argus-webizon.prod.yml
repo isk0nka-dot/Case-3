@@ -1,0 +1,587 @@
+name: argus-webizon-prod
+
+x-restart-init: &restart_init
+  restart: unless-stopped
+  init: true
+
+x-logging: &default_logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "5"
+
+services:
+  nginx:
+    <<: [*restart_init, *default_logging]
+    image: nginx:1.27-alpine
+    container_name: prod-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/nginx.argus-webizon.conf:/etc/nginx/nginx.conf:ro
+      - letsencrypt:/etc/letsencrypt:ro
+      - certbot_webroot:/var/www/certbot:ro
+    depends_on:
+      argus-frontend:
+        condition: service_healthy
+      argus-backend:
+        condition: service_healthy
+      webizon-app:
+        condition: service_healthy
+    networks:
+      - proxy_public_net
+      - argus_edge_net
+      - webizon_edge_net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    mem_limit: 256m
+    memswap_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  certbot:
+    <<: [*restart_init, *default_logging]
+    image: certbot/certbot:v2.11.0
+    container_name: prod-certbot
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        trap exit TERM
+        while :; do
+          certbot renew --webroot -w /var/www/certbot --quiet
+          sleep 43200
+        done
+    networks:
+      - proxy_public_net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+    mem_limit: 128m
+    memswap_limit: 128m
+
+  argus-frontend:
+    <<: [*restart_init, *default_logging]
+    image: ${ARGUS_FRONTEND_IMAGE:?ARGUS_FRONTEND_IMAGE is required}
+    container_name: argus-frontend
+    environment:
+      NODE_ENV: production
+      NUXT_PUBLIC_API_BASE_URL: ${ARGUS_PUBLIC_URL:?ARGUS_PUBLIC_URL is required}
+    networks:
+      - argus_edge_net
+    depends_on:
+      argus-backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 384M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+    mem_limit: 384m
+    memswap_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  argus-backend:
+    <<: [*restart_init, *default_logging]
+    image: ${ARGUS_BACKEND_IMAGE:?ARGUS_BACKEND_IMAGE is required}
+    container_name: argus-backend
+    volumes:
+      - ./config.yaml:/app/deployments/config.yaml:ro
+      - argus_dlq:/data/argus-dlq
+    environment:
+      EVENT_COLLECTOR_HTTP_PORT: 8080
+      EVENT_COLLECTOR_GRPC_PORT: 50051
+      EVENT_COLLECTOR_CORS_ORIGINS: ${ARGUS_CORS_ORIGINS:?ARGUS_CORS_ORIGINS is required}
+      EVENT_COLLECTOR_JWT_SIGNING_KEY: ${ARGUS_JWT_SIGNING_KEY:?ARGUS_JWT_SIGNING_KEY is required}
+      EVENT_COLLECTOR_LOG_LEVEL: ${ARGUS_LOG_LEVEL:-info}
+      EVENT_COLLECTOR_KAFKA_BROKERS: argus-kafka:9092
+      EVENT_COLLECTOR_PG_HOST: argus-postgres
+      EVENT_COLLECTOR_PG_PORT: 5432
+      EVENT_COLLECTOR_PG_DATABASE: ${ARGUS_POSTGRES_DB:?ARGUS_POSTGRES_DB is required}
+      EVENT_COLLECTOR_PG_USERNAME: ${ARGUS_POSTGRES_USER:?ARGUS_POSTGRES_USER is required}
+      EVENT_COLLECTOR_PG_PASSWORD: ${ARGUS_POSTGRES_PASSWORD:?ARGUS_POSTGRES_PASSWORD is required}
+      EVENT_COLLECTOR_CH_ADDRS: argus-clickhouse:9000
+      EVENT_COLLECTOR_CH_DATABASE: ${ARGUS_CLICKHOUSE_DATABASE:?ARGUS_CLICKHOUSE_DATABASE is required}
+      EVENT_COLLECTOR_CH_USERNAME: ${ARGUS_CLICKHOUSE_USER:?ARGUS_CLICKHOUSE_USER is required}
+      EVENT_COLLECTOR_CH_PASSWORD: ${ARGUS_CLICKHOUSE_PASSWORD:-}
+      EVENT_COLLECTOR_REDIS_ADDR: argus-redis:6379
+      EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL: http://argus-ai-sidecar:8091
+      EVENT_COLLECTOR_MINIO_ENDPOINT: argus-minio:9000
+      EVENT_COLLECTOR_MINIO_ACCESS_KEY: ${ARGUS_MINIO_ROOT_USER:?ARGUS_MINIO_ROOT_USER is required}
+      EVENT_COLLECTOR_MINIO_SECRET_KEY: ${ARGUS_MINIO_ROOT_PASSWORD:?ARGUS_MINIO_ROOT_PASSWORD is required}
+      EVENT_COLLECTOR_MINIO_BUCKET: ${ARGUS_MINIO_BUCKET:?ARGUS_MINIO_BUCKET is required}
+      EVENT_COLLECTOR_DLQ_ENABLED: "true"
+      EVENT_COLLECTOR_DLQ_DATA_DIR: /data/argus-dlq
+    networks:
+      - argus_edge_net
+      - argus_internal_net
+    depends_on:
+      argus-postgres:
+        condition: service_healthy
+      argus-kafka:
+        condition: service_healthy
+      argus-clickhouse:
+        condition: service_healthy
+      argus-redis:
+        condition: service_healthy
+      argus-minio:
+        condition: service_healthy
+      argus-ai-sidecar:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 1G
+        reservations:
+          cpus: "0.30"
+          memory: 256M
+    mem_limit: 1g
+    memswap_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  argus-worker:
+    <<: [*restart_init, *default_logging]
+    image: ${ARGUS_WORKER_IMAGE:?ARGUS_WORKER_IMAGE is required}
+    container_name: argus-worker
+    volumes:
+      - ./config.yaml:/app/deployments/config.yaml:ro
+      - argus_dlq:/data/argus-dlq
+    environment:
+      EVENT_COLLECTOR_LOG_LEVEL: ${ARGUS_LOG_LEVEL:-info}
+      EVENT_COLLECTOR_KAFKA_BROKERS: argus-kafka:9092
+      EVENT_COLLECTOR_PG_HOST: argus-postgres
+      EVENT_COLLECTOR_PG_PORT: 5432
+      EVENT_COLLECTOR_PG_DATABASE: ${ARGUS_POSTGRES_DB:?ARGUS_POSTGRES_DB is required}
+      EVENT_COLLECTOR_PG_USERNAME: ${ARGUS_POSTGRES_USER:?ARGUS_POSTGRES_USER is required}
+      EVENT_COLLECTOR_PG_PASSWORD: ${ARGUS_POSTGRES_PASSWORD:?ARGUS_POSTGRES_PASSWORD is required}
+      EVENT_COLLECTOR_CH_ADDRS: argus-clickhouse:9000
+      EVENT_COLLECTOR_CH_DATABASE: ${ARGUS_CLICKHOUSE_DATABASE:?ARGUS_CLICKHOUSE_DATABASE is required}
+      EVENT_COLLECTOR_CH_USERNAME: ${ARGUS_CLICKHOUSE_USER:?ARGUS_CLICKHOUSE_USER is required}
+      EVENT_COLLECTOR_CH_PASSWORD: ${ARGUS_CLICKHOUSE_PASSWORD:-}
+      EVENT_COLLECTOR_REDIS_ADDR: argus-redis:6379
+      EVENT_COLLECTOR_INFERENCE_GRPC_HOST: argus-inference
+      EVENT_COLLECTOR_INFERENCE_GRPC_PORT: 50061
+      EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC: ${ARGUS_FRAME_EXTRACTION_INTERVAL_SEC:-4}
+      EVENT_COLLECTOR_MINIO_ENDPOINT: argus-minio:9000
+      EVENT_COLLECTOR_MINIO_ACCESS_KEY: ${ARGUS_MINIO_ROOT_USER:?ARGUS_MINIO_ROOT_USER is required}
+      EVENT_COLLECTOR_MINIO_SECRET_KEY: ${ARGUS_MINIO_ROOT_PASSWORD:?ARGUS_MINIO_ROOT_PASSWORD is required}
+      EVENT_COLLECTOR_MINIO_BUCKET: ${ARGUS_MINIO_BUCKET:?ARGUS_MINIO_BUCKET is required}
+      EVENT_COLLECTOR_DLQ_ENABLED: "true"
+      EVENT_COLLECTOR_DLQ_DATA_DIR: /data/argus-dlq
+    networks:
+      - argus_internal_net
+    depends_on:
+      argus-postgres:
+        condition: service_healthy
+      argus-kafka:
+        condition: service_healthy
+      argus-clickhouse:
+        condition: service_healthy
+      argus-redis:
+        condition: service_healthy
+      argus-minio:
+        condition: service_healthy
+      argus-inference:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 768M
+        reservations:
+          cpus: "0.20"
+          memory: 256M
+    mem_limit: 768m
+    memswap_limit: 768m
+
+  argus-inference:
+    <<: [*restart_init, *default_logging]
+    image: ${ARGUS_INFERENCE_IMAGE:?ARGUS_INFERENCE_IMAGE is required}
+    container_name: argus-inference
+    volumes:
+      - ./config.yaml:/app/deployments/config.yaml:ro
+    environment:
+      EVENT_COLLECTOR_INFERENCE_GRPC_HOST: 0.0.0.0
+      EVENT_COLLECTOR_INFERENCE_GRPC_PORT: 50061
+      EVENT_COLLECTOR_INFERENCE_ENGINE_TYPE: python_bridge
+      EVENT_COLLECTOR_INFERENCE_ALLOW_STUB: "false"
+      EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL: http://argus-ai-sidecar:8091
+      EVENT_COLLECTOR_LOG_LEVEL: ${ARGUS_LOG_LEVEL:-info}
+    networks:
+      - argus_internal_net
+    depends_on:
+      argus-ai-sidecar:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 384M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+    mem_limit: 384m
+    memswap_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 50061 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  argus-ai-sidecar:
+    <<: [*restart_init, *default_logging]
+    image: ${ARGUS_AI_SIDECAR_IMAGE:?ARGUS_AI_SIDECAR_IMAGE is required}
+    container_name: argus-ai-sidecar
+    volumes:
+      - ${ARGUS_MODELS_PATH:?ARGUS_MODELS_PATH is required}:/models:ro
+    environment:
+      ONNX_MODELS_PATH: /models
+      MODEL_FAIL_FAST: "true"
+      YOLO_MODEL_FILE: ${ARGUS_YOLO_MODEL_FILE:-yolov8n.onnx}
+      ARCFACE_MODEL_FILE: ${ARGUS_ARCFACE_MODEL_FILE:-arcface.onnx}
+      YOLO_CONFIDENCE_THRESHOLD: ${ARGUS_YOLO_CONFIDENCE_THRESHOLD:-0.35}
+      FACE_MISMATCH_THRESHOLD: ${ARGUS_FACE_MISMATCH_THRESHOLD:-0.62}
+      AUDIO_VAD_THRESHOLD: ${ARGUS_AUDIO_VAD_THRESHOLD:-0.65}
+    networks:
+      - argus_internal_net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 1536M
+        reservations:
+          cpus: "0.30"
+          memory: 512M
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/healthz')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  argus-clickhouse:
+    <<: [*restart_init, *default_logging]
+    image: clickhouse/clickhouse-server:24.8
+    container_name: argus-clickhouse
+    environment:
+      CLICKHOUSE_DB: ${ARGUS_CLICKHOUSE_DATABASE:?ARGUS_CLICKHOUSE_DATABASE is required}
+      CLICKHOUSE_USER: ${ARGUS_CLICKHOUSE_USER:?ARGUS_CLICKHOUSE_USER is required}
+      CLICKHOUSE_PASSWORD: ${ARGUS_CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - argus_clickhouse_data:/var/lib/clickhouse
+      - argus_clickhouse_logs:/var/log/clickhouse-server
+    networks:
+      - argus_internal_net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 2G
+        reservations:
+          cpus: "0.30"
+          memory: 512M
+    mem_limit: 2g
+    memswap_limit: 2g
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1' >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  argus-redis:
+    <<: [*restart_init, *default_logging]
+    image: redis:7-alpine
+    container_name: argus-redis
+    command: redis-server --appendonly yes --appendfsync everysec --save 900 1 --save 300 10 --save 60 10000 --maxmemory 384mb --maxmemory-policy noeviction
+    volumes:
+      - argus_redis_data:/data
+    networks:
+      - argus_internal_net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+    mem_limit: 512m
+    memswap_limit: 512m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  argus-postgres:
+    <<: [*restart_init, *default_logging]
+    image: postgres:16-alpine
+    container_name: argus-postgres
+    environment:
+      POSTGRES_DB: ${ARGUS_POSTGRES_DB:?ARGUS_POSTGRES_DB is required}
+      POSTGRES_USER: ${ARGUS_POSTGRES_USER:?ARGUS_POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${ARGUS_POSTGRES_PASSWORD:?ARGUS_POSTGRES_PASSWORD is required}
+    volumes:
+      - argus_postgres_data:/var/lib/postgresql/data
+      - ../migrations/postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    networks:
+      - argus_internal_net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 768M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+    mem_limit: 768m
+    memswap_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  argus-kafka:
+    <<: [*restart_init, *default_logging]
+    image: apache/kafka:3.9.0
+    container_name: argus-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@argus-kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://argus-kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - argus_kafka_data:/tmp/kraft-combined-logs
+    networks:
+      - argus_internal_net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+        reservations:
+          cpus: "0.20"
+          memory: 512M
+    mem_limit: 1g
+    memswap_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server 127.0.0.1:9092 >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+  argus-minio:
+    <<: [*restart_init, *default_logging]
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: argus-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${ARGUS_MINIO_ROOT_USER:?ARGUS_MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${ARGUS_MINIO_ROOT_PASSWORD:?ARGUS_MINIO_ROOT_PASSWORD is required}
+    volumes:
+      - argus_minio_data:/data
+    networks:
+      - argus_internal_net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+    mem_limit: 512m
+    memswap_limit: 512m
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  argus-minio-init:
+    <<: [*restart_init, *default_logging]
+    image: minio/mc:RELEASE.2024-11-21T17-21-54Z
+    container_name: argus-minio-init
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        until mc alias set local http://argus-minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do
+          sleep 2
+        done
+        mc mb --ignore-existing local/"$${ARGUS_MINIO_BUCKET}"
+        mc mb --ignore-existing local/"$${ARGUS_MINIO_EXPORT_BUCKET}"
+    environment:
+      MINIO_ROOT_USER: ${ARGUS_MINIO_ROOT_USER:?ARGUS_MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${ARGUS_MINIO_ROOT_PASSWORD:?ARGUS_MINIO_ROOT_PASSWORD is required}
+      ARGUS_MINIO_BUCKET: ${ARGUS_MINIO_BUCKET:?ARGUS_MINIO_BUCKET is required}
+      ARGUS_MINIO_EXPORT_BUCKET: ${ARGUS_MINIO_EXPORT_BUCKET:-argus-exports}
+    depends_on:
+      argus-minio:
+        condition: service_healthy
+    networks:
+      - argus_internal_net
+
+  webizon-app:
+    <<: [*restart_init, *default_logging]
+    image: ${WEBIZON_APP_IMAGE:?WEBIZON_APP_IMAGE is required}
+    container_name: webizon-app
+    environment:
+      SERVER_PORT: 8080
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://webizon-postgres:5432/${WEBIZON_POSTGRES_DB:?WEBIZON_POSTGRES_DB is required}
+      SPRING_DATASOURCE_USERNAME: ${WEBIZON_POSTGRES_USER:?WEBIZON_POSTGRES_USER is required}
+      SPRING_DATASOURCE_PASSWORD: ${WEBIZON_POSTGRES_PASSWORD:?WEBIZON_POSTGRES_PASSWORD is required}
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError -Dfile.encoding=UTF-8"
+      WEBIZON_PUBLIC_URL: ${WEBIZON_PUBLIC_URL:?WEBIZON_PUBLIC_URL is required}
+    networks:
+      - webizon_edge_net
+      - webizon_internal_net
+    depends_on:
+      webizon-postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 4608M
+        reservations:
+          cpus: "0.50"
+          memory: 1G
+    mem_limit: 4608m
+    memswap_limit: 4608m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health >/dev/null || wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  webizon-postgres:
+    <<: [*restart_init, *default_logging]
+    image: postgres:16-alpine
+    container_name: webizon-postgres
+    environment:
+      POSTGRES_DB: ${WEBIZON_POSTGRES_DB:?WEBIZON_POSTGRES_DB is required}
+      POSTGRES_USER: ${WEBIZON_POSTGRES_USER:?WEBIZON_POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${WEBIZON_POSTGRES_PASSWORD:?WEBIZON_POSTGRES_PASSWORD is required}
+    volumes:
+      - webizon_postgres_data:/var/lib/postgresql/data
+    networks:
+      - webizon_internal_net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+        reservations:
+          cpus: "0.20"
+          memory: 256M
+    mem_limit: 1g
+    memswap_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  proxy_public_net:
+    name: proxy_public_net
+    driver: bridge
+  argus_edge_net:
+    name: argus_edge_net
+    driver: bridge
+  argus_internal_net:
+    name: argus_internal_net
+    driver: bridge
+    internal: true
+  webizon_edge_net:
+    name: webizon_edge_net
+    driver: bridge
+  webizon_internal_net:
+    name: webizon_internal_net
+    driver: bridge
+    internal: true
+
+volumes:
+  letsencrypt:
+    name: prod_letsencrypt
+  certbot_webroot:
+    name: prod_certbot_webroot
+  argus_postgres_data:
+    name: argus_postgres_data
+  argus_clickhouse_data:
+    name: argus_clickhouse_data
+  argus_clickhouse_logs:
+    name: argus_clickhouse_logs
+  argus_redis_data:
+    name: argus_redis_data
+  argus_kafka_data:
+    name: argus_kafka_data
+  argus_minio_data:
+    name: argus_minio_data
+  argus_dlq:
+    name: argus_dlq
+  webizon_postgres_data:
+    name: webizon_postgres_data
