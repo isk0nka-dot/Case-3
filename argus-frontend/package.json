@@ -1,0 +1,37 @@
+{
+  "name": "proctor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.89",
+    "@iconify-json/simple-icons": "^1.2.70",
+    "@mediapipe/tasks-vision": "^0.10.35",
+    "@nuxt/ui": "^4.4.0",
+    "@pinia/nuxt": "^0.9.0",
+    "chart.js": "^4.5.1",
+    "livekit-client": "^2.17.1",
+    "nuxt": "^4.3.1",
+    "pinia": "^2.3.0",
+    "tailwindcss": "^4.1.18",
+    "vue-chartjs": "^5.3.3"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "^1.14.0",
+    "@playwright/test": "^1.58.2",
+    "eslint": "^10.0.0",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5",
+    "typescript": "^5.9.3",
+    "vue-tsc": "^3.2.4"
+  }
+}

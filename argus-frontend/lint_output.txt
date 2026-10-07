@@ -1,0 +1,274 @@
+
+> lint
+> eslint . --fix
+
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/CriticalAlertsBanner.vue
+  20:3  error  'alerts' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/DocCodeBlock.vue
+  14:24  error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/EvidenceViewer.vue
+  39:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  55:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  71:12  error  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  71:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/LivenessChallenge.vue
+  10:59  error  'ChallengeStatus' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/MonitoringModal.vue
+   23:11  error  'sseEvents' is assigned a value but never used. Allowed unused vars must match /^_/u                                                   @typescript-eslint/no-unused-vars
+   32:10  error  'sseReset' is assigned a value but never used. Allowed unused vars must match /^_/u                                                    @typescript-eslint/no-unused-vars
+   47:5   error  Unexpected mutation of "session" prop                                                                                                  vue/no-mutating-props
+   74:1   error  Function "gazeColor" matches the pattern of centralized utility "status-switch" (useStatusHelpers). Use the composable import instead  argus/no-duplicate-utils
+  195:3   error  Unexpected mutation of "session" prop                                                                                                  vue/no-mutating-props
+  202:3   error  Unexpected mutation of "session" prop                                                                                                  vue/no-mutating-props
+  221:3   error  Unexpected mutation of "session" prop                                                                                                  vue/no-mutating-props
+  282:14  error  '_e' is defined but never used                                                                                                         @typescript-eslint/no-unused-vars
+  301:14  error  '_e' is defined but never used                                                                                                         @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/OrgSwitcher.vue
+  82:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/PerformanceDebugger.vue
+  26:19  error  'errorBg' is assigned a value but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+  26:28  error  'successBg' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/PreExamCheck.vue
+  370:1  error  Function "runStorageAudit" matches the pattern of centralized utility "file-size" (useFormatters). Use the composable import instead  argus/no-duplicate-utils
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/ResilienceIndicator.vue
+   51:29  error  Expected to return a value in computed function                                        vue/return-in-computed-property
+  101:7   error  'showBanner' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/ReviewPanel.vue
+  50:12  error  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  50:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  77:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/SecondaryCamSetup.vue
+  26:17  error  'errorBg' is assigned a value but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+  26:26  error  'successBg' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  26:37  error  'warningBg' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  26:48  error  'accentBg' is assigned a value but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/SecurityShield.vue
+  161:1  error  Function "statusColor" matches the pattern of centralized utility "status-switch" (useStatusHelpers). Use the composable import instead  argus/no-duplicate-utils
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/StudentConnectionBanner.vue
+  56:30  error  Expected to return a value in computed function  vue/return-in-computed-property
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/VideoPlayer.vue
+   26:4   error  This overload and the one on line 25 can be combined into one signature taking `'connected' | 'disconnected'`  @typescript-eslint/unified-signatures
+  117:17  error  Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+  148:29  error  Expected to return a value in computed function                                                                vue/return-in-computed-property
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/inspector/FocusModeView.vue
+  22:9   error  'isDark' is assigned a value but never used. Allowed unused vars must match /^_/u     @typescript-eslint/no-unused-vars
+  22:37  error  'successBg' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/inspector/InspectorCell.vue
+  25:4  error  These overloads can be combined into one signature taking `'focus' | 'filter'`  @typescript-eslint/unified-signatures
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/components/inspector/InspectorGrid.vue
+  10:34  error  'GridDensity' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useAntiSpoofing.ts
+  31:15  error  'computed' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  77:15  error  Unexpected any. Specify a different type                                    @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useAudioEngine.ts
+  214:25  error  This line has 14 statements. Maximum allowed is 1                                           @stylistic/max-statements-per-line
+  316:11  error  'broadbandEnergy' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useBrowserIntegrity.ts
+   21:15  error  'onMounted' is defined but never used. Allowed unused vars must match /^_/u    @typescript-eslint/no-unused-vars
+   21:26  error  'onUnmounted' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   69:15  error  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+  151:34  error  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+  166:18  error  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+  166:61  error  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useDeviceFingerprint.ts
+  209:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  257:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  275:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useLivenessChallenge.ts
+   25:30  error  'Ref' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  117:15  error  Unexpected any. Specify a different type                               @typescript-eslint/no-explicit-any
+  298:26  error  This line has 3 statements. Maximum allowed is 1                       @stylistic/max-statements-per-line
+  299:26  error  This line has 3 statements. Maximum allowed is 1                       @stylistic/max-statements-per-line
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useLowSpecMode.ts
+  28:32  error  'onMounted' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useOfflineQueue.ts
+  48:49  error  'OPFSStorageStats' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useProctoringAlerts.ts
+  58:3  error  'isCriticalEvent' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useResilience.ts
+   33:32  error  'OfflineQueueWriter' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   37:69  error  'TelemetryMode' is defined but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+  430:15  error  '$grpc' is assigned a value but never used. Allowed unused vars must match /^_/u      @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useSecondaryCam.ts
+   19:3   error  'SidecamCalibrationStatus' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  154:19  error  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+  168:19  error  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+  188:19  error  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useSecurityShield.ts
+  178:13  error  'current' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useSnapshotCapture.ts
+  169:13  error  'hash' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useVirtualCameraDetector.ts
+  21:15  error  'computed' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  78:15  error  Unexpected any. Specify a different type                                    @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/composables/useVisionEngine.ts
+  115:7   error  'MODEL_POINTS_3D' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  197:9   error  'mouthMidY' is assigned a value but never used. Allowed unused vars must match /^_/u        @typescript-eslint/no-unused-vars
+  379:17  error  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+  629:26  error  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/lib/grpc/interceptors.ts
+  205:9  error  'MAX_LATENCY_SAMPLES' is assigned a value but never used. Allowed unused vars must match /^_/u                                    @typescript-eslint/no-unused-vars
+  206:7  error  'latencyIndex' is assigned a value but never used. Allowed unused vars must match /^_/u                                           @typescript-eslint/no-unused-vars
+  349:1  error  Function "formatBytes" matches the pattern of centralized utility "file-size" (useFormatters). Use the composable import instead  argus/no-duplicate-utils
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/lib/proto/types.ts
+  82:3  error  Duplicate enum member value 50  @typescript-eslint/no-duplicate-enum-values
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/lib/storage/opfs.ts
+  122:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  217:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/analytics.vue
+   5:58  error  'purpleBg' is assigned a value but never used. Allowed unused vars must match /^_/u            @typescript-eslint/no-unused-vars
+   6:10  error  'cyanBg' is defined but never used. Allowed unused vars must match /^_/u                       @typescript-eslint/no-unused-vars
+  60:7   error  'maxMonthlySessions' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/api.vue
+   10:9   error  'isDark' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  166:22  error  This line has 2 statements. Maximum allowed is 1                                   @stylistic/max-statements-per-line
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/appeals.vue
+  25:7  error  'authStore' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/archive.vue
+   38:1   error  Function "sourceColor" is a centralized utility in useStatusHelpers. Import it instead of redefining locally        argus/no-duplicate-utils
+   41:1   error  Function "integrityGradient" is a centralized utility in useStatusHelpers. Import it instead of redefining locally  argus/no-duplicate-utils
+   92:7   error  'archiveExamOptions' is assigned a value but never used. Allowed unused vars must match /^_/u                       @typescript-eslint/no-unused-vars
+  160:22  error  This line has 2 statements. Maximum allowed is 1                                                                    @stylistic/max-statements-per-line
+  164:24  error  This line has 2 statements. Maximum allowed is 1                                                                    @stylistic/max-statements-per-line
+  200:14  error  '_e' is defined but never used                                                                                      @typescript-eslint/no-unused-vars
+  219:14  error  '_e' is defined but never used                                                                                      @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/dashboard/exams.vue
+   66:202  error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+   96:10   error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+  101:24   error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+  102:17   error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+  343:21   error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+  370:22   error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+  440:38   error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+  507:29   error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/dashboard/executive.vue
+   24:7   error  'toast' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   67:12  error  'e' is defined but never used                                                     @typescript-eslint/no-unused-vars
+   67:15  error  Unexpected any. Specify a different type                                          @typescript-eslint/no-explicit-any
+  145:22  error  Unexpected any. Specify a different type                                          @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/dashboard/exports.vue
+  4:7   error  'authStore' is assigned a value but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+  6:40  error  'formatFileSize' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/dashboard/index.vue
+   2:34  error  'ActiveExam' is defined but never used. Allowed unused vars must match /^_/u      @typescript-eslint/no-unused-vars
+   2:51  error  'ViolationAlert' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  48:22  error  This line has 2 statements. Maximum allowed is 1                                  @stylistic/max-statements-per-line
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/dashboard/infrastructure.vue
+  58:11  error  'msg' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/dashboard/regions.vue
+  19:1  error  Function "integrityGradient" is a centralized utility in useStatusHelpers. Import it instead of redefining locally  argus/no-duplicate-utils
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/dashboard/violations.vue
+   38:1   error  Function "severityBg" is a centralized utility in useStatusHelpers. Import it instead of redefining locally     argus/no-duplicate-utils
+   46:1   error  Function "severityColor" is a centralized utility in useStatusHelpers. Import it instead of redefining locally  argus/no-duplicate-utils
+  135:22  error  This line has 2 statements. Maximum allowed is 1                                                                @stylistic/max-statements-per-line
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/docs.vue
+  143:60  error  Unnecessary escape character: \/  no-useless-escape
+  170:2   error  Unnecessary escape character: \/  no-useless-escape
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/forensic.vue
+  19:3   error  'ForensicIntegrityScore' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  22:10  error  'integrityColor' is defined but never used. Allowed unused vars must match /^_/u          @typescript-eslint/no-unused-vars
+  59:15  error  Unexpected any. Specify a different type                                                  @typescript-eslint/no-explicit-any
+  83:15  error  Unexpected any. Specify a different type                                                  @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/index.vue
+  140:29   error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+  140:60   error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+  145:112  error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+  157:27   error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+  642:24   error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/integrations.vue
+  150:22  error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/monitoring.vue
+  27:9   error  'isDark' is assigned a value but never used. Allowed unused vars must match /^_/u         @typescript-eslint/no-unused-vars
+  44:7   error  'actionLoading' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  71:15  error  Unexpected any. Specify a different type                                                  @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/organizations.vue
+  122:22  error  This line has 2 statements. Maximum allowed is 1                             @stylistic/max-statements-per-line
+  369:24  error  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+  387:10  error  'planColor' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/pages/student-guide.vue
+  160:22  error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+  167:26  error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+  171:26  error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/stores/useAuthStore.ts
+  96:33  error  'password' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/stores/useInspectorStore.ts
+  21:10  error  'Severity' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/stores/useTelemetryStore.ts
+  46:39  error  'onUnmounted' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/app/workers/telemetry.worker.ts
+  176:18  error  This line has 3 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+  207:23  error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/eslint-rules/no-duplicate-utils.js
+  37:9  error  Function "create" matches the pattern of centralized utility "date-formatter" (useFormatters). Use the composable import instead  argus/no-duplicate-utils
+  37:9  error  Function "create" matches the pattern of centralized utility "date-formatter" (useFormatters). Use the composable import instead  argus/no-duplicate-utils
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/tests/resiliency/offline_sync.spec.ts
+  44:10  error  'buildTestEvent' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+/Users/aidos/Desktop/argus_ai/argus-frontend/tests/resiliency/tiered_logic.spec.ts
+  100:17  error  Unexpected any. Specify a different type          @typescript-eslint/no-explicit-any
+  506:46  error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+  508:54  error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+  509:42  error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+  510:56  error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+  511:44  error  This line has 2 statements. Maximum allowed is 1  @stylistic/max-statements-per-line
+
+✖ 149 problems (149 errors, 0 warnings)
+

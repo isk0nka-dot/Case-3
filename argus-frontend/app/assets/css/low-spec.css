@@ -1,0 +1,125 @@
+/* =============================================================================
+ * Argus AI — Low-Spec Device CSS Overrides
+ * =============================================================================
+ *
+ * When the <html> element has the 'low-spec-mode' class, these rules override
+ * all CSS animations, transitions, backdrop-filter, and other GPU-intensive
+ * visual effects. This reduces CPU/GPU load on low-spec devices.
+ *
+ * Activated by: useLowSpecMode composable (manual toggle or auto-detect)
+ * Removed by:   useLowSpecMode.disable()
+ *
+ * Categories disabled:
+ *   1. CSS animations (animation-duration: 0s)
+ *   2. CSS transitions (transition-duration: 0s)
+ *   3. Backdrop filters (blur, saturate)
+ *   4. WebGL / effect canvases
+ *   5. Smooth scrolling (forced to 'auto')
+ *   6. Box shadows on frequently repainted elements
+ *   7. CSS filters (blur, brightness)
+ * ============================================================================= */
+
+/* ---------------------------------------------------------------------------
+ * 1. Disable ALL animations and transitions
+ *
+ * Uses !important to override component-scoped styles. The * selector ensures
+ * no nested element can trigger a reflow-causing animation.
+ * Also disables ::before and ::after pseudo-elements which are common
+ * animation targets (loading spinners, ripple effects).
+ * --------------------------------------------------------------------------- */
+.low-spec-mode,
+.low-spec-mode *,
+.low-spec-mode *::before,
+.low-spec-mode *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * 2. Disable backdrop-filter (very GPU intensive)
+ *
+ * backdrop-filter: blur() triggers a full-layer composite on every paint.
+ * This is the single most expensive CSS property on low-spec devices.
+ * --------------------------------------------------------------------------- */
+.low-spec-mode,
+.low-spec-mode * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. Hide WebGL and effect canvases
+ *
+ * Background effect canvases (particles, gradients, noise) are hidden
+ * entirely. Video and capture canvases are NOT affected.
+ * --------------------------------------------------------------------------- */
+.low-spec-mode canvas.effect-canvas,
+.low-spec-mode canvas[data-effect],
+.low-spec-mode .background-effect {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * 4. Force auto scroll behavior (disable smooth scrolling)
+ *
+ * smooth scrolling uses requestAnimationFrame internally which competes
+ * with proctoring telemetry and video capture for CPU time.
+ * --------------------------------------------------------------------------- */
+.low-spec-mode {
+  scroll-behavior: auto !important;
+}
+
+.low-spec-mode * {
+  scroll-behavior: auto !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * 5. Reduce box-shadow complexity
+ *
+ * Multi-layer box shadows with blur cause expensive GPU compositing.
+ * Simplified to a single 1px solid border equivalent.
+ * Only applied to common UI elements, not all elements.
+ * --------------------------------------------------------------------------- */
+.low-spec-mode .card,
+.low-spec-mode .modal,
+.low-spec-mode .dropdown-menu,
+.low-spec-mode .popover,
+.low-spec-mode .tooltip,
+.low-spec-mode [class*="shadow"] {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * 6. Disable CSS filters on decorative elements
+ *
+ * filter: blur() and filter: brightness() trigger GPU layer creation.
+ * Disabled on decorative elements only (not on functional elements like
+ * video overlays that need blur for privacy).
+ * --------------------------------------------------------------------------- */
+.low-spec-mode .decorative-blur,
+.low-spec-mode [data-decorative] {
+  filter: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * 7. Reduce will-change usage
+ *
+ * will-change creates GPU layers. On low-spec devices, too many layers
+ * cause memory pressure and actually hurt performance.
+ * --------------------------------------------------------------------------- */
+.low-spec-mode *:not(video):not(.video-container) {
+  will-change: auto !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * 8. Disable pointer-events on decorative overlays
+ *
+ * Decorative overlays (gradients, noise textures) that don't need
+ * interaction should not trigger hit-testing.
+ * --------------------------------------------------------------------------- */
+.low-spec-mode .decorative-overlay {
+  pointer-events: none !important;
+}

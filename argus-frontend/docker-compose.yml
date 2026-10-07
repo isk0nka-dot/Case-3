@@ -1,0 +1,15 @@
+services:
+  frontend:
+    image: argus/frontend:latest
+    container_name: argus-frontend-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NUXT_PUBLIC_API_BASE_URL=https://argusai.kz
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
