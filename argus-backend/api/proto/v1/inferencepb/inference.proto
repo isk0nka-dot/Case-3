@@ -1,0 +1,178 @@
+syntax = "proto3";
+
+package argus.inference.v1;
+
+option go_package = "github.com/argus-ai/event-collector/api/proto/v1/inferencepb";
+
+// ============================================================================
+//  INFERENCE SERVICE
+//  GPU-accelerated backend AI inference for face recognition, object detection,
+//  liveness verification, and deep fraud analysis. Accepts raw frames or video
+//  segments and returns structured detection results.
+//
+//  This service runs as a standalone binary (cmd/inference) and is called by
+//  the Argus Worker for post-session deep scans, or directly by the API server
+//  for real-time frame analysis.
+// ============================================================================
+
+service InferenceService {
+  // AnalyzeFrame processes a single image frame and returns face detections,
+  // object detections, and liveness verification results.
+  rpc AnalyzeFrame(AnalyzeFrameRequest) returns (AnalyzeFrameResponse);
+
+  // AnalyzeVideo accepts a client-streamed video segment (WebM/MP4 chunks)
+  // and returns frame-by-frame analysis with an aggregate fraud summary.
+  // Used by the Worker for post-session deep scans.
+  rpc AnalyzeVideo(stream AnalyzeVideoChunk) returns (AnalyzeVideoResponse);
+}
+
+// ============================================================================
+//  REQUEST / RESPONSE MESSAGES
+// ============================================================================
+
+message AnalyzeFrameRequest {
+  // Session context for correlation with proctoring events.
+  string session_id = 1;
+  string student_id = 2;
+  string exam_id = 3;
+  string org_id = 4;
+
+  // Raw image bytes (JPEG or PNG).
+  bytes frame_data = 5;
+
+  // MIME type of the frame data ("image/jpeg" or "image/png").
+  string content_type = 6;
+
+  // Position in the session recording (seconds from session start).
+  double video_timestamp_sec = 7;
+
+  // Enrolled ArcFace embedding used to compute identity similarity.
+  repeated float reference_embedding = 8;
+}
+
+message AnalyzeFrameResponse {
+  // All faces detected in the frame.
+  repeated FaceDetection faces = 1;
+
+  // All objects detected in the frame.
+  repeated ObjectDetection objects = 2;
+
+  // Liveness verification result for the primary face.
+  LivenessResult liveness = 3;
+
+  // Server-side processing latency in milliseconds.
+  double processing_time_ms = 4;
+}
+
+message AnalyzeVideoChunk {
+  // Session context (only required on the first chunk).
+  string session_id = 1;
+  string org_id = 2;
+
+  // Raw video bytes (partial or complete segment).
+  bytes data = 3;
+
+  // MIME type of the video ("video/webm" or "video/mp4").
+  string content_type = 4;
+
+  // True if this is the final chunk in the stream.
+  bool is_last = 5;
+}
+
+message AnalyzeVideoResponse {
+  // Per-frame analysis results (sampled at the configured frame rate).
+  repeated FrameAnalysis frames = 1;
+
+  // Aggregate summary across all analyzed frames.
+  AnalysisSummary summary = 2;
+
+  // Total server-side processing time in milliseconds.
+  double total_processing_time_ms = 3;
+}
+
+// ============================================================================
+//  DETECTION RESULT MESSAGES
+// ============================================================================
+
+message FrameAnalysis {
+  // Timestamp in seconds from the start of the video segment.
+  double timestamp_sec = 1;
+
+  repeated FaceDetection faces = 2;
+  repeated ObjectDetection objects = 3;
+  LivenessResult liveness = 4;
+}
+
+message FaceDetection {
+  // Detection confidence (0.0 - 1.0).
+  float confidence = 1;
+
+  // Bounding box coordinates (normalized 0-1).
+  float bbox_x = 2;
+  float bbox_y = 3;
+  float bbox_w = 4;
+  float bbox_h = 5;
+
+  // 512-dimensional ArcFace embedding vector.
+  repeated float embedding = 6;
+
+  // Cosine similarity to the enrolled face (-1.0 if not computed).
+  float similarity = 7;
+
+  // Anti-spoofing result.
+  bool is_spoof = 8;
+  string spoof_type = 9;  // "photo" | "video" | "mask" | "deepfake" | ""
+
+  // Head pose angles in degrees.
+  float head_yaw = 10;
+  float head_pitch = 11;
+  float head_roll = 12;
+}
+
+message ObjectDetection {
+  // Object class label.
+  string object_type = 1;  // "phone" | "book" | "earbuds" | "screen_reflection" | "person"
+
+  // Detection confidence (0.0 - 1.0).
+  float confidence = 2;
+
+  // Bounding box coordinates (normalized 0-1).
+  float bbox_x = 3;
+  float bbox_y = 4;
+  float bbox_w = 5;
+  float bbox_h = 6;
+}
+
+message LivenessResult {
+  // Liveness score (0.0 = definite spoof, 1.0 = definitely live).
+  float score = 1;
+
+  // Binary liveness decision.
+  bool is_live = 2;
+
+  // Method used for liveness detection.
+  string method = 3;  // "texture" | "blink" | "depth"
+}
+
+message AnalysisSummary {
+  // Total number of frames analyzed in the video.
+  int32 total_frames_analyzed = 1;
+
+  // Count of frames where fraud indicators were detected.
+  int32 fraud_frames = 2;
+
+  // Count of frames where the face did not match the enrolled identity.
+  int32 face_mismatch_frames = 3;
+
+  // Count of frames where spoofing was detected.
+  int32 spoof_frames = 4;
+
+  // Count of frames where prohibited objects were detected.
+  int32 object_detection_frames = 5;
+
+  // Maximum fraud confidence across all frames (0.0 - 1.0).
+  float max_fraud_confidence = 6;
+
+  // Aggregate verdict for the entire video segment.
+  string verdict = 7;  // "clean" | "suspicious" | "fraud"
+}

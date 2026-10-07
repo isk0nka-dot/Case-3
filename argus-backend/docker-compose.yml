@@ -1,0 +1,321 @@
+services:
+  db:
+    image: postgres:15
+    container_name: argus-db
+    restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1g
+    init: true
+    environment:
+      POSTGRES_DB: ${ARGUS_POSTGRES_DB:-argus_db}
+      POSTGRES_USER: ${ARGUS_POSTGRES_USER:-argus}
+      POSTGRES_PASSWORD: ${ARGUS_POSTGRES_PASSWORD:?ARGUS_POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: argus-clickhouse
+    restart: unless-stopped
+    mem_limit: 1500m
+    memswap_limit: 1500m
+    environment:
+      CLICKHOUSE_USER: ${ARGUS_CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${ARGUS_CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_DB: ${ARGUS_CLICKHOUSE_DATABASE:-argus_analytics}
+    ports:
+      - "127.0.0.1:${ARGUS_CLICKHOUSE_HTTP_PORT:-8123}:8123"
+      - "127.0.0.1:${ARGUS_CLICKHOUSE_NATIVE_PORT:-9000}:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: argus-zookeeper
+    restart: unless-stopped
+    mem_limit: 256m
+    memswap_limit: 256m
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: argus-kafka
+    restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1g
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: argus-redis
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction
+    volumes:
+      - redis_data:/data
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: argus-minio
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${ARGUS_MINIO_ROOT_USER:-argus-minio-admin}
+      MINIO_ROOT_PASSWORD: ${ARGUS_MINIO_ROOT_PASSWORD:?ARGUS_MINIO_ROOT_PASSWORD is required}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  minio-init:
+    image: minio/mc:RELEASE.2024-11-21T17-21-54Z
+    container_name: argus-minio-init
+    depends_on:
+      - minio
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do
+          sleep 2
+        done
+        mc mb --ignore-existing local/"$${ARGUS_MINIO_BUCKET}"
+        mc mb --ignore-existing local/"$${ARGUS_MINIO_EXPORT_BUCKET}"
+    environment:
+      MINIO_ROOT_USER: ${ARGUS_MINIO_ROOT_USER:-argus-minio-admin}
+      MINIO_ROOT_PASSWORD: ${ARGUS_MINIO_ROOT_PASSWORD:?ARGUS_MINIO_ROOT_PASSWORD is required}
+      ARGUS_MINIO_BUCKET: ${ARGUS_MINIO_BUCKET:-argus-evidence}
+      ARGUS_MINIO_EXPORT_BUCKET: ${ARGUS_MINIO_EXPORT_BUCKET:-argus-exports}
+
+  livekit:
+    image: livekit/livekit-server:v1.8.3
+    container_name: argus-livekit
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
+    ports:
+      - "127.0.0.1:7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-argus-livekit-prod}: ${LIVEKIT_API_SECRET:-argus-livekit-secret-production-2026-secure-key}"
+      LIVEKIT_REDIS_ADDRESS: redis:6379
+      LIVEKIT_RTC_TCP_PORT: "7881"
+      LIVEKIT_RTC_PORT_RANGE_START: "7882"
+      LIVEKIT_RTC_PORT_RANGE_END: "7882"
+      LIVEKIT_WEBHOOK_URLS: "http://app:8080/api/v1/livekit/webhook"
+      LIVEKIT_WEBHOOK_API_KEY: "${LIVEKIT_API_KEY:-argus-livekit-prod}"
+    depends_on:
+      - redis
+
+  livekit-egress:
+    image: livekit/egress:v1.9.0
+    container_name: argus-livekit-egress
+    restart: unless-stopped
+    mem_limit: 2g
+    memswap_limit: 2g
+    environment:
+      EGRESS_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY:-argus-livekit-prod}
+        api_secret: ${LIVEKIT_API_SECRET:-argus-livekit-secret-production-2026-secure-key}
+        ws_url: ws://livekit:7880
+        insecure: true
+        redis:
+          address: redis:6379
+        logging:
+          level: info
+        storage:
+          s3:
+            endpoint: http://minio:9000
+            access_key: ${ARGUS_MINIO_ROOT_USER:-argus-minio-admin}
+            secret: ${ARGUS_MINIO_ROOT_PASSWORD}
+            bucket: ${ARGUS_MINIO_EXPORT_BUCKET:-argus-exports}
+            region: us-east-1
+            force_path_style: true
+    depends_on:
+      - livekit
+      - redis
+      - minio
+
+  ai-sidecar:
+    build:
+      context: ./ai-sidecar
+      dockerfile: Dockerfile
+    container_name: argus-ai-sidecar
+    restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1g
+    init: true
+    volumes:
+      - ./models:/models:ro
+    environment:
+      ONNX_MODELS_PATH: /models
+      MODEL_FAIL_FAST: ${MODEL_FAIL_FAST:-true}
+      YOLO_MODEL_FILE: ${YOLO_MODEL_FILE:-yolov8n.onnx}
+      ARCFACE_MODEL_FILE: ${ARCFACE_MODEL_FILE:-arcface.onnx}
+      YOLO_CONFIDENCE_THRESHOLD: ${YOLO_CONFIDENCE_THRESHOLD:-0.35}
+      FACE_MISMATCH_THRESHOLD: ${FACE_MISMATCH_THRESHOLD:-0.62}
+      AUDIO_VAD_THRESHOLD: ${AUDIO_VAD_THRESHOLD:-0.65}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8091/healthz')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  inference:
+    build:
+      context: .
+      dockerfile: Dockerfile.inference
+    container_name: argus-inference
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
+    init: true
+    depends_on:
+      - ai-sidecar
+    volumes:
+      - ./deployments/config.yaml:/app/deployments/config.yaml:ro
+    ports:
+      - "127.0.0.1:${ARGUS_INFERENCE_GRPC_PORT:-50061}:50061"
+    environment:
+      EVENT_COLLECTOR_INFERENCE_GRPC_HOST: 0.0.0.0
+      EVENT_COLLECTOR_INFERENCE_GRPC_PORT: 50061
+      EVENT_COLLECTOR_INFERENCE_ENGINE_TYPE: python_bridge
+      EVENT_COLLECTOR_INFERENCE_ALLOW_STUB: "false"
+      EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL: http://ai-sidecar:8091
+      EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC: ${FRAME_EXTRACTION_INTERVAL_SEC:-4}
+      EVENT_COLLECTOR_LOG_LEVEL: ${EVENT_COLLECTOR_LOG_LEVEL:-info}
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: argus-worker
+    restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1g
+    init: true
+    depends_on:
+      - db
+      - kafka
+      - clickhouse
+      - redis
+      - minio-init
+      - inference
+    volumes:
+      - ./deployments/config.yaml:/app/deployments/config.yaml:ro
+      - argus_dlq:/data/argus-dlq
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GROUP_ID:-110}"
+    environment:
+      EVENT_COLLECTOR_KAFKA_BROKERS: kafka:9092
+      EVENT_COLLECTOR_PG_HOST: db
+      EVENT_COLLECTOR_PG_DATABASE: ${ARGUS_POSTGRES_DB:-argus_db}
+      EVENT_COLLECTOR_PG_USERNAME: ${ARGUS_POSTGRES_USER:-argus}
+      EVENT_COLLECTOR_PG_PASSWORD: ${ARGUS_POSTGRES_PASSWORD:?ARGUS_POSTGRES_PASSWORD is required}
+      EVENT_COLLECTOR_CH_ADDRS: clickhouse:9000
+      EVENT_COLLECTOR_CH_DATABASE: ${ARGUS_CLICKHOUSE_DATABASE:-argus_analytics}
+      EVENT_COLLECTOR_CH_USERNAME: ${ARGUS_CLICKHOUSE_USER:-default}
+      EVENT_COLLECTOR_CH_PASSWORD: ${ARGUS_CLICKHOUSE_PASSWORD:-}
+      EVENT_COLLECTOR_REDIS_ADDR: redis:6379
+      EVENT_COLLECTOR_INFERENCE_GRPC_HOST: inference
+      EVENT_COLLECTOR_INFERENCE_GRPC_PORT: 50061
+      EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC: ${FRAME_EXTRACTION_INTERVAL_SEC:-4}
+      EVENT_COLLECTOR_MINIO_ENDPOINT: minio:9000
+      EVENT_COLLECTOR_MINIO_ACCESS_KEY: ${ARGUS_MINIO_ROOT_USER:-argus-minio-admin}
+      EVENT_COLLECTOR_MINIO_SECRET_KEY: ${ARGUS_MINIO_ROOT_PASSWORD:?ARGUS_MINIO_ROOT_PASSWORD is required}
+      EVENT_COLLECTOR_MINIO_BUCKET: ${ARGUS_MINIO_BUCKET:-argus-evidence}
+      EVENT_COLLECTOR_DLQ_ENABLED: "true"
+      EVENT_COLLECTOR_DLQ_DATA_DIR: /data/argus-dlq
+      EVENT_COLLECTOR_LOG_LEVEL: ${EVENT_COLLECTOR_LOG_LEVEL:-info}
+
+  app:
+    build: .
+    container_name: argus-backend-app
+    restart: unless-stopped
+    mem_limit: 2g
+    memswap_limit: 2g
+    init: true
+    depends_on:
+      - db
+      - kafka
+      - clickhouse
+      - redis
+      - minio-init
+      - ai-sidecar
+    volumes:
+      - ./deployments/config.yaml:/app/deployments/config.yaml:ro
+      - argus_dlq:/data/argus-dlq
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "127.0.0.1:${ARGUS_BACKEND_HTTP_PORT:-8080}:8080"
+    group_add:
+      - "${DOCKER_GROUP_ID:-110}"
+    environment:
+      EVENT_COLLECTOR_KAFKA_BROKERS: kafka:9092
+      EVENT_COLLECTOR_PG_HOST: db
+      EVENT_COLLECTOR_PG_DATABASE: ${ARGUS_POSTGRES_DB:-argus_db}
+      EVENT_COLLECTOR_PG_USERNAME: ${ARGUS_POSTGRES_USER:-argus}
+      EVENT_COLLECTOR_PG_PASSWORD: ${ARGUS_POSTGRES_PASSWORD:?ARGUS_POSTGRES_PASSWORD is required}
+      EVENT_COLLECTOR_HTTP_PORT: 8080
+      EVENT_COLLECTOR_CH_ADDRS: clickhouse:9000
+      EVENT_COLLECTOR_CH_DATABASE: ${ARGUS_CLICKHOUSE_DATABASE:-argus_analytics}
+      EVENT_COLLECTOR_CH_USERNAME: ${ARGUS_CLICKHOUSE_USER:-default}
+      EVENT_COLLECTOR_CH_PASSWORD: ${ARGUS_CLICKHOUSE_PASSWORD:-}
+      EVENT_COLLECTOR_REDIS_ADDR: redis:6379
+      EVENT_COLLECTOR_JWT_SIGNING_KEY: ${EVENT_COLLECTOR_JWT_SIGNING_KEY:?EVENT_COLLECTOR_JWT_SIGNING_KEY is required}
+      EVENT_COLLECTOR_CORS_ORIGINS: ${EVENT_COLLECTOR_CORS_ORIGINS:-https://argusai.kz,https://www.argusai.kz}
+      EVENT_COLLECTOR_LOG_LEVEL: ${EVENT_COLLECTOR_LOG_LEVEL:-info}
+      ARGUS_SDK_URL: ${ARGUS_SDK_URL:-https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js}
+      EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL: http://ai-sidecar:8091
+      EVENT_COLLECTOR_MINIO_ENDPOINT: minio:9000
+      EVENT_COLLECTOR_MINIO_ACCESS_KEY: ${ARGUS_MINIO_ROOT_USER:-argus-minio-admin}
+      EVENT_COLLECTOR_MINIO_SECRET_KEY: ${ARGUS_MINIO_ROOT_PASSWORD:?ARGUS_MINIO_ROOT_PASSWORD is required}
+      EVENT_COLLECTOR_MINIO_BUCKET: ${ARGUS_MINIO_BUCKET:-argus-evidence}
+      EVENT_COLLECTOR_DLQ_ENABLED: "true"
+      EVENT_COLLECTOR_DLQ_DATA_DIR: /data/argus-dlq
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-}
+      LIVEKIT_WS_URL: ${LIVEKIT_WS_URL:-ws://livekit:7880}
+      LIVEKIT_PUBLIC_WS_URL: ${LIVEKIT_PUBLIC_WS_URL:-wss://argusai.kz/livekit}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  clickhouse_logs:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:
+  minio_data:
+  redis_data:
+  argus_dlq:

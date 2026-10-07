@@ -1,0 +1,1258 @@
+openapi: "3.0.3"
+info:
+  title: Argus AI Proctoring — External API
+  version: "1.0.0"
+  description: |
+    REST API for LMS partners to integrate Argus AI exam proctoring.
+
+    ## Authentication
+    All External API endpoints use API key authentication via headers:
+    - `X-CLIENT-ID`: Your key ID
+    - `X-API-KEY`: Your secret key
+
+    Student-facing endpoints (event ingestion, media token, recording-ready)
+    use `Authorization: Bearer <argusSessionToken>` obtained from session create.
+
+    ## Quick Start
+    1. Create a session → get `argusSessionToken` + `sdkUrl`
+    2. Load SDK from `sdkUrl`, initialize with `argusSessionToken`
+    3. Student runs preflight → starts session → events flow to backend
+    4. Receive `verdict.ready` webhook when exam is analyzed
+    5. Fetch JSON or PDF report
+
+  contact:
+    name: Argus AI Support
+    url: https://argusai.kz
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://argusai.kz
+    description: Production
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Sessions
+    description: Create and manage proctoring sessions
+  - name: Events
+    description: Student event ingestion (session token auth)
+  - name: Reports
+    description: Session reports and verdicts
+  - name: Webhooks
+    description: Webhook endpoint management
+  - name: Enrollment
+    description: Student biometric enrollment (face identity)
+  - name: Media
+    description: LiveKit media tokens and recording
+  - name: LTI
+    description: LTI 1.3 integration for Moodle/Canvas
+  - name: Sidecam
+    description: Secondary mobile camera pairing, health, and telemetry
+  - name: Admin
+    description: Admin operations for privacy, retention, and organization management
+
+# ── Security Schemes ─────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-CLIENT-ID
+      description: |
+        Use both X-CLIENT-ID and X-API-KEY headers together.
+        Example:
+          X-CLIENT-ID: key_abc123
+          X-API-KEY: secret_xyz789
+    SessionTokenAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: argusSessionToken from POST /api/v1/external/sessions
+    DashboardBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Admin/proctor dashboard JWT.
+    DeviceTokenAuth:
+      type: apiKey
+      in: header
+      name: X-Device-Token
+      description: Device token returned by POST /api/v1/sidecam/pair/complete.
+    SidecamSessionHeader:
+      type: apiKey
+      in: header
+      name: X-Session-ID
+      description: Session id required with X-Device-Token for mobile sidecam endpoints.
+
+  schemas:
+    SessionCreate:
+      type: object
+      required: [examId, studentId]
+      properties:
+        examId:
+          type: string
+          example: "exam-math-2026-001"
+        studentId:
+          type: string
+          example: "student-12345"
+        studentName:
+          type: string
+          example: "Askar Nurzhanov"
+        examName:
+          type: string
+          example: "Mathematics Final Exam"
+        callbackUrl:
+          type: string
+          format: uri
+          example: "https://lms.example.kz/argus/callback"
+        durationMin:
+          type: integer
+          minimum: 10
+          maximum: 480
+          default: 240
+          example: 120
+        referencePhotoUrl:
+          type: string
+          format: uri
+          description: URL of student's reference photo for face identity verification
+          example: "https://lms.example.kz/photos/student-12345.jpg"
+
+    SessionCreateResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          example: "ses_a1b2c3d4e5f6"
+        argusSessionToken:
+          type: string
+          description: JWT token to pass to the SDK
+          example: "eyJhbGciOiJIUzI1NiIs..."
+        sdkUrl:
+          type: string
+          format: uri
+          example: "https://cdn.argusai.kz/sdk/v1/argus-sdk.umd.js"
+        expiresAt:
+          type: string
+          format: date-time
+          example: "2026-06-01T16:00:00Z"
+
+    SessionStatus:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        status:
+          type: string
+          enum: [created, active, completed, cancelled, expired]
+        verdict:
+          type: string
+          enum: [clean, suspicious, violation]
+          nullable: true
+        integrityScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          nullable: true
+        violationCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ExternalReport:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        examId:
+          type: string
+        studentId:
+          type: string
+        verdict:
+          type: string
+          enum: [clean, suspicious, violation]
+          nullable: true
+        integrityScore:
+          type: number
+          nullable: true
+        riskScore:
+          type: number
+          nullable: true
+        violationCount:
+          type: integer
+        reviewStatus:
+          type: string
+          enum: [pending, ready, cancelled, expired]
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineEvent'
+        aiDetections:
+          $ref: '#/components/schemas/AIDetections'
+          nullable: true
+        recordings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Recording'
+        reportUrl:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+
+    TimelineEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+        eventType:
+          type: string
+          example: "FACE_NOT_DETECTED"
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        source:
+          type: string
+          enum: [WEBCAM, SIDE_CAMERA, SYSTEM, BROWSER, KERNEL_AGENT, BACKEND_AI]
+        label:
+          type: string
+        confidence:
+          type: number
+          format: float
+        timestamp:
+          type: string
+          format: date-time
+        videoTimestamp:
+          type: integer
+          description: Seconds into the recording
+
+    AIDetections:
+      type: object
+      properties:
+        scanned:
+          type: boolean
+        identityVerified:
+          type: boolean
+          nullable: true
+        avgFaceSimilarity:
+          type: number
+          nullable: true
+        faceMismatchCount:
+          type: integer
+        livenessFailCount:
+          type: integer
+        deepfakeCount:
+          type: integer
+        screenReflectionCount:
+          type: integer
+        voiceSynthCount:
+          type: integer
+        avgLivenessScore:
+          type: number
+          nullable: true
+        objectDetections:
+          type: array
+          items:
+            type: object
+            properties:
+              objectType:
+                type: string
+                example: "phone"
+              count:
+                type: integer
+              maxConfidence:
+                type: number
+        backendEventCount:
+          type: integer
+
+    Recording:
+      type: object
+      properties:
+        egressId:
+          type: string
+        status:
+          type: string
+        roomName:
+          type: string
+        fileUrl:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+            enum: [session.started, session.completed, violation.detected, verdict.ready]
+        isActive:
+          type: boolean
+
+    EnrollmentStatus:
+      type: object
+      properties:
+        studentId:
+          type: string
+        enrolled:
+          type: boolean
+        enrolledBy:
+          type: string
+          enum: [lms, api, manual]
+          nullable: true
+        enrolledAt:
+          type: string
+          format: date-time
+          nullable: true
+        modelVersion:
+          type: string
+          nullable: true
+        embeddingDim:
+          type: integer
+          nullable: true
+
+    SidecamPairingPayload:
+      type: object
+      properties:
+        sid:
+          type: string
+          description: Argus session id.
+        tok:
+          type: string
+          description: One-time pairing token encoded in the QR payload.
+        url:
+          type: string
+          format: uri
+          description: Backend base URL for the mobile device.
+        exp:
+          type: integer
+          format: int64
+          description: Unix timestamp when pairing expires.
+
+    SidecamMobileDevice:
+      type: object
+      properties:
+        deviceModel:
+          type: string
+        osVersion:
+          type: string
+        batteryLevel:
+          type: number
+          minimum: 0
+          maximum: 1
+        isCharging:
+          type: boolean
+        thermalState:
+          type: string
+          enum: [nominal, fair, serious, critical]
+        fpsCurrent:
+          type: integer
+        fpsTarget:
+          type: integer
+        accelX:
+          type: number
+        accelY:
+          type: number
+        accelZ:
+          type: number
+        gyroMagnitude:
+          type: number
+
+    SidecamSession:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        studentId:
+          type: string
+        examId:
+          type: string
+        orgId:
+          type: string
+        policy:
+          type: string
+          enum: [disabled, optional, mandatory]
+        state:
+          type: string
+          enum: [pending, connected, calibrating, ready, disconnected, failed]
+        deviceToken:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+        deviceInfo:
+          $ref: '#/components/schemas/SidecamMobileDevice'
+
+    SidecamStreamHealth:
+      type: object
+      properties:
+        connected:
+          type: boolean
+        lastHeartbeat:
+          type: string
+          format: date-time
+        latencyMs:
+          type: integer
+        frameRate:
+          type: integer
+        droppedFrames:
+          type: integer
+        uptimeSec:
+          type: integer
+        quality:
+          type: string
+          enum: [excellent, good, degraded, critical]
+
+    RetentionCleanupRequest:
+      type: object
+      properties:
+        dryRun:
+          type: boolean
+          default: true
+          description: When true, only count matching records.
+        videoRetentionDays:
+          type: integer
+          default: 180
+          description: Retention period for LiveKit recording metadata.
+        auditRetentionDays:
+          type: integer
+          default: 365
+          description: Retention period for PostgreSQL audit_log rows.
+
+    RetentionCleanupResult:
+      type: object
+      properties:
+        orgId:
+          type: string
+        dryRun:
+          type: boolean
+        videoRetentionDays:
+          type: integer
+        auditRetentionDays:
+          type: integer
+        videoCutoff:
+          type: string
+          format: date-time
+        auditCutoff:
+          type: string
+          format: date-time
+        recordingsMatched:
+          type: integer
+          format: int64
+        recordingsDeleted:
+          type: integer
+          format: int64
+        auditMatched:
+          type: integer
+          format: int64
+        auditDeleted:
+          type: integer
+          format: int64
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Session not found"
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+paths:
+
+  # ── Admin ─────────────────────────────────────────────────────────────────
+
+  /api/v1/admin/organizations/{orgId}/retention/apply:
+    post:
+      tags: [Admin]
+      summary: Apply or dry-run retention cleanup for one organization
+      description: |
+        Counts or deletes old PostgreSQL retention data for an organization.
+        Current implementation removes audit_log rows and LiveKit recording
+        metadata only. Physical S3/MinIO object deletion is intentionally
+        handled separately because evidence buckets may use governance/WORM
+        retention.
+      security:
+        - DashboardBearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetentionCleanupRequest'
+      responses:
+        "200":
+          description: Retention cleanup summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionCleanupResult'
+
+  # ── Sessions ───────────────────────────────────────────────────────────────
+
+  /api/v1/external/sessions:
+    post:
+      tags: [Sessions]
+      summary: Create proctoring session
+      description: |
+        Creates a new proctoring session and returns a student session token
+        for the SDK. Pass `Idempotency-Key` header to safely retry on network
+        errors without creating duplicate sessions.
+
+        If `referencePhotoUrl` is provided, a background enrollment task is
+        queued to extract the student's ArcFace embedding for identity checks.
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          schema:
+            type: string
+            maxLength: 128
+          description: Unique key for safe retries (e.g. "exam-001:student-123:attempt-1")
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCreate'
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCreateResponse'
+        "200":
+          description: Idempotent replay — existing session returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCreateResponse'
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Invalid API key
+
+  /api/v1/external/sessions/{sessionId}:
+    get:
+      tags: [Sessions]
+      summary: Get session status
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionStatus'
+        "404":
+          description: Session not found
+
+  /api/v1/external/sessions/{sessionId}/complete:
+    post:
+      tags: [Sessions]
+      summary: Complete session with verdict
+      description: |
+        Marks the session as completed and triggers AI deep scan + webhook delivery.
+        The `verdict.ready` webhook is sent once analysis finishes.
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [verdict]
+              properties:
+                verdict:
+                  type: string
+                  enum: [clean, suspicious, violation]
+                integrityScore:
+                  type: number
+                  minimum: 0
+                  maximum: 100
+                violationCount:
+                  type: integer
+      responses:
+        "200":
+          description: Session completed
+        "404":
+          description: Session not found
+        "409":
+          description: Session already in terminal state
+
+  /api/v1/external/sessions/{sessionId}/cancel:
+    post:
+      tags: [Sessions]
+      summary: Cancel session
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session cancelled
+
+  # ── Reports ────────────────────────────────────────────────────────────────
+
+  /api/v1/external/sessions/{sessionId}/report:
+    get:
+      tags: [Reports]
+      summary: Get JSON report
+      description: Returns a JSON report with timeline, AI detections, and recordings.
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalReport'
+        "404":
+          description: Session not found
+
+  /api/v1/external/sessions/{sessionId}/report.pdf:
+    get:
+      tags: [Reports]
+      summary: Download bilingual PDF report (RU/KZ)
+      description: |
+        Generates and downloads a bilingual Russian/Kazakh PDF report suitable
+        for official documentation and appeals.
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: PDF report
+          headers:
+            X-Report-Hash:
+              schema:
+                type: string
+              description: SHA-256 hash of the PDF for integrity verification
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Session not found
+
+  # ── Events (session token auth) ────────────────────────────────────────────
+
+  /api/v1/external/events:
+    post:
+      tags: [Events]
+      summary: Ingest proctoring events from SDK
+      description: |
+        Used by the Argus SDK to push batches of proctoring events to the backend.
+        Requires `Authorization: Bearer <argusSessionToken>` (not API key).
+      security:
+        - SessionTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  items:
+                    type: object
+                    required: [eventType, severity, source, label, timestamp]
+                    properties:
+                      eventType:
+                        type: string
+                        example: "FACE_NOT_DETECTED"
+                      severity:
+                        type: string
+                        enum: [info, warning, critical]
+                      source:
+                        type: string
+                        enum: [WEBCAM, SIDE_CAMERA, SYSTEM, BROWSER, KERNEL_AGENT]
+                      label:
+                        type: string
+                      confidence:
+                        type: number
+                        default: 1.0
+                      timestamp:
+                        type: string
+                        format: date-time
+      responses:
+        "200":
+          description: Events accepted
+        "401":
+          description: Invalid session token
+
+  # ── Webhooks ───────────────────────────────────────────────────────────────
+
+  /api/v1/external/webhooks:
+    get:
+      tags: [Webhooks]
+      summary: List webhook endpoints
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Webhook'
+    post:
+      tags: [Webhooks]
+      summary: Register webhook endpoint
+      description: |
+        Webhooks are delivered with `X-Argus-Signature: sha256=<hmac>` header
+        for verification. Retry schedule: exponential backoff up to 5 attempts.
+
+        **Events:**
+        - `session.started` — student started preflight
+        - `session.completed` — session ended
+        - `violation.detected` — critical violation detected in real time
+        - `verdict.ready` — AI analysis complete, report available
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, url, events]
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                  format: uri
+                secret:
+                  type: string
+                  description: HMAC secret for signature verification
+                events:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "201":
+          description: Webhook created
+
+  /api/v1/external/webhooks/{webhookId}:
+    delete:
+      tags: [Webhooks]
+      summary: Delete webhook endpoint
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: webhookId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Webhook deleted
+
+  # ── Enrollment ─────────────────────────────────────────────────────────────
+
+  /api/v1/external/students/{studentId}/enroll:
+    post:
+      tags: [Enrollment]
+      summary: Enroll student with reference photo
+      description: |
+        Fetches the photo from `photoUrl`, runs ArcFace inference, and stores
+        the 512-dimensional embedding. Used for face identity verification
+        during AI deep scan. Processing is async (queued in background).
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [photoUrl]
+              properties:
+                photoUrl:
+                  type: string
+                  format: uri
+                  example: "https://lms.example.kz/photos/student-12345.jpg"
+                enrolledBy:
+                  type: string
+                  default: api
+      responses:
+        "202":
+          description: Enrollment queued
+
+  /api/v1/external/students/{studentId}/enrollment:
+    get:
+      tags: [Enrollment]
+      summary: Check enrollment status
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Enrollment status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentStatus'
+    delete:
+      tags: [Enrollment]
+      summary: Delete enrollment
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Enrollment deleted
+
+  # ── Media ──────────────────────────────────────────────────────────────────
+
+  /api/v1/external/sessions/{sessionId}/student-token:
+    post:
+      tags: [Media]
+      summary: Get LiveKit student token
+      description: Returns a LiveKit JWT token for the student to publish camera/audio.
+      security:
+        - SessionTokenAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: LiveKit token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  wsUrl:
+                    type: string
+                  room:
+                    type: string
+
+  /api/v1/external/sessions/{sessionId}/recording-ready:
+    post:
+      tags: [Media]
+      summary: Signal that student has joined LiveKit room
+      description: Triggers LiveKit egress recording. Call after SDK joins the room.
+      security:
+        - SessionTokenAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Recording started
+
+  # ── Sidecam ────────────────────────────────────────────────────────────────
+
+  /api/v1/sidecam/pair/initiate:
+    post:
+      tags: [Sidecam]
+      summary: Create QR pairing payload for a secondary mobile camera
+      security:
+        - DashboardBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, examId]
+              properties:
+                sessionId:
+                  type: string
+                studentId:
+                  type: string
+                examId:
+                  type: string
+                orgId:
+                  type: string
+                policy:
+                  type: string
+                  enum: [disabled, optional, mandatory]
+                  default: optional
+      responses:
+        "200":
+          description: QR payload generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session:
+                    $ref: '#/components/schemas/SidecamSession'
+                  qrData:
+                    type: string
+                    description: Serialized payload to encode into QR.
+                  payload:
+                    $ref: '#/components/schemas/SidecamPairingPayload'
+
+  /api/v1/sidecam/pair/complete:
+    post:
+      tags: [Sidecam]
+      summary: Complete QR pairing from the mobile browser
+      description: No dashboard JWT is required; the one-time pairing token authenticates the mobile device.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, pairingToken]
+              properties:
+                sessionId:
+                  type: string
+                pairingToken:
+                  type: string
+                device:
+                  $ref: '#/components/schemas/SidecamMobileDevice'
+      responses:
+        "200":
+          description: Device paired
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: paired
+                  session:
+                    $ref: '#/components/schemas/SidecamSession'
+                  deviceToken:
+                    type: string
+
+  /api/v1/sidecam/validate-start:
+    post:
+      tags: [Sidecam]
+      summary: Check whether exam start is allowed by sidecam policy
+      security:
+        - DashboardBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId:
+                  type: string
+                policy:
+                  type: string
+                  enum: [disabled, optional, mandatory]
+                  default: optional
+      responses:
+        "200":
+          description: Start decision
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allowed:
+                    type: boolean
+                  reason:
+                    type: string
+                    nullable: true
+
+  /api/v1/sidecam/media-token:
+    post:
+      tags: [Sidecam]
+      summary: Generate LiveKit publisher token for a paired secondary camera
+      security:
+        - DeviceTokenAuth: []
+          SidecamSessionHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId:
+                  type: string
+      responses:
+        "200":
+          description: LiveKit token for sidecam publisher
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  livekitToken:
+                    type: string
+                  livekitUrl:
+                    type: string
+                    format: uri
+                  room:
+                    type: string
+                  identity:
+                    type: string
+
+  /api/v1/sidecam/heartbeat:
+    post:
+      tags: [Sidecam]
+      summary: Stream health heartbeat from paired mobile device
+      security:
+        - DeviceTokenAuth: []
+          SidecamSessionHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId:
+                  type: string
+                clientTs:
+                  type: string
+                  format: date-time
+                frameRate:
+                  type: integer
+                droppedFrames:
+                  type: integer
+      responses:
+        "200":
+          description: Stream health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SidecamStreamHealth'
+
+  /api/v1/sidecam/telemetry:
+    post:
+      tags: [Sidecam]
+      summary: Device telemetry from paired mobile camera
+      security:
+        - DeviceTokenAuth: []
+          SidecamSessionHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, device]
+              properties:
+                sessionId:
+                  type: string
+                device:
+                  $ref: '#/components/schemas/SidecamMobileDevice'
+      responses:
+        "200":
+          description: Device directive
+
+  /api/v1/sidecam/session/{sessionId}:
+    get:
+      tags: [Sidecam]
+      summary: Get sidecam pairing status
+      security:
+        - DashboardBearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pairing session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SidecamSession'
+    delete:
+      tags: [Sidecam]
+      summary: Cleanup sidecam pairing session
+      security:
+        - DashboardBearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Pairing session removed
+
+  # ── LTI ───────────────────────────────────────────────────────────────────
+
+  /api/v1/lti/config:
+    get:
+      tags: [LTI]
+      summary: LTI 1.3 tool configuration JSON
+      description: Used for automatic tool registration in Moodle/Canvas admin.
+      responses:
+        "200":
+          description: LTI tool configuration
+
+  /api/v1/lti/login:
+    post:
+      tags: [LTI]
+      summary: OIDC login initiation (step 1)
+      description: LMS redirects student here to start the OIDC flow.
+      responses:
+        "302":
+          description: Redirect to LMS OIDC auth endpoint
+
+  /api/v1/lti/launch:
+    post:
+      tags: [LTI]
+      summary: LTI launch (step 3)
+      description: LMS redirects student here with signed id_token. Argus verifies RS256 signature through platform JWKS, creates session, and redirects to exam shell.
+      responses:
+        "302":
+          description: Redirect to student exam shell
+        "400":
+          description: Invalid id_token, issuer, audience, deployment, or message type
+
+  /api/v1/lti/grades/{sessionId}:
+    post:
+      tags: [LTI]
+      summary: LTI AGS grade passback
+      description: Posts score to `{lineItemUrl}/scores` when token URL, client ID and client secret are configured; otherwise returns queued status.
+      security:
+        - SessionTokenAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [score, lineItemUrl]
+              properties:
+                userId:
+                  type: string
+                  description: LMS user id. Falls back to sessionId if omitted.
+                score:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                maxScore:
+                  type: number
+                  default: 100
+                verdict:
+                  type: string
+                  enum: [clean, suspicious, violation]
+                comment:
+                  type: string
+                lineItemUrl:
+                  type: string
+                  format: uri
+      responses:
+        "200":
+          description: Grade posted to LMS
+        "202":
+          description: Grade passback queued
+
+  /api/v1/lti/jwks:
+    get:
+      tags: [LTI]
+      summary: Argus public JWKS for LMS tool registration
+      description: Placeholder JWKS endpoint. LTI launch verification uses the LMS JWKS configured by ARGUS_LTI_PLATFORM_JWKS_URL.
+      responses:
+        "200":
+          description: JWKS document

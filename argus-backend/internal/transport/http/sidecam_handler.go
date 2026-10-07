@@ -1,0 +1,602 @@
+// =============================================================================
+// Argus AI — Secondary Camera (Mobile) Orchestration REST API Handler
+// =============================================================================
+//
+// Provides HTTP endpoints for the full secondary camera lifecycle:
+//   - QR-based pairing initiation & completion
+//   - Spatial calibration verification (Golden Angle 45-60°)
+//   - Session gating (mandatory/optional/disabled)
+//   - Device telemetry processing (battery, thermal, displacement)
+//   - Stream health heartbeat
+//   - Hands-on-desk anomaly reporting
+//   - Pairing status query & cleanup
+//
+// Endpoints:
+//
+//	POST /api/v1/sidecam/pair/initiate           — Generate QR pairing payload
+//	POST /api/v1/sidecam/pair/complete            — Mobile device completes pairing
+//	POST /api/v1/sidecam/validate-start           — Gate exam start (mandatory mode)
+//	POST /api/v1/sidecam/media-token              — Generate LiveKit token for paired device
+//	POST /api/v1/sidecam/calibrate                — Process calibration frame
+//	POST /api/v1/sidecam/telemetry                — Device health telemetry
+//	POST /api/v1/sidecam/heartbeat                — Stream health heartbeat
+//	POST /api/v1/sidecam/hands                    — Hands-on-desk detection
+//	GET  /api/v1/sidecam/session/{sessionId}      — Get pairing status
+//	DELETE /api/v1/sidecam/session/{sessionId}     — Cleanup pairing session
+//
+// =============================================================================
+package http
+
+import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/argus-ai/event-collector/internal/domain/entity"
+	"github.com/argus-ai/event-collector/internal/infrastructure/sidecam"
+)
+
+// SidecamHandler serves the secondary camera orchestration REST API.
+type SidecamHandler struct {
+	orchestrator *sidecam.Orchestrator
+	logger       *zap.Logger
+
+	jwtSigningKey []byte
+	repo          adminRepo
+
+	livekitAPIKey    string
+	livekitAPISecret string
+	livekitPublicURL string
+}
+
+// NewSidecamHandler creates a new secondary camera API handler.
+func NewSidecamHandler(
+	orchestrator *sidecam.Orchestrator,
+	repo adminRepo,
+	logger *zap.Logger,
+	jwtSigningKey []byte,
+) *SidecamHandler {
+	lkAPIKey := os.Getenv("LIVEKIT_API_KEY")
+	if lkAPIKey == "" {
+		lkAPIKey = "argus-dev-api-key"
+	}
+	lkAPISecret := os.Getenv("LIVEKIT_API_SECRET")
+	if lkAPISecret == "" {
+		lkAPISecret = "argus-dev-api-secret-must-be-at-least-32-characters-long"
+	}
+	lkPublicURL := os.Getenv("LIVEKIT_PUBLIC_WS_URL")
+	if lkPublicURL == "" {
+		lkPublicURL = os.Getenv("LIVEKIT_WS_URL")
+		if lkPublicURL == "" {
+			lkPublicURL = "ws://localhost:7880"
+		}
+	}
+
+	return &SidecamHandler{
+		orchestrator:     orchestrator,
+		logger:           logger.Named("sidecam_api"),
+		jwtSigningKey:    jwtSigningKey,
+		repo:             repo,
+		livekitAPIKey:    lkAPIKey,
+		livekitAPISecret: lkAPISecret,
+		livekitPublicURL: lkPublicURL,
+	}
+}
+
+// RegisterRoutes registers secondary camera API endpoints on the given mux.
+func (h *SidecamHandler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/v1/sidecam/pair/initiate", h.requireAuth(h.handleInitiatePairing))
+	mux.HandleFunc("POST /api/v1/sidecam/pair/complete", h.handleCompletePairing) // No auth — mobile device uses pairing token
+	mux.HandleFunc("POST /api/v1/sidecam/validate-start", h.requireAuth(h.handleValidateStart))
+	// Fix 4: Device-token auth for mobile endpoints (post-pairing)
+	mux.HandleFunc("POST /api/v1/sidecam/media-token", h.requireDeviceToken(h.handleMediaToken))
+	mux.HandleFunc("POST /api/v1/sidecam/calibrate", h.requireDeviceToken(h.handleCalibrate))
+	mux.HandleFunc("POST /api/v1/sidecam/telemetry", h.requireDeviceToken(h.handleTelemetry))
+	mux.HandleFunc("POST /api/v1/sidecam/heartbeat", h.requireDeviceToken(h.handleHeartbeat))
+	mux.HandleFunc("POST /api/v1/sidecam/hands", h.requireDeviceToken(h.handleHandsDetection))
+	mux.HandleFunc("GET /api/v1/sidecam/session/{sessionId}", h.requireAuth(h.handleGetSession))
+	mux.HandleFunc("DELETE /api/v1/sidecam/session/{sessionId}", h.requireAuth(h.handleCleanupSession))
+}
+
+// ==========================================================================
+// Request/Response Types
+// ==========================================================================
+
+type initiatePairingRequest struct {
+	SessionID string               `json:"sessionId"`
+	StudentID string               `json:"studentId"`
+	ExamID    string               `json:"examId"`
+	OrgID     string               `json:"orgId"`
+	Policy    sidecam.CameraPolicy `json:"policy"`
+}
+
+type initiatePairingResponse struct {
+	Session *sidecam.PairingSession     `json:"session"`
+	QRData  string                      `json:"qrData"`
+	Payload *sidecam.PairingCodePayload `json:"payload"`
+}
+
+type completePairingRequest struct {
+	SessionID    string                    `json:"sessionId"`
+	PairingToken string                    `json:"pairingToken"`
+	Device       *sidecam.MobileDeviceInfo `json:"device"`
+}
+
+type validateStartRequest struct {
+	SessionID string               `json:"sessionId"`
+	Policy    sidecam.CameraPolicy `json:"policy"`
+}
+
+type calibrateRequest struct {
+	SessionID string                    `json:"sessionId"`
+	Frame     *sidecam.CalibrationFrame `json:"frame"`
+}
+
+type telemetryRequest struct {
+	SessionID string                    `json:"sessionId"`
+	Device    *sidecam.MobileDeviceInfo `json:"device"`
+}
+
+type heartbeatRequest struct {
+	SessionID     string `json:"sessionId"`
+	ClientTs      string `json:"clientTs"`
+	FrameRate     int    `json:"frameRate"`
+	DroppedFrames int    `json:"droppedFrames"`
+}
+
+type sidecamMediaTokenRequest struct {
+	SessionID string `json:"sessionId"`
+}
+
+type handsDetectionRequest struct {
+	SessionID    string `json:"sessionId"`
+	HandsVisible bool   `json:"handsVisible"`
+}
+
+// ==========================================================================
+// Handlers
+// ==========================================================================
+
+// handleInitiatePairing generates a QR pairing payload for the mobile device.
+func (h *SidecamHandler) handleInitiatePairing(w http.ResponseWriter, r *http.Request) {
+	var req initiatePairingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.SessionID == "" || req.ExamID == "" {
+		h.jsonError(w, "sessionId and examId are required", http.StatusBadRequest)
+		return
+	}
+
+	if req.Policy == "" {
+		req.Policy = sidecam.PolicyOptional
+	}
+
+	session, payload, err := h.orchestrator.InitiatePairing(
+		req.SessionID, req.StudentID, req.ExamID, req.OrgID, req.Policy,
+	)
+	if err != nil {
+		h.logger.Error("sidecam: initiate pairing failed",
+			zap.String("session_id", req.SessionID),
+			zap.Error(err),
+		)
+		h.jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	qrData, err := sidecam.MarshalQRPayload(payload)
+	if err != nil {
+		h.jsonError(w, "Failed to encode QR payload", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(initiatePairingResponse{
+		Session: session,
+		QRData:  qrData,
+		Payload: payload,
+	})
+}
+
+// handleCompletePairing validates the mobile device's pairing attempt.
+// No JWT auth — the mobile device authenticates via the pairing token.
+func (h *SidecamHandler) handleCompletePairing(w http.ResponseWriter, r *http.Request) {
+	var req completePairingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.SessionID == "" || req.PairingToken == "" {
+		h.jsonError(w, "sessionId and pairingToken are required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.orchestrator.CompletePairing(req.SessionID, req.PairingToken, req.Device); err != nil {
+		h.logger.Error("sidecam: complete pairing failed",
+			zap.String("session_id", req.SessionID),
+			zap.Error(err),
+		)
+		status := http.StatusBadRequest
+		if err.Error() == "sidecam: invalid pairing token" {
+			status = http.StatusUnauthorized
+		}
+		h.jsonError(w, err.Error(), status)
+		return
+	}
+
+	// Return updated session state + device token (Fix 4)
+	session, _ := h.orchestrator.GetPairingSession(req.SessionID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":      "paired",
+		"session":     session,
+		"deviceToken": session.DeviceToken, // Fix 4: issued for post-pairing device auth
+	})
+}
+
+// handleValidateStart checks whether an exam session can start given the camera policy.
+func (h *SidecamHandler) handleValidateStart(w http.ResponseWriter, r *http.Request) {
+	var req validateStartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.SessionID == "" {
+		h.jsonError(w, "sessionId is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.Policy == "" {
+		req.Policy = sidecam.PolicyOptional
+	}
+
+	if err := h.orchestrator.ValidateSessionStart(req.SessionID, req.Policy); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"allowed": false,
+			"reason":  err.Error(),
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"allowed": true,
+	})
+}
+
+// handleMediaToken returns a LiveKit publisher token for a paired secondary camera.
+func (h *SidecamHandler) handleMediaToken(w http.ResponseWriter, r *http.Request) {
+	var req sidecamMediaTokenRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.SessionID == "" {
+		h.jsonError(w, "sessionId is required", http.StatusBadRequest)
+		return
+	}
+
+	session, err := h.orchestrator.GetPairingSession(req.SessionID)
+	if err != nil {
+		h.jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	roomName := "argus-session-" + req.SessionID
+	identity := "sidecam-" + req.SessionID
+	if session.StudentID != "" {
+		identity = fmt.Sprintf("sidecam-%s", session.StudentID)
+	}
+
+	token, err := h.generateSidecamLiveKitToken(identity, "Argus side camera", roomName)
+	if err != nil {
+		h.logger.Error("sidecam: failed to generate livekit token",
+			zap.String("session_id", req.SessionID),
+			zap.Error(err),
+		)
+		h.jsonError(w, "failed to generate livekit token", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"livekitToken": token,
+		"livekitUrl":   h.livekitPublicURL,
+		"room":         roomName,
+		"identity":     identity,
+	})
+}
+
+// handleCalibrate processes a spatial calibration frame from the mobile device.
+func (h *SidecamHandler) handleCalibrate(w http.ResponseWriter, r *http.Request) {
+	var req calibrateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.SessionID == "" || req.Frame == nil {
+		h.jsonError(w, "sessionId and frame are required", http.StatusBadRequest)
+		return
+	}
+
+	status, err := h.orchestrator.ProcessCalibrationFrame(req.SessionID, req.Frame)
+	if err != nil {
+		h.jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(status)
+}
+
+// handleTelemetry processes device health telemetry (battery, thermal, accel).
+func (h *SidecamHandler) handleTelemetry(w http.ResponseWriter, r *http.Request) {
+	var req telemetryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.SessionID == "" || req.Device == nil {
+		h.jsonError(w, "sessionId and device are required", http.StatusBadRequest)
+		return
+	}
+
+	directive, err := h.orchestrator.ProcessDeviceTelemetry(req.SessionID, req.Device)
+	if err != nil {
+		h.jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(directive)
+}
+
+// handleHeartbeat processes a stream health heartbeat from the mobile device.
+func (h *SidecamHandler) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
+	var req heartbeatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.SessionID == "" {
+		h.jsonError(w, "sessionId is required", http.StatusBadRequest)
+		return
+	}
+
+	clientTs, err := time.Parse(time.RFC3339, req.ClientTs)
+	if err != nil {
+		clientTs = time.Now() // Fallback to server time if client timestamp is invalid
+	}
+
+	health, err := h.orchestrator.ProcessHeartbeat(req.SessionID, clientTs, req.FrameRate, req.DroppedFrames)
+	if err != nil {
+		h.jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(health)
+}
+
+// handleHandsDetection processes a hands-on-desk detection report.
+func (h *SidecamHandler) handleHandsDetection(w http.ResponseWriter, r *http.Request) {
+	var req handsDetectionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.jsonError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.SessionID == "" {
+		h.jsonError(w, "sessionId is required", http.StatusBadRequest)
+		return
+	}
+
+	h.orchestrator.ProcessHandsDetection(req.SessionID, req.HandsVisible)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// handleGetSession returns the current pairing state for a session.
+func (h *SidecamHandler) handleGetSession(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("sessionId")
+	if sessionID == "" {
+		h.jsonError(w, "sessionId is required", http.StatusBadRequest)
+		return
+	}
+
+	session, err := h.orchestrator.GetPairingSession(sessionID)
+	if err != nil {
+		h.jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(session)
+}
+
+// handleCleanupSession removes a pairing session.
+func (h *SidecamHandler) handleCleanupSession(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("sessionId")
+	if sessionID == "" {
+		h.jsonError(w, "sessionId is required", http.StatusBadRequest)
+		return
+	}
+
+	h.orchestrator.CleanupSession(sessionID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "cleaned"})
+}
+
+// ==========================================================================
+// Auth + Helpers (follows existing handler pattern)
+// ==========================================================================
+
+// requireDeviceToken validates the X-Device-Token header for mobile endpoints (Fix 4).
+// The device token is issued at pairing completion and must be sent with all post-pairing requests.
+func (h *SidecamHandler) requireDeviceToken(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		deviceToken := r.Header.Get("X-Device-Token")
+		if deviceToken == "" {
+			h.jsonError(w, "Missing X-Device-Token header", http.StatusUnauthorized)
+			return
+		}
+
+		// Extract sessionId from the request body (peek without consuming)
+		// For simplicity, the device token middleware reads sessionId from the header as well
+		sessionID := r.Header.Get("X-Session-ID")
+		if sessionID == "" {
+			// Fallback: try to parse from body by wrapping the request
+			// For now, we require X-Session-ID header for device-authenticated endpoints
+			h.jsonError(w, "Missing X-Session-ID header", http.StatusBadRequest)
+			return
+		}
+
+		if err := h.orchestrator.ValidateDeviceToken(sessionID, deviceToken); err != nil {
+			h.logger.Warn("sidecam: device token validation failed",
+				zap.String("session_id", sessionID),
+				zap.Error(err),
+			)
+			h.jsonError(w, "Invalid device token", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
+}
+
+func (h *SidecamHandler) generateSidecamLiveKitToken(identity, name, room string) (string, error) {
+	now := time.Now()
+	boolTrue := true
+	boolFalse := false
+
+	claims := livekitTokenClaims{
+		Exp:  now.Add(8 * time.Hour).Unix(),
+		Iss:  h.livekitAPIKey,
+		Nbf:  now.Unix(),
+		Sub:  identity,
+		Name: name,
+		Video: livekitVideoGrant{
+			RoomJoin:       true,
+			Room:           room,
+			CanPublish:     &boolTrue,
+			CanSubscribe:   &boolFalse,
+			CanPublishData: &boolTrue,
+		},
+	}
+
+	header := `{"alg":"HS256","typ":"JWT"}`
+	headerB64 := lkBase64Encode([]byte(header))
+
+	payloadJSON, err := json.Marshal(claims)
+	if err != nil {
+		return "", fmt.Errorf("marshal claims: %w", err)
+	}
+	payloadB64 := lkBase64Encode(payloadJSON)
+
+	signingInput := headerB64 + "." + payloadB64
+	mac := hmac.New(sha256.New, []byte(h.livekitAPISecret))
+	mac.Write([]byte(signingInput))
+	signatureB64 := lkBase64Encode(mac.Sum(nil))
+
+	return headerB64 + "." + payloadB64 + "." + signatureB64, nil
+}
+
+func (h *SidecamHandler) requireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := ""
+		authHeader := r.Header.Get("Authorization")
+		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			token = authHeader[7:]
+		}
+
+		if token == "" {
+			h.jsonError(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		user, err := h.verifyToken(r.Context(), token)
+		if err != nil {
+			h.jsonError(w, "Invalid or expired token", http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), userContextKey, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	}
+}
+
+func (h *SidecamHandler) verifyToken(ctx context.Context, tokenStr string) (*entity.User, error) {
+	parts := splitToken(tokenStr)
+	if parts == nil {
+		return nil, errInvalidToken
+	}
+
+	signingInput := parts[0] + "." + parts[1]
+	expectedSig := hmacSHA256([]byte(signingInput), h.jwtSigningKey)
+	actualSig, err := base64URLDecode(parts[2])
+	if err != nil {
+		return nil, errInvalidToken
+	}
+	if !hmacEqual(expectedSig, actualSig) {
+		return nil, errInvalidToken
+	}
+
+	payloadBytes, err := base64URLDecode(parts[1])
+	if err != nil {
+		return nil, errInvalidToken
+	}
+
+	var claims struct {
+		Sub string `json:"sub"`
+		Exp int64  `json:"exp"`
+	}
+	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
+		return nil, errInvalidToken
+	}
+	if time.Now().Unix() > claims.Exp {
+		return nil, errInvalidToken
+	}
+
+	user, err := h.repo.GetUserByID(ctx, claims.Sub)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (h *SidecamHandler) jsonError(w http.ResponseWriter, msg string, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}

@@ -1,0 +1,268 @@
+# =============================================================================
+# Event-Collector Service — Production Configuration
+# =============================================================================
+#
+# Optimized based on ARGUS-LOADTEST-10K-20260214 stress test results:
+#   - 10,000 concurrent users, 1,157,608 events, 100% ingestion rate
+#   - P50: 7.0ms, P95: 17.9ms, P99: 29.2ms
+#   - Worker pool increased 256→512 (optimizer recommendation)
+#   - ClickHouse batch size 1000→5000 (60% fewer flushes)
+#   - HTTP rate limiter 1000→5000 global RPS
+#
+# In production, most values are overridden by environment variables:
+#
+#   EVENT_COLLECTOR_GRPC_PORT        Server.GRPCPort
+#   EVENT_COLLECTOR_HTTP_PORT        Server.HTTPPort
+#   EVENT_COLLECTOR_KAFKA_BROKERS    Kafka.Brokers      (comma-separated)
+#   EVENT_COLLECTOR_CH_ADDRS         ClickHouse.Addrs   (comma-separated)
+#   EVENT_COLLECTOR_CH_DATABASE      ClickHouse.Database
+#   EVENT_COLLECTOR_CH_USERNAME      ClickHouse.Username
+#   EVENT_COLLECTOR_CH_PASSWORD      ClickHouse.Password
+#   EVENT_COLLECTOR_LOG_LEVEL        Logger.Level
+#   EVENT_COLLECTOR_WORKER_POOL_SIZE WorkerPool.Size
+#   EVENT_COLLECTOR_JWT_SIGNING_KEY  Auth.SigningKey
+#   EVENT_COLLECTOR_JWT_ISSUER       Auth.Issuer
+#   EVENT_COLLECTOR_EDUSER_ENDPOINT  Session.EduserEndpoint
+#   EVENT_COLLECTOR_CORS_ORIGINS     CORS.AllowedOrigins (comma-separated)
+#   EVENT_COLLECTOR_MINIO_ENDPOINT  MinIO.Endpoint
+#   EVENT_COLLECTOR_MINIO_ACCESS_KEY MinIO.AccessKey
+#   EVENT_COLLECTOR_MINIO_SECRET_KEY MinIO.SecretKey
+#   EVENT_COLLECTOR_MINIO_BUCKET    MinIO.Bucket
+#
+# =============================================================================
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# PRODUCTION OVERRIDES — MUST be set via environment variables:
+#
+#   EVENT_COLLECTOR_LOG_LEVEL=info          (not "debug")
+#   EVENT_COLLECTOR_CORS_ORIGINS=https://argusai.kz  (not "*")
+#   EVENT_COLLECTOR_JWT_SIGNING_KEY=<secret>          (enables auth)
+#   EVENT_COLLECTOR_PG_PASSWORD=<real password>       (not "argus")
+#   EVENT_COLLECTOR_MINIO_SECRET_KEY=<real secret>    (not placeholder)
+#   EVENT_COLLECTOR_CH_PASSWORD=<real password>        (if set)
+#
+# Running with development defaults in production is a SECURITY RISK.
+# The deploy.sh script validates that required env vars are set before
+# starting the stack.
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+# ---------------------------------------------------------------------------
+# Server
+# ---------------------------------------------------------------------------
+server:
+  # gRPC port for native gRPC connections (service-to-service).
+  grpc_port: 50051
+
+  # HTTP port for:
+  #   - gRPC-Web requests from Nuxt 3 browser clients
+  #   - Health-check endpoints (/healthz, /readyz)
+  #   - Future: Prometheus metrics (/metrics)
+  http_port: 8080
+
+  # Maximum time to wait for in-flight requests to drain on SIGTERM/SIGINT.
+  shutdown_timeout: 30s
+
+# ---------------------------------------------------------------------------
+# Kafka
+# ---------------------------------------------------------------------------
+kafka:
+  brokers:
+    - "localhost:9092"
+  required_acks: -1
+  max_message_bytes: 1048576  # 1 MiB
+  flush_frequency: 100ms
+  flush_messages: 100
+  retry_max: 3
+  compression_codec: "zstd"
+  idempotent_enabled: true
+
+# ---------------------------------------------------------------------------
+# ClickHouse
+# ---------------------------------------------------------------------------
+clickhouse:
+  addrs:
+    - "localhost:9000"
+  database: "argus"
+  username: "default"
+  password: ""
+  batch_size: 5000          # Optimized: was 1000, reduced flush frequency by ~60%
+  flush_interval: 3s        # Optimized: was 5s, improves tail latency under load
+  max_retries: 3
+
+# ---------------------------------------------------------------------------
+# PostgreSQL (SaaS Admin Layer)
+# ---------------------------------------------------------------------------
+postgres:
+  host: "localhost"
+  port: 5432
+  database: "argus"
+  username: "argus"
+  password: "argus"
+  ssl_mode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 10
+  conn_max_lifetime: 5m
+
+# ---------------------------------------------------------------------------
+# MinIO (S3-Compatible Evidence Storage)
+# ---------------------------------------------------------------------------
+minio:
+  # MinIO S3 API endpoint (host:port, no protocol).
+  # In Docker: "minio:9000" (internal). From host: "localhost:9002".
+  endpoint: "localhost:9002"
+  access_key: "argus-minio-admin"
+  secret_key: "argus-minio-secret-change-in-production"
+  bucket: "argus-evidence"
+  region: "us-east-1"
+  use_ssl: false
+
+  # Presigned URL TTL for evidence downloads (5 minutes).
+  # Short TTL prevents unauthorized link sharing.
+  presign_ttl: 5m
+
+  # Maximum upload time per evidence fragment.
+  upload_timeout: 30s
+
+# ---------------------------------------------------------------------------
+# Logger
+# ---------------------------------------------------------------------------
+logger:
+  level: "info"
+  encoding: "json"
+  development: false
+
+# ---------------------------------------------------------------------------
+# Rate Limiting
+# ---------------------------------------------------------------------------
+rate_limit:
+  # gRPC event ingestion rate limits.
+  global_rps: 50000
+  global_burst: 100000
+  per_session_rps: 100
+  per_session_burst: 200
+
+  # HTTP admin API rate limits (separate from gRPC).
+  # Lower limits because admin operations are less frequent than event ingestion.
+  http_global_rps: 5000     # Optimized: was 1000, supports dashboard + API traffic at scale
+  http_global_burst: 10000  # Optimized: was 2000, burst capacity for dashboard refresh spikes
+  http_per_ip_rps: 100
+  http_per_ip_burst: 200
+
+# ---------------------------------------------------------------------------
+# Worker Pool
+# ---------------------------------------------------------------------------
+worker_pool:
+  size: 512               # Optimized: was 256, handles 10K concurrent streams with headroom
+  queue_size: 16384       # Optimized: was 10000, power-of-2 for efficient ring buffer
+
+# ---------------------------------------------------------------------------
+# Authentication (JWT)
+# ---------------------------------------------------------------------------
+auth:
+  # Disabled for local development. Set to true and provide a signing_key
+  # for staging/production. Or set EVENT_COLLECTOR_JWT_SIGNING_KEY env var
+  # (auto-enables auth when key is provided).
+  enabled: false
+  algorithm: "HS256"
+
+  # HMAC-SHA256 shared secret for JWT verification.
+  # Must be at least 32 characters. In production, ALWAYS set via env var:
+  #   EVENT_COLLECTOR_JWT_SIGNING_KEY=<your-secret>
+  # signing_key: ""
+
+  # Expected JWT claims. Must match the Eduser (Java) token issuer.
+  issuer: "eduser"
+  audience: "argus-event-collector"
+
+  # Maximum clock drift tolerance between Eduser and Event Collector.
+  clock_skew: 30s
+
+  # When true, the session_secret claim in the JWT is validated against
+  # the Eduser session store. Provides defense against token theft.
+  require_session_secret: false
+
+# ---------------------------------------------------------------------------
+# Session Validation (Eduser Integration)
+# ---------------------------------------------------------------------------
+session:
+  # Time a validated session stays in the in-memory cache before re-checking
+  # with Eduser. Reduces Eduser API calls from 100K+/sec to ~1/session/5min.
+  cache_ttl: 5m
+
+  # Time an invalid/rejected session stays cached to prevent repeated API
+  # calls for the same bad session (protection against session-guessing).
+  negative_cache_ttl: 30s
+
+  # How often the background goroutine scans for expired cache entries.
+  cleanup_interval: 1m
+
+  # Eduser gRPC/HTTP endpoint for session validation.
+  # Leave empty for local development (noop mode: all sessions accepted).
+  # Example: "eduser-service:50051"
+  eduser_endpoint: ""
+
+  # Per-call timeout for Eduser API requests.
+  eduser_timeout: 3s
+
+# ---------------------------------------------------------------------------
+# CORS (Cross-Origin Resource Sharing)
+# ---------------------------------------------------------------------------
+cors:
+  # Allowed origins for gRPC-Web requests from the Nuxt 3 frontend.
+  allowed_origins:
+    - "https://argusai.kz"
+    - "https://www.argusai.kz"
+
+  # Preflight response cache duration (24 hours). Prevents browsers from
+  # sending an OPTIONS request before every gRPC-Web call.
+  max_age: "86400"
+
+  # Must be true to allow the Authorization header (JWT) in cross-origin
+  # requests. When true, the server echoes the exact Origin (not "*").
+  allow_credentials: true
+
+# ---------------------------------------------------------------------------
+# Backend AI Inference Gateway
+# ---------------------------------------------------------------------------
+inference:
+  # Production should use python_bridge. The stub engine is only for local
+  # development and is blocked unless allow_stub=true.
+  grpc_host: "localhost"
+  grpc_port: 50061
+  engine_type: "python_bridge"
+  allow_stub: false
+
+  # HTTP endpoint of ai-sidecar/Dockerfile. Override in Docker/Kubernetes with
+  # EVENT_COLLECTOR_INFERENCE_PYTHON_BRIDGE_URL.
+  python_bridge_url: "http://localhost:8091"
+  bridge_timeout_sec: 5
+
+  # Resource guardrails. If all inference slots are busy, frames are dropped
+  # with ResourceExhausted instead of blocking exam session traffic.
+  # Override budgets with EVENT_COLLECTOR_INFERENCE_MAX_FRAME_BYTES,
+  # EVENT_COLLECTOR_INFERENCE_MAX_VIDEO_DUR_SEC, and
+  # EVENT_COLLECTOR_INFERENCE_FRAME_SAMPLE_INTERVAL_SEC.
+  max_frame_bytes: 10485760
+  max_video_dur_sec: 300
+  frame_sample_rate: 2
+  frame_sample_interval_sec: 4
+  concurrency: 2
+
+  # Runtime-tunable anomaly thresholds.
+  face_mismatch_threshold: 0.62
+  liveness_threshold: 0.40
+  object_confidence_threshold: 0.35
+  spoof_confidence_threshold: 0.70
+
+# ---------------------------------------------------------------------------
+# Audio AI Bridge
+# ---------------------------------------------------------------------------
+audio_bridge:
+  # Aggregates browser-local AudioLevelTelemetry into derived ClickHouse
+  # audio_anomaly rows. Raw microphone audio is never transmitted.
+  enabled: true
+  noise_threshold_db: -35
+  vad_confidence_threshold: 0.70
+  consecutive_events: 3
+  cooldown_events: 12
+  derived_event_confidence: 0.85

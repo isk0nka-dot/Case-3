@@ -1,0 +1,95 @@
+# =============================================================================
+# argus-backend — .gitignore (Go 1.24 / gRPC / ClickHouse / Kafka)
+# =============================================================================
+
+# ── Compiled binaries ────────────────────────────────────────────────────────
+bin/
+event-collector
+loadtest
+/server
+/worker
+/inference
+/setup
+*.exe
+*.dll
+*.so
+*.dylib
+
+# ── Test artifacts ───────────────────────────────────────────────────────────
+*.test
+coverage
+coverage.*
+*.out
+coverage.html
+
+# ── Profiling / Debugging ────────────────────────────────────────────────────
+*.prof
+*.pprof
+*.trace
+cpu.prof
+mem.prof
+debug.test
+
+# ── Environment & Secrets (CRITICAL: never commit) ──────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+credentials.json
+service-account*.json
+secrets.yaml
+secrets.yml
+*.secret
+
+# ── Docker build cache ──────────────────────────────────────────────────────
+*.pid
+
+# ── AI model weights (large binaries; mount or download outside Git) ────────
+models/
+*.onnx
+*.pt
+ai-sidecar/.test-tmp/
+ai-sidecar/.venv*/
+
+# ── Vendor (if not committing Go vendor dir) ────────────────────────────────
+# vendor/
+
+# ── Editor / IDE ─────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+.fleet/
+*.swp
+*.swo
+*~
+\#*\#
+.#*
+
+# ── CI cache ──────────────────────────────────────────────────────────────
+.cache/
+.go-cache/
+.go-build-cache/
+.gocache/
+.golangci-cache/
+
+# ── Ad-hoc SQL / query artifacts ──────────────────────────────────────────
+combined.sql
+
+# ── Temporary / Generated ───────────────────────────────────────────────────
+gosec.sarif
+*.log
+*.tmp
+*.bak
+tmp/
+
+# ONNX model weights — large binaries, stored on server only
+ai-sidecar/models/*.onnx
+ai-sidecar/models/*.pt

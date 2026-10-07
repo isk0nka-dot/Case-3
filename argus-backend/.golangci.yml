@@ -1,0 +1,43 @@
+# .golangci.yml — Argus Backend linter configuration.
+# Compatible with golangci-lint v2. CI pins to v2.12.2.
+
+version: "2"
+
+run:
+  concurrency: 1
+  timeout: 5m
+  issues-exit-code: 1
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+  exclusions:
+    rules:
+      # HTTP response writing — if the client disconnected, there is nothing
+      # actionable. Our critical handlers (admin_handler, external_handler)
+      # already check these errors; legacy handlers use the bare pattern safely.
+      - linters:
+          - errcheck
+        source: "json\\.NewEncoder\\(w\\)\\.Encode"
+      # Cleanup paths intentionally ignore close/remove errors; the operation
+      # outcome is already determined by the preceding read/write path.
+      - linters:
+          - errcheck
+        source: "(defer\\s+)?[A-Za-z0-9_\\.]+\\.Close\\(\\)"
+      - linters:
+          - errcheck
+        source: "(defer\\s+)?os\\.Remove(All)?\\("
+      # SSE and lightweight HTTP responses cannot recover meaningfully if the
+      # client disconnects while writing the response body.
+      - linters:
+          - errcheck
+        source: "fmt\\.Fprint(f)?\\(w,"
+      # QF1012 is a cosmetic string-builder suggestion. Keep staticcheck
+      # enabled for correctness checks while avoiding churn in generated text.
+      - linters:
+          - staticcheck
+        text: "QF1012:"
