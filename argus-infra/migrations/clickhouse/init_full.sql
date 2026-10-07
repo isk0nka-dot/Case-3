@@ -368,7 +368,7 @@ ENGINE = MergeTree
 PARTITION BY toYYYYMM(uploaded_at)
 ORDER BY (org_id, session_id, uploaded_at)
 TTL uploaded_at + INTERVAL 730 DAY
-SETTINGS index_granularity = 8192;
+SETTINGS allow_dimensions_outside_sorting_key = 1, index_granularity = 8192;
 
 
 -- =============================================================================
@@ -399,7 +399,7 @@ CREATE TABLE IF NOT EXISTS session_ai_summary
 ENGINE = AggregatingMergeTree()
 ORDER BY (org_id, exam_id, session_id)
 TTL last_event_time + INTERVAL 90 DAY
-SETTINGS index_granularity = 8192;
+SETTINGS allow_dimensions_outside_sorting_key = 1, index_granularity = 8192;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS session_ai_summary_mv
 TO session_ai_summary

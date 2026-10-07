@@ -71,7 +71,7 @@ services:
       - redis_data:/data
 
   minio:
-    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    image: scnd/minio-mirror:RELEASE.2025-09-07T16-13-09Z
     container_name: argus-minio
     restart: unless-stopped
     mem_limit: 512m
