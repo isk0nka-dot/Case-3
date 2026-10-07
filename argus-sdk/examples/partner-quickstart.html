@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Argus Partner Quickstart</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        background: #f6f7f9;
+        color: #17202a;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 32px 20px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+        line-height: 1.2;
+      }
+
+      p {
+        color: #53616f;
+        line-height: 1.5;
+      }
+
+      .panel {
+        background: #ffffff;
+        border: 1px solid #d9e0e7;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        color: #354250;
+      }
+
+      input,
+      textarea,
+      select {
+        min-height: 38px;
+        border: 1px solid #c8d1da;
+        border-radius: 6px;
+        padding: 8px 10px;
+        font: inherit;
+        background: #ffffff;
+        color: #17202a;
+      }
+
+      textarea {
+        min-height: 96px;
+        resize: vertical;
+      }
+
+      button {
+        min-height: 40px;
+        border: 0;
+        border-radius: 6px;
+        padding: 0 14px;
+        font: inherit;
+        font-weight: 650;
+        color: #ffffff;
+        background: #176b87;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        color: #176b87;
+        background: #e8f3f6;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .notice {
+        padding: 12px;
+        border-radius: 6px;
+        background: #fff7e0;
+        border: 1px solid #ecd58b;
+        color: #5e4b12;
+      }
+
+      #argus-camera {
+        min-height: 280px;
+        border: 1px solid #c8d1da;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #0f1720;
+      }
+
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        margin: 0;
+        padding: 14px;
+        border-radius: 6px;
+        background: #101820;
+        color: #d8e8f0;
+      }
+
+      @media (max-width: 760px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Argus Partner Quickstart</h1>
+      <p>
+        Local sandbox for the External API flow: create a session, load the
+        returned SDK URL, then initialize the student-side SDK.
+      </p>
+
+      <div class="notice">
+        Demo only. In production, keep <code>X-API-KEY</code> on your backend
+        and send only <code>argusSessionToken</code> to the browser.
+      </div>
+
+      <section class="panel">
+        <div class="grid">
+          <label>
+            Argus API base URL
+            <input id="baseUrl" value="http://localhost:8080" />
+          </label>
+          <label>
+            SDK server URL
+            <input id="serverUrl" value="http://localhost:8080" />
+          </label>
+          <label>
+            X-CLIENT-ID
+            <input id="clientId" autocomplete="off" />
+          </label>
+          <label>
+            X-API-KEY
+            <input id="apiKey" type="password" autocomplete="off" />
+          </label>
+          <label>
+            Idempotency-Key
+            <input id="idempotencyKey" value="exam-demo-001:student-demo-001:attempt-1" />
+          </label>
+          <label>
+            Locale
+            <select id="locale">
+              <option value="ru">RU</option>
+              <option value="kk">KZ</option>
+              <option value="en">EN</option>
+            </select>
+          </label>
+          <label>
+            Consent accepted
+            <select id="consentAccepted">
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </label>
+          <label>
+            LiveKit publishing
+            <select id="liveKitEnabled">
+              <option value="false">Off</option>
+              <option value="true">On</option>
+            </select>
+          </label>
+          <label>
+            Exam ID
+            <input id="examId" value="exam-demo-001" />
+          </label>
+          <label>
+            Student ID
+            <input id="studentId" value="student-demo-001" />
+          </label>
+          <label>
+            Student name
+            <input id="studentName" value="Demo Student" />
+          </label>
+          <label>
+            Exam name
+            <input id="examName" value="Argus Browser MVP" />
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="createSession">Create session</button>
+          <button id="loadSdk" class="secondary" disabled>Load SDK</button>
+          <button id="startPreflight" class="secondary" disabled>Start preflight</button>
+          <button id="startSession" class="secondary" disabled>Start session</button>
+          <button id="endSession" class="secondary" disabled>End session</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div id="argus-camera"></div>
+      </section>
+
+      <section class="panel">
+        <pre id="log">Ready.</pre>
+      </section>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const logEl = $("log");
+      let sessionResponse = null;
+      let proctoring = null;
+
+      function log(message, data) {
+        const line = data
+          ? `${message}\n${JSON.stringify(data, null, 2)}`
+          : message;
+        logEl.textContent = `${new Date().toISOString()} ${line}\n\n${logEl.textContent}`;
+      }
+
+      function loadScript(src) {
+        return new Promise((resolve, reject) => {
+          if (window.ArgusSDK) {
+            resolve();
+            return;
+          }
+          const script = document.createElement("script");
+          script.src = src;
+          script.async = true;
+          script.onload = resolve;
+          script.onerror = () => reject(new Error(`Failed to load SDK: ${src}`));
+          document.head.appendChild(script);
+        });
+      }
+
+      $("createSession").addEventListener("click", async () => {
+        const baseUrl = $("baseUrl").value.replace(/\/+$/, "");
+        const headers = {
+          "Content-Type": "application/json",
+          "X-CLIENT-ID": $("clientId").value,
+          "X-API-KEY": $("apiKey").value,
+        };
+        const idempotencyKey = $("idempotencyKey").value.trim();
+        if (idempotencyKey) {
+          headers["Idempotency-Key"] = idempotencyKey;
+        }
+
+        const response = await fetch(`${baseUrl}/api/v1/external/sessions`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            examId: $("examId").value,
+            studentId: $("studentId").value,
+            studentName: $("studentName").value,
+            examName: $("examName").value,
+            metadata: { source: "partner-quickstart.html" },
+          }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          log(`Create session failed (${response.status})`, payload);
+          return;
+        }
+
+        sessionResponse = payload;
+        $("loadSdk").disabled = false;
+        log(`Session ready (${response.status})`, payload);
+      });
+
+      $("loadSdk").addEventListener("click", async () => {
+        await loadScript(sessionResponse.sdkUrl);
+        proctoring = new window.ArgusSDK({
+          sessionToken: sessionResponse.argusSessionToken,
+          serverUrl: $("serverUrl").value.replace(/\/+$/, ""),
+          containerId: "argus-camera",
+          locale: $("locale").value,
+          preflight: {
+            consentAccepted: $("consentAccepted").value === "true",
+          },
+          liveKit: {
+            enabled: $("liveKitEnabled").value === "true",
+            client: window.LivekitClient || window.LiveKitClient,
+            required: false,
+          },
+          onViolation: (event) => log("Violation", event),
+          onStatusChange: (status) => log("Status", { status }),
+          onPreflightComplete: (result) => log("Preflight result", result),
+          onDeliveryUpdate: (state) => log("Delivery queue", state),
+          onLiveKitStateChange: (state) => log("LiveKit state", state),
+        });
+        $("startPreflight").disabled = false;
+        log("SDK loaded and initialized", { sdkUrl: sessionResponse.sdkUrl });
+      });
+
+      $("startPreflight").addEventListener("click", async () => {
+        const passed = await proctoring.startPreflight();
+        $("startSession").disabled = !passed;
+        log("Preflight completed", { passed });
+      });
+
+      $("startSession").addEventListener("click", async () => {
+        await proctoring.startSession();
+        $("endSession").disabled = false;
+        log("Session started");
+      });
+
+      $("endSession").addEventListener("click", async () => {
+        await proctoring.endSession();
+        proctoring.destroy();
+        $("endSession").disabled = true;
+        log("Session ended");
+      });
+    </script>
+  </body>
+</html>

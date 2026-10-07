@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Экзамен — Argus Proctoring</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --text-muted: #8b949e;
+        --accent: #1f6feb;
+        --accent-hover: #388bfd;
+        --success: #238636;
+        --success-fg: #3fb950;
+        --warn: #9e6a03;
+        --warn-fg: #d29922;
+        --error: #da3633;
+        --error-fg: #f85149;
+        --radius: 8px;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 15px;
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      body { min-height: 100dvh; display: flex; flex-direction: column; }
+
+      /* ── screens ── */
+      .screen {
+        display: none;
+        flex: 1;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px;
+      }
+      .screen.active { display: flex; }
+
+      /* ── card ── */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        width: 100%;
+        max-width: 520px;
+        padding: 32px;
+      }
+
+      /* ── typography ── */
+      .logo { font-size: 13px; font-weight: 600; letter-spacing: .04em; color: var(--text-muted); margin-bottom: 24px; display: flex; align-items: center; gap: 6px; }
+      .logo::before { content: ""; display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+      h2 { font-size: 20px; font-weight: 600; line-height: 1.3; margin-bottom: 8px; }
+      .sub { color: var(--text-muted); font-size: 14px; line-height: 1.55; margin-bottom: 24px; }
+
+      /* ── buttons ── */
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        min-height: 40px; padding: 0 20px;
+        border: 0; border-radius: 6px;
+        font: inherit; font-size: 14px; font-weight: 600;
+        cursor: pointer; transition: opacity .15s, background .15s;
+      }
+      .btn:disabled { opacity: .45; cursor: not-allowed; }
+      .btn-primary { background: var(--accent); color: #fff; }
+      .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+      .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+      .btn-ghost:hover:not(:disabled) { color: var(--text); border-color: var(--text-muted); }
+      .btn-danger { background: var(--error); color: #fff; }
+      .btn-danger:hover:not(:disabled) { opacity: .85; }
+      .btn-row { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+
+      /* ── consent ── */
+      .consent-scroll {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 16px;
+        max-height: 260px;
+        overflow-y: auto;
+        font-size: 13px;
+        line-height: 1.65;
+        color: var(--text-muted);
+        margin-bottom: 20px;
+      }
+      .consent-scroll p { margin-bottom: 10px; }
+      .consent-scroll p:last-child { margin-bottom: 0; }
+      .consent-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+      .consent-check input[type=checkbox] { width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; accent-color: var(--accent); cursor: pointer; }
+      .consent-check span { font-size: 14px; line-height: 1.5; }
+
+      /* ── preflight steps ── */
+      .steps { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+      .step {
+        display: flex; align-items: center; gap: 12px;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--bg);
+        font-size: 14px;
+        transition: border-color .2s;
+      }
+      .step.checking { border-color: var(--warn); }
+      .step.passed { border-color: var(--success); }
+      .step.failed { border-color: var(--error); }
+      .step-icon { width: 20px; height: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+      .step-label { flex: 1; }
+      .step-msg { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+      /* ── active exam ── */
+      #screen-active {
+        padding: 0;
+        justify-content: stretch;
+        align-items: stretch;
+        position: relative;
+      }
+      #exam-content {
+        flex: 1;
+        border: none;
+        background: #fff;
+      }
+
+      /* ── camera overlay ── */
+      #cam-overlay {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 180px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        z-index: 100;
+        box-shadow: 0 4px 24px rgba(0,0,0,.5);
+      }
+      #cam-overlay-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 6px 10px;
+        background: var(--bg);
+        font-size: 11px; font-weight: 600; color: var(--text-muted);
+      }
+      #cam-status-dot {
+        width: 7px; height: 7px; border-radius: 50%;
+        background: var(--success-fg);
+        flex-shrink: 0;
+      }
+      #cam-status-dot.warn { background: var(--warn-fg); }
+      #cam-status-dot.error { background: var(--error-fg); }
+      #argus-camera-container {
+        min-height: 100px;
+        background: #000;
+      }
+
+      /* ── violation toast ── */
+      #toast-container {
+        position: fixed;
+        top: 16px; left: 50%;
+        transform: translateX(-50%);
+        width: min(480px, calc(100vw - 32px));
+        z-index: 200;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+      }
+      .toast {
+        background: var(--surface);
+        border: 1px solid var(--error);
+        border-radius: 6px;
+        padding: 10px 14px;
+        font-size: 13px;
+        color: var(--error-fg);
+        font-weight: 500;
+        pointer-events: auto;
+        animation: slideIn .2s ease;
+        display: flex; align-items: center; gap: 8px;
+      }
+      .toast.warn { border-color: var(--warn); color: var(--warn-fg); }
+      @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+      /* ── end-session bar ── */
+      #end-bar {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        padding: 10px 20px;
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px;
+        z-index: 150;
+      }
+      #end-bar-info { font-size: 13px; color: var(--text-muted); }
+      #violation-count { font-size: 12px; }
+
+      /* ── done ── */
+      .done-icon { font-size: 48px; text-align: center; margin-bottom: 16px; }
+
+      /* ── error ── */
+      .error-banner {
+        background: rgba(218,54,51,.12);
+        border: 1px solid var(--error);
+        border-radius: 6px;
+        padding: 12px 14px;
+        font-size: 13px;
+        color: var(--error-fg);
+        margin-bottom: 20px;
+        line-height: 1.5;
+      }
+
+      /* ── spinner ── */
+      .spinner {
+        width: 18px; height: 18px;
+        border: 2px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin .7s linear infinite;
+        flex-shrink: 0;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* ── responsive ── */
+      @media (max-width: 560px) {
+        .card { padding: 24px 16px; }
+        #cam-overlay { width: 130px; bottom: 60px; right: 10px; }
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- ══════════════════════════════════════
+         SCREEN: fatal error (missing params)
+    ══════════════════════════════════════ -->
+    <div id="screen-fatal" class="screen">
+      <div class="card">
+        <div class="logo">ARGUS PROCTORING</div>
+        <h2 id="fatal-title">Ошибка</h2>
+        <p class="sub" id="fatal-msg">Ссылка недействительна.</p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SCREEN: consent
+    ══════════════════════════════════════ -->
+    <div id="screen-consent" class="screen">
+      <div class="card">
+        <div class="logo">ARGUS PROCTORING</div>
+        <h2 id="consent-title">Согласие на прокторинг</h2>
+        <p class="sub" id="consent-subtitle">Перед началом экзамена прочитайте условия и примите согласие.</p>
+
+        <div class="consent-scroll" id="consent-text"></div>
+
+        <label class="consent-check" id="consent-check-label">
+          <input type="checkbox" id="consent-checkbox" />
+          <span id="consent-check-text">Я ознакомился(-ась) с условиями и принимаю их</span>
+        </label>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btn-consent" disabled>
+            Продолжить
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SCREEN: preflight
+    ══════════════════════════════════════ -->
+    <div id="screen-preflight" class="screen">
+      <div class="card">
+        <div class="logo">ARGUS PROCTORING</div>
+        <h2 id="preflight-title">Проверка системы</h2>
+        <p class="sub" id="preflight-subtitle">Идёт проверка — не закрывайте страницу.</p>
+
+        <ul class="steps" id="preflight-steps">
+          <li class="step pending" data-step="consent">
+            <span class="step-icon">○</span>
+            <div class="step-label">
+              <div id="step-consent-label">Согласие</div>
+              <div class="step-msg" id="step-consent-msg"></div>
+            </div>
+          </li>
+          <li class="step pending" data-step="hardware">
+            <span class="step-icon">○</span>
+            <div class="step-label">
+              <div id="step-hardware-label">Камера и микрофон</div>
+              <div class="step-msg" id="step-hardware-msg"></div>
+            </div>
+          </li>
+          <li class="step pending" data-step="environment">
+            <span class="step-icon">○</span>
+            <div class="step-label">
+              <div id="step-environment-label">Лицо в кадре</div>
+              <div class="step-msg" id="step-environment-msg"></div>
+            </div>
+          </li>
+          <li class="step pending" data-step="system">
+            <span class="step-icon">○</span>
+            <div class="step-label">
+              <div id="step-system-label">Система</div>
+              <div class="step-msg" id="step-system-msg"></div>
+            </div>
+          </li>
+          <li class="step pending" data-step="network">
+            <span class="step-icon">○</span>
+            <div class="step-label">
+              <div id="step-network-label">Сеть</div>
+              <div class="step-msg" id="step-network-msg"></div>
+            </div>
+          </li>
+        </ul>
+
+        <div id="preflight-error" class="error-banner" style="display:none"></div>
+
+        <div class="btn-row" id="preflight-btn-row" style="display:none">
+          <button class="btn btn-primary" id="btn-retry-preflight">Повторить проверку</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SCREEN: active exam
+    ══════════════════════════════════════ -->
+    <div id="screen-active" class="screen">
+      <!-- exam iframe (if examUrl provided) -->
+      <iframe id="exam-content" title="Exam" allow="fullscreen" style="display:none"></iframe>
+
+      <!-- placeholder when no examUrl -->
+      <div id="exam-placeholder" style="flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; color:var(--text-muted); font-size:14px;">
+        <div style="font-size:32px;">📋</div>
+        <div id="exam-placeholder-name"></div>
+        <div style="font-size:12px;">Прокторинг активен</div>
+      </div>
+
+      <!-- floating camera overlay -->
+      <div id="cam-overlay">
+        <div id="cam-overlay-header">
+          <span>Камера</span>
+          <span id="cam-status-dot"></span>
+        </div>
+        <div id="argus-camera-container"></div>
+      </div>
+
+      <!-- bottom bar -->
+      <div id="end-bar">
+        <div id="end-bar-info">
+          <span id="exam-name-bar"></span>
+          <span id="violation-count"></span>
+        </div>
+        <button class="btn btn-danger" id="btn-end-session">Завершить экзамен</button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SCREEN: completed
+    ══════════════════════════════════════ -->
+    <div id="screen-done" class="screen">
+      <div class="card" style="text-align:center">
+        <div class="done-icon">✅</div>
+        <div class="logo" style="justify-content:center">ARGUS PROCTORING</div>
+        <h2 id="done-title">Экзамен завершён</h2>
+        <p class="sub" id="done-sub">Результаты переданы. Можете закрыть страницу.</p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         violation toasts
+    ══════════════════════════════════════ -->
+    <div id="toast-container" aria-live="assertive"></div>
+
+    <!-- ══════════════════════════════════════
+         SCRIPT
+    ══════════════════════════════════════ -->
+    <script>
+      // ── helpers ────────────────────────────────────────────────────────────
+
+      function $(id) { return document.getElementById(id); }
+
+      function show(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        $(id).classList.add('active');
+      }
+
+      function parseParams() {
+        const p = new URLSearchParams(location.search);
+        return {
+          token:       p.get('token') || p.get('sessionToken') || '',
+          serverUrl:   (p.get('serverUrl') || p.get('server') || '').replace(/\/+$/, ''),
+          sdkUrl:      p.get('sdkUrl') || p.get('sdk') || '',
+          locale:      (p.get('locale') || 'ru'),
+          examName:    p.get('examName') || p.get('exam') || '',
+          studentName: p.get('studentName') || p.get('student') || '',
+          examUrl:     p.get('examUrl') || '',
+          livekit:     p.get('livekit') === 'true',
+        };
+      }
+
+      function loadScript(src) {
+        return new Promise((resolve, reject) => {
+          if (window.ArgusSDK) { resolve(); return; }
+          const s = document.createElement('script');
+          s.src = src;
+          s.async = true;
+          s.onload = resolve;
+          s.onerror = () => reject(new Error('SDK load failed: ' + src));
+          document.head.appendChild(s);
+        });
+      }
+
+      // ── i18n ───────────────────────────────────────────────────────────────
+
+      const I18N = {
+        ru: {
+          consentTitle: 'Согласие на прокторинг',
+          consentSub: 'Перед началом экзамена ознакомьтесь с условиями.',
+          consentBody: [
+            'В ходе экзамена система Argus будет записывать видео с камеры и аудио с микрофона вашего устройства.',
+            'Данные записи используются исключительно для контроля честности проведения экзамена.',
+            'Запись хранится в зашифрованном виде и доступна только уполномоченным сотрудникам вашей организации.',
+            'Система в реальном времени анализирует видеопоток для обнаружения нарушений: присутствие посторонних лиц, использование телефона или запрещённых материалов.',
+            'Браузерные действия (переключение вкладок, выход из полноэкранного режима, копирование текста) также фиксируются.',
+            'Нажимая «Продолжить», вы подтверждаете, что ознакомились с условиями и даёте согласие на обработку указанных данных в целях проведения экзамена.',
+          ],
+          consentCheck: 'Я ознакомился(-ась) с условиями и принимаю их',
+          consentBtn: 'Продолжить',
+          preflightTitle: 'Проверка системы',
+          preflightSub: 'Идёт проверка — не закрывайте страницу.',
+          preflightRetry: 'Повторить проверку',
+          stepLabels: {
+            consent: 'Согласие',
+            hardware: 'Камера и микрофон',
+            environment: 'Лицо в кадре',
+            system: 'Совместимость',
+            network: 'Соединение с сервером',
+          },
+          endExam: 'Завершить экзамен',
+          proctoringActive: 'Прокторинг активен',
+          violations: (n) => n === 1 ? '1 нарушение' : `${n} нарушений`,
+          doneTitle: 'Экзамен завершён',
+          doneSub: 'Результаты переданы. Можете закрыть страницу.',
+          fatalInvalidLink: 'Ссылка недействительна.',
+          fatalNoToken: 'Отсутствует токен сессии. Получите ссылку из вашей LMS.',
+          fatalNoServer: 'Не указан адрес сервера. Проверьте ссылку.',
+          fatalSdkLoad: 'Не удалось загрузить SDK. Проверьте подключение к интернету.',
+          violationWarn: '⚠ Нарушение',
+          sessionStopped: 'Экзамен остановлен системой или проктором.',
+        },
+        kk: {
+          consentTitle: 'Прокторингке келісім',
+          consentSub: 'Емтиханды бастамас бұрын шарттарды оқыңыз.',
+          consentBody: [
+            'Емтихан барысында Argus жүйесі құрылғыңыздың камерасы мен микрофонынан бейне мен аудионы жазады.',
+            'Бұл жазбалар тек емтиханның шынайылығын бақылау үшін пайдаланылады.',
+            'Жазба шифрланған түрде сақталады және тек ұйымыңыздың уәкілетті қызметкерлеріне қолжетімді.',
+            'Жүйе бейне ағынын нақты уақытта талдайды: бөгде адамдардың, телефонның немесе тыйым салынған материалдардың болуын анықтайды.',
+            'Браузер әрекеттері де тіркеледі: қойындыны ауыстыру, толық экранды жабу, мәтінді көшіру.',
+            '«Жалғастыру» батырмасын басу арқылы сіз шарттармен танысқаныңызды және деректерді өңдеуге келісетіндігіңізді растайсыз.',
+          ],
+          consentCheck: 'Мен шарттармен таныстым және оларды қабылдаймын',
+          consentBtn: 'Жалғастыру',
+          preflightTitle: 'Жүйені тексеру',
+          preflightSub: 'Тексеру жүргізілуде — бетті жаппаңыз.',
+          preflightRetry: 'Тексеруді қайталау',
+          stepLabels: {
+            consent: 'Келісім',
+            hardware: 'Камера мен микрофон',
+            environment: 'Камерадағы бет',
+            system: 'Үйлесімділік',
+            network: 'Сервермен байланыс',
+          },
+          endExam: 'Емтиханды аяқтау',
+          proctoringActive: 'Прокторинг белсенді',
+          violations: (n) => `${n} бұзушылық`,
+          doneTitle: 'Емтихан аяқталды',
+          doneSub: 'Нәтижелер берілді. Бетті жаба аласыз.',
+          fatalInvalidLink: 'Сілтеме жарамсыз.',
+          fatalNoToken: 'Сессия токені жоқ. LMS-тен сілтемені алыңыз.',
+          fatalNoServer: 'Сервер мекенжайы көрсетілмеген. Сілтемені тексеріңіз.',
+          fatalSdkLoad: 'SDK жүктелмеді. Интернет байланысын тексеріңіз.',
+          violationWarn: '⚠ Бұзушылық',
+          sessionStopped: 'Емтиханды жүйе немесе проктор тоқтатты.',
+        },
+        en: {
+          consentTitle: 'Proctoring Consent',
+          consentSub: 'Please read and accept the terms before starting.',
+          consentBody: [
+            'During the exam, the Argus system will record video from your camera and audio from your microphone.',
+            'These recordings are used solely to verify the integrity of your exam.',
+            'Recordings are stored in encrypted form and accessible only to authorised staff of your organisation.',
+            'The system analyses the video stream in real time to detect violations: presence of other persons, use of a phone, or prohibited materials.',
+            'Browser actions are also logged: tab switching, fullscreen exit, and copy-paste attempts.',
+            'By clicking Continue you confirm that you have read and agree to the processing of the above data for the purpose of this exam.',
+          ],
+          consentCheck: 'I have read and accept the terms',
+          consentBtn: 'Continue',
+          preflightTitle: 'System Check',
+          preflightSub: 'Checking your setup — do not close this page.',
+          preflightRetry: 'Retry Check',
+          stepLabels: {
+            consent: 'Consent',
+            hardware: 'Camera & Microphone',
+            environment: 'Face Detection',
+            system: 'Compatibility',
+            network: 'Server Connection',
+          },
+          endExam: 'End Exam',
+          proctoringActive: 'Proctoring active',
+          violations: (n) => n === 1 ? '1 violation' : `${n} violations`,
+          doneTitle: 'Exam Completed',
+          doneSub: 'Your results have been submitted. You may close this tab.',
+          fatalInvalidLink: 'The link is invalid.',
+          fatalNoToken: 'Session token is missing. Please open the exam link from your LMS.',
+          fatalNoServer: 'Server URL is missing. Check the exam link.',
+          fatalSdkLoad: 'Failed to load the SDK. Check your internet connection.',
+          violationWarn: '⚠ Violation',
+          sessionStopped: 'The exam was stopped by the system or proctor.',
+        },
+      };
+
+      // ── step icons ─────────────────────────────────────────────────────────
+
+      const STEP_ICONS = { pending: '○', checking: '◌', passed: '✓', failed: '✗' };
+
+      function updateStep(stepId, status, msg) {
+        const li = document.querySelector(`[data-step="${stepId}"]`);
+        if (!li) return;
+        li.className = `step ${status}`;
+        li.querySelector('.step-icon').textContent = STEP_ICONS[status] || '○';
+        if (msg) li.querySelector('.step-msg').textContent = msg;
+        if (status === 'checking') {
+          const icon = li.querySelector('.step-icon');
+          icon.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px"></span>';
+        }
+      }
+
+      // ── toast ──────────────────────────────────────────────────────────────
+
+      function showToast(text, level = 'error') {
+        const div = document.createElement('div');
+        div.className = `toast ${level === 'warn' ? 'warn' : ''}`;
+        div.textContent = text;
+        $('toast-container').prepend(div);
+        setTimeout(() => div.remove(), 6000);
+      }
+
+      // ── main ───────────────────────────────────────────────────────────────
+
+      (async function main() {
+        const params = parseParams();
+        const locale = ['ru', 'kk', 'en'].includes(params.locale) ? params.locale : 'ru';
+        const t = I18N[locale];
+
+        document.documentElement.lang = locale === 'kk' ? 'kk' : locale === 'en' ? 'en' : 'ru';
+
+        // validation
+        if (!params.token) {
+          show('screen-fatal');
+          $('fatal-title').textContent = t.fatalInvalidLink;
+          $('fatal-msg').textContent = t.fatalNoToken;
+          return;
+        }
+        if (!params.serverUrl) {
+          show('screen-fatal');
+          $('fatal-title').textContent = t.fatalInvalidLink;
+          $('fatal-msg').textContent = t.fatalNoServer;
+          return;
+        }
+
+        // ── CONSENT screen ──────────────────────────────────────────────────
+
+        $('consent-title').textContent = t.consentTitle;
+        $('consent-subtitle').textContent = t.consentSub;
+        $('consent-text').innerHTML = t.consentBody.map(p => `<p>${p}</p>`).join('');
+        $('consent-check-text').textContent = t.consentCheck;
+        $('btn-consent').textContent = t.consentBtn;
+
+        if (params.examName) {
+          $('consent-subtitle').textContent += ` — ${params.examName}`;
+        }
+
+        const checkbox = $('consent-checkbox');
+        const btnConsent = $('btn-consent');
+        checkbox.addEventListener('change', () => { btnConsent.disabled = !checkbox.checked; });
+
+        show('screen-consent');
+
+        await new Promise(resolve => {
+          btnConsent.addEventListener('click', resolve, { once: true });
+        });
+
+        // ── PREFLIGHT screen ────────────────────────────────────────────────
+
+        show('screen-preflight');
+        $('preflight-title').textContent = t.preflightTitle;
+        $('preflight-subtitle').textContent = t.preflightSub;
+        $('btn-retry-preflight').textContent = t.preflightRetry;
+
+        // apply translated step labels
+        Object.entries(t.stepLabels).forEach(([id, label]) => {
+          const el = $(`step-${id}-label`);
+          if (el) el.textContent = label;
+        });
+
+        // load SDK
+        const sdkSrc = params.sdkUrl ||
+          (params.serverUrl ? `${params.serverUrl}/argus-sdk.umd.js` : null) ||
+          '../dist/argus-sdk.umd.js';
+
+        try {
+          await loadScript(sdkSrc);
+        } catch (err) {
+          show('screen-fatal');
+          $('fatal-title').textContent = t.fatalInvalidLink;
+          $('fatal-msg').textContent = t.fatalSdkLoad;
+          return;
+        }
+
+        // initialise SDK
+        let proctoring = new window.ArgusSDK({
+          sessionToken: params.token,
+          serverUrl: params.serverUrl,
+          containerId: 'argus-camera-container',
+          locale,
+          preflight: {
+            consentAccepted: true,
+          },
+          liveKit: params.livekit ? {
+            enabled: true,
+            client: window.LivekitClient || window.LiveKitClient,
+            required: false,
+          } : { enabled: false },
+
+          onPreflightStep: (step) => {
+            updateStep(step.id, step.status, step.message);
+          },
+
+          onViolation: (event) => {
+            const dot = $('cam-status-dot');
+            dot.className = 'warn';
+            setTimeout(() => { dot.className = ''; }, 3000);
+            const violations = proctoring ? proctoring.violationCount : 0;
+            const vEl = $('violation-count');
+            if (vEl) vEl.textContent = ' · ' + t.violations(violations);
+            showToast(`${t.violationWarn}: ${event.label || event.type || ''}`, 'error');
+          },
+
+          onStatusChange: (status) => {
+            if (status === 'completed') {
+              show('screen-done');
+              $('done-title').textContent = t.doneTitle;
+              $('done-sub').textContent = t.doneSub;
+            }
+            if (status === 'error' && proctoring && proctoring.status === 'active') {
+              showToast(t.sessionStopped, 'error');
+            }
+          },
+
+          onError: (err) => {
+            if (!err.recoverable) {
+              showToast(err.message, 'error');
+            }
+          },
+        });
+
+        // run preflight (with retry loop)
+        async function runPreflight() {
+          $('preflight-error').style.display = 'none';
+          $('preflight-btn-row').style.display = 'none';
+
+          // reset all steps to pending
+          ['consent', 'hardware', 'environment', 'system', 'network'].forEach(id => {
+            updateStep(id, 'pending', '');
+            const el = $(`step-${id}-msg`);
+            if (el) el.textContent = '';
+          });
+
+          let passed = false;
+          try {
+            passed = await proctoring.startPreflight();
+          } catch (err) {
+            passed = false;
+          }
+
+          if (passed) {
+            return true;
+          }
+
+          // show failures
+          const result = proctoring.lastPreflightResult;
+          if (result) {
+            const failed = result.checks
+              .filter(c => c.required && c.status !== 'passed')
+              .map(c => c.message)
+              .join('\n');
+            $('preflight-error').textContent = failed;
+            $('preflight-error').style.display = 'block';
+          }
+          $('preflight-btn-row').style.display = 'flex';
+          return false;
+        }
+
+        let preflightPassed = await runPreflight();
+
+        if (!preflightPassed) {
+          // wait for retry clicks
+          while (!preflightPassed) {
+            await new Promise(resolve => {
+              $('btn-retry-preflight').addEventListener('click', resolve, { once: true });
+            });
+            // re-init SDK for retry (fresh state)
+            try { proctoring.destroy(); } catch (_) {}
+            proctoring = new window.ArgusSDK({
+              sessionToken: params.token,
+              serverUrl: params.serverUrl,
+              containerId: 'argus-camera-container',
+              locale,
+              preflight: { consentAccepted: true },
+              liveKit: params.livekit ? {
+                enabled: true,
+                client: window.LivekitClient || window.LiveKitClient,
+                required: false,
+              } : { enabled: false },
+              onPreflightStep: (step) => updateStep(step.id, step.status, step.message),
+              onViolation: (event) => {
+                const dot = $('cam-status-dot');
+                dot.className = 'warn';
+                setTimeout(() => { dot.className = ''; }, 3000);
+                const v = proctoring ? proctoring.violationCount : 0;
+                const vEl = $('violation-count');
+                if (vEl) vEl.textContent = ' · ' + t.violations(v);
+                showToast(`${t.violationWarn}: ${event.label || event.type || ''}`, 'error');
+              },
+              onStatusChange: (status) => {
+                if (status === 'completed') {
+                  show('screen-done');
+                  $('done-title').textContent = t.doneTitle;
+                  $('done-sub').textContent = t.doneSub;
+                }
+              },
+            });
+            preflightPassed = await runPreflight();
+          }
+        }
+
+        // ── ACTIVE exam screen ──────────────────────────────────────────────
+
+        show('screen-active');
+
+        // exam content
+        if (params.examUrl) {
+          const iframe = $('exam-content');
+          iframe.src = params.examUrl;
+          iframe.style.display = 'block';
+          $('exam-placeholder').style.display = 'none';
+        } else {
+          $('exam-placeholder-name').textContent = params.examName || t.proctoringActive;
+        }
+
+        $('exam-name-bar').textContent = params.examName || '';
+        $('btn-end-session').textContent = t.endExam;
+
+        // request fullscreen
+        try {
+          await document.documentElement.requestFullscreen();
+        } catch (_) { /* best-effort */ }
+
+        // start session
+        try {
+          await proctoring.startSession();
+        } catch (err) {
+          showToast(err.message || 'Session start failed', 'error');
+          show('screen-done');
+          $('done-title').textContent = 'Ошибка';
+          $('done-sub').textContent = err.message || 'Session start failed';
+          return;
+        }
+
+        // end-session button
+        $('btn-end-session').addEventListener('click', async () => {
+          $('btn-end-session').disabled = true;
+          try {
+            await proctoring.endSession();
+            proctoring.destroy();
+          } catch (_) {}
+          try { document.exitFullscreen(); } catch (_) {}
+          show('screen-done');
+          $('done-title').textContent = t.doneTitle;
+          $('done-sub').textContent = t.doneSub;
+        });
+
+        // detect fullscreen exit during exam (soft warning only — no force)
+        document.addEventListener('fullscreenchange', () => {
+          if (!document.fullscreenElement && proctoring && proctoring.status === 'active') {
+            showToast('⚠ Вышли из полноэкранного режима', 'warn');
+          }
+        });
+
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,61 @@
+{
+  "manifest_version": 3,
+  "name": "Argus Proctoring",
+  "short_name": "Argus",
+  "version": "0.1.0",
+  "description": "Argus AI exam proctoring — environment isolation, tab/monitor control and presence verification.",
+  "minimum_chrome_version": "116",
+
+  "//key": "Set a fixed 'key' here before Web Store publish to pin a stable extension_id that the backend can verify. Generate with: openssl genrsa 2048 | openssl rsa -pubout -outform DER | base64 -w0",
+
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "scripting",
+    "webNavigation",
+    "system.display",
+    "storage",
+    "desktopCapture"
+  ],
+
+  "host_permissions": [
+    "https://argusai.kz/*",
+    "https://*.argusai.kz/*",
+    "https://ustaz.media/*",
+    "https://*.ustaz.media/*",
+    "https://webizon.net/*",
+    "https://*.webizon.net/*"
+  ],
+
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://argusai.kz/*",
+        "https://*.argusai.kz/*",
+        "https://ustaz.media/*",
+        "https://*.ustaz.media/*",
+        "https://webizon.net/*",
+        "https://*.webizon.net/*"
+      ],
+      "js": ["content/content-script.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Argus Proctoring"
+  },
+
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}
