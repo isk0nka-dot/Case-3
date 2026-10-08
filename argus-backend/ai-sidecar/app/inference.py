@@ -16,6 +16,76 @@ COCO_CLASS_MAP = {
     73: "book",
 }
 
+# ---------------------------------------------------------------------------
+# Определение «попытки сфотографировать экран»
+# Все координаты bbox нормализованы (0..1): x, y, w, h
+# ---------------------------------------------------------------------------
+PHONE_PHOTO_LABEL = "phone_photo_attempt"
+
+# Центральная зона кадра (если человек не найден): телефон на уровне лица/экрана
+SCREEN_ZONE = {"x": 0.20, "y": 0.0, "w": 0.60, "h": 0.65}
+
+# Минимальная доля площади телефона, которая должна лежать в зоне головы
+PHOTO_OVERLAP_MIN = 0.30
+
+
+def _box_area(b: dict[str, float]) -> float:
+    return max(0.0, b["w"]) * max(0.0, b["h"])
+
+
+def _intersection_area(a: dict[str, float], b: dict[str, float]) -> float:
+    x1 = max(a["x"], b["x"])
+    y1 = max(a["y"], b["y"])
+    x2 = min(a["x"] + a["w"], b["x"] + b["w"])
+    y2 = min(a["y"] + a["h"], b["y"] + b["h"])
+    return max(0.0, x2 - x1) * max(0.0, y2 - y1)
+
+
+def _head_zone(person: dict[str, float]) -> dict[str, float]:
+    """Верхние ~45% рамки человека и центральные 70% по ширине = голова/плечи."""
+    return {
+        "x": person["x"] + person["w"] * 0.15,
+        "y": person["y"],
+        "w": person["w"] * 0.70,
+        "h": person["h"] * 0.45,
+    }
+
+
+def flag_photo_attempts(objects: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Если рамка телефона пересекается с зоной головы (или центром кадра),
+    добавляет отдельную детекцию phone_photo_attempt.
+    Исходные детекции (phone, person) сохраняются.
+    """
+    try:
+        persons = [o["bbox"] for o in objects if o.get("object_type") == "person"]
+        zones = [_head_zone(p) for p in persons] or [SCREEN_ZONE]
+
+        extra: list[dict[str, Any]] = []
+        for obj in objects:
+            if obj.get("object_type") != "phone":
+                continue
+
+            phone = obj["bbox"]
+            area = _box_area(phone)
+            if area <= 0.0:
+                continue
+
+            overlap = max(_intersection_area(phone, z) / area for z in zones)
+            cx = phone["x"] + phone["w"] / 2.0
+            cy = phone["y"] + phone["h"] / 2.0
+            in_center = 0.20 <= cx <= 0.80 and cy <= 0.65
+
+            if overlap >= PHOTO_OVERLAP_MIN and in_center:
+                extra.append({
+                    "object_type": PHONE_PHOTO_LABEL,
+                    "confidence": obj["confidence"],
+                    "bbox": dict(phone),
+                })
+        return objects + extra
+    except Exception:
+        # Эвристика не должна ронять основной анализ кадра
+        return objects
 
 @dataclass
 class FrameAnalyzer:
@@ -35,6 +105,7 @@ class FrameAnalyzer:
         objects = []
         if self.inventory.yolo.loaded:
             objects = _run_yolo(self.inventory.yolo.session, image, self.settings.yolo_confidence_threshold)
+            objects = flag_photo_attempts(objects)
 
         faces = []
         if self.inventory.arcface.loaded and reference_embedding:
