@@ -24,3 +24,4 @@ echo ==============================================
 echo.
 echo To view logs, run: docker compose logs -f
 pause
+

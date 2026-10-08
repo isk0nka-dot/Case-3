@@ -41,47 +41,19 @@ function toggleTheme() {
   colorMode.preference = isDark.value ? 'light' : 'dark'
 }
 
-// Dashboard sub-pages (visible to all roles)
+// Dashboard sub-pages
 const dashboardChildren = computed(() => {
-  const items = [
-    { label: t('nav.overview'), icon: 'i-lucide-gauge', to: '/dashboard' },
-    { label: t('nav.regions'), icon: 'i-lucide-map-pin', to: '/dashboard/regions' },
-    { label: t('nav.violations'), icon: 'i-heroicons-exclamation-triangle', to: '/dashboard/violations' }
+  return [
+    { label: t('nav.overview'), icon: 'i-lucide-gauge', to: '/dashboard' }
   ]
-  // Infrastructure and Executive are global/system pages — Super Admin only
-  if (authStore.isSuperAdmin) {
-    items.splice(1, 0, { label: t('nav.infrastructure'), icon: 'i-lucide-server', to: '/dashboard/infrastructure' })
-    items.splice(2, 0, { label: t('nav.executive'), icon: 'i-lucide-shield-check', to: '/dashboard/executive' })
-  }
-  return items
 })
 
-// Other top-level navigation items (visible to all roles)
+// Other top-level navigation items
 const topNavigation = computed(() => {
-  const items = [
-    { label: t('nav.exams'), icon: 'i-lucide-graduation-cap', to: '/dashboard/exams' },
-    { label: t('nav.tests'), icon: 'i-lucide-file-text', to: '/dashboard/tests' },
-    { label: t('nav.complexTests'), icon: 'i-lucide-layers', to: '/dashboard/complex-tests' },
+  return [
     { label: t('nav.monitoring'), icon: 'i-lucide-video', to: '/monitoring' },
-    { label: t('nav.archive'), icon: 'i-lucide-archive', to: '/archive' },
-    { label: t('nav.forensic'), icon: 'i-lucide-file-search', to: '/forensic' },
-    { label: t('nav.appeals'), icon: 'i-lucide-scale', to: '/appeals' },
-    { label: t('nav.exports'), icon: 'i-lucide-hard-drive-download', to: '/dashboard/exports' },
-    { label: t('nav.analytics'), icon: 'i-lucide-bar-chart-3', to: '/analytics' }
+    { label: t('nav.archive'), icon: 'i-lucide-archive', to: '/archive' }
   ]
-  // Integrations page — visible to org_admin + super_admin
-  if (authStore.isSuperAdmin || authStore.isOrgAdmin) {
-    items.push({ label: t('nav.integrations'), icon: 'i-lucide-blocks', to: '/integrations' })
-  }
-  // API & Integrations is a system page — Super Admin only
-  if (authStore.isSuperAdmin) {
-    items.push({ label: t('nav.apiIntegrations'), icon: 'i-lucide-plug', to: '/api' })
-  }
-  // Privacy & Data Retention — org_admin + super_admin
-  if (authStore.isSuperAdmin || authStore.isOrgAdmin) {
-    items.push({ label: t('nav.privacy'), icon: 'i-lucide-shield', to: '/privacy' })
-  }
-  return items
 })
 
 // Super Admin-only navigation items
@@ -572,3 +544,5 @@ onMounted(() => {
     />
   </UApp>
 </template>
+
+
